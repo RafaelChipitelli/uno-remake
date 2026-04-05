@@ -69,6 +69,10 @@ Cada pasta possui um README próprio com detalhes específicos.
 - Melhorar o visual da tela inicial e do jogo
 - Incorporar assets visuais das cartas e animações da mesa.
 
+## Sugestões de Funcionalidades para o Futuro
+- Implementação de decks customizados para partidas (Deck base uno + cartas criadas)
+   - Criação de cartas customizadas com anexo de imagem e criação de efeito para adicionar nos decks
+
 ---
 
 Para mais detalhes específicos consulte `client/README.md` e `server/README.md`.
