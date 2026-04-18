@@ -256,16 +256,29 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
-    const mockCard: Card = {
-      id: `client-${Date.now()}`,
-      color: 'red',
-      value: '9',
-    };
+    if (!this.player.hand || this.player.hand.length === 0) {
+      this.pushLog('Você não tem cartas para jogar!');
+      return;
+    }
+
+    // ✅ PEGA A PRIMEIRA CARTA DA MÃO DO JOGADOR (TEMPORÁRIO ATÉ IMPLEMENTAR SELEÇÃO)
+    const selectedCard = this.player.hand[0];
+
+    // Remove carta da mão local
+    this.player.hand.shift();
 
     this.socket.emit('card:play', {
       playerId: this.player.id,
-      card: mockCard,
+      card: selectedCard,
     });
+
+    this.pushLog(`Você jogou ${selectedCard.color} ${selectedCard.value}`);
+    
+    // Atualiza visualização
+    if (this.cardStage) {
+      this.cardStage.setHandCards(this.player.hand);
+      this.cardStage.setTableCard(selectedCard);
+    }
   }
 
   private handleDrawCard() {

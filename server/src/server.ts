@@ -148,11 +148,29 @@ io.on('connection', (socket) => {
       return;
     }
 
+    const room = rooms.get(actor.roomId);
+    if (!room) {
+      socket.emit('room:error', { message: 'Sala não encontrada.' });
+      return;
+    }
+
+    // ✅ Adiciona carta jogada na pilha de descarte
+    room.discardPile.push(payload.card);
+    room.currentColor = payload.card.color === 'wild' ? room.currentColor : payload.card.color;
+
+    // ✅ Remove carta da mão do jogador no servidor
+    const cardIndex = actor.hand.findIndex(c => c.id === payload.card.id);
+    if (cardIndex !== -1) {
+      actor.hand.splice(cardIndex, 1);
+    }
+
     const event = createActionEvent(actor, 'play', payload.card);
     console.log(
       `[card:play] ${actor.nickname} jogou ${payload.card.color} ${payload.card.value} na sala ${actor.roomId}`,
     );
+    
     io.to(actor.roomId).emit('card:played', event);
+    emitRoomState(actor.roomId);
   });
 
   socket.on('card:draw', (_payload: DrawCardPayload) => {
