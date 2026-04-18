@@ -17,6 +17,11 @@ export default class CardStage {
   private cardLabel?: Phaser.GameObjects.Text;
   private playerBadge?: Phaser.GameObjects.Text;
   private currentNickname?: string;
+  private handCards: any[] = [];
+  private handElements: Phaser.GameObjects.GameObject[] = [];
+  private tableCard?: Phaser.GameObjects.Rectangle;
+  private tableCardText?: Phaser.GameObjects.Text;
+  private tableCardShadow?: Phaser.GameObjects.Rectangle;
 
   constructor(scene: Phaser.Scene, options: CardStageOptions) {
     this.scene = scene;
@@ -94,9 +99,89 @@ export default class CardStage {
     });
   }
 
+  setHandCards(cards: any[]) {
+    this.handCards = cards;
+    this.renderHandCards();
+  }
+
+  setTableCard(card: any) {
+    // Limpa carta anterior
+    if (this.tableCard) this.tableCard.destroy();
+    if (this.tableCardText) this.tableCardText.destroy();
+    if (this.tableCardShadow) this.tableCardShadow.destroy();
+
+    const colorMap: Record<string, number> = {
+      red: 0xdc2626,
+      green: 0x16a34a,
+      blue: 0x2563eb,
+      yellow: 0xeab308,
+      wild: 0x1f2937
+    };
+
+    const stageX = this.scene.scale.width / 2 + this.options.hudWidth / 2;
+    const stageY = this.scene.scale.height / 2;
+
+    this.tableCardShadow = this.scene.add
+      .rectangle(stageX + 6, stageY + 8, 150, 210, 0x000000, 0.25)
+      .setOrigin(0.5);
+
+    this.tableCard = this.scene.add.rectangle(stageX, stageY, 150, 210, colorMap[card.color] || 0x333333)
+      .setOrigin(0.5)
+      .setStrokeStyle(3, 0xffffff);
+
+    this.tableCardText = this.scene.add.text(stageX, stageY, card.value, {
+      fontFamily: this.options.fontFamily,
+      fontSize: '48px',
+      fontStyle: 'bold',
+      color: '#ffffff'
+    }).setOrigin(0.5).setResolution(this.options.textResolution);
+  }
+
+  private renderHandCards() {
+    // Limpa cartas antigas
+    this.handElements.forEach(obj => obj.destroy());
+    this.handElements = [];
+
+    if (this.handCards.length === 0) return;
+
+    const cardWidth = 90;
+    const cardHeight = 130;
+    const spacing = 20;
+    const totalWidth = this.handCards.length * (cardWidth + spacing) - spacing;
+    const startX = this.scene.scale.width / 2 - totalWidth / 2;
+    const baseY = this.scene.scale.height - 100;
+
+    const colorMap: Record<string, number> = {
+      red: 0xdc2626,
+      green: 0x16a34a,
+      blue: 0x2563eb,
+      yellow: 0xeab308,
+      wild: 0x1f2937
+    };
+
+    this.handCards.forEach((card, index) => {
+      const x = startX + index * (cardWidth + spacing) + cardWidth / 2;
+      
+      const bg = this.scene.add.rectangle(x, baseY, cardWidth, cardHeight, colorMap[card.color] || 0x333333)
+        .setOrigin(0.5)
+        .setStrokeStyle(2, 0xffffff);
+
+      const valueText = this.scene.add.text(x, baseY, card.value, {
+        fontFamily: this.options.fontFamily,
+        fontSize: '24px',
+        fontStyle: 'bold',
+        color: '#ffffff'
+      }).setOrigin(0.5).setResolution(this.options.textResolution);
+
+      this.handElements.push(bg, valueText);
+    });
+  }
+
   destroy() {
     this.elements.forEach((obj) => obj.destroy());
     this.elements = [];
+    this.handElements.forEach((obj) => obj.destroy());
+    this.handElements = [];
   }
 
   private applyNickname() {
