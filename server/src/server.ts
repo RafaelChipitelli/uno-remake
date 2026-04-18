@@ -24,6 +24,7 @@ const io = new Server(server, {
 
 const players = new Map<string, Player>();
 const rooms = new Map<string, Room>();
+const serverDecks = new Map<string, Card[]>();
 const COLORS: Card['color'][] = ['red', 'green', 'blue', 'yellow', 'wild'];
 const VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'skip', 'reverse', '+2'];
 const ROOM_CODE_LENGTH = 4;
@@ -274,4 +275,38 @@ function removePlayerFromRoom(roomId: string, playerId: string) {
 
   const socket = io.sockets.sockets.get(playerId);
   socket?.leave(roomId);
+}
+
+function createUnoDeck(): Card[] {
+  const deck: Card[] = [];
+  const standardColors: Card['color'][] = ['red', 'green', 'blue', 'yellow'];
+
+  for (const color of standardColors) {
+    // 1 carta '0' por cor
+    deck.push({ id: `card-${color}-0-${Date.now()}-${Math.random()}`, color, value: '0' });
+
+    // 2 cartas de 1 a 9, Pular, Inverter e +2 por cor
+    const actionValues = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'skip', 'reverse', '+2'];
+    for (const value of actionValues) {
+      deck.push({ id: `card-${color}-${value}-A-${Date.now()}-${Math.random()}`, color, value });
+      deck.push({ id: `card-${color}-${value}-B-${Date.now()}-${Math.random()}`, color, value });
+    }
+  }
+
+  // 4 Curingas e 4 Curingas +4
+  for (let i = 0; i < 4; i++) {
+    deck.push({ id: `card-wild-color-${i}-${Date.now()}`, color: 'wild', value: 'wild' }); // *Veja o aviso abaixo
+    deck.push({ id: `card-wild-+4-${i}-${Date.now()}`, color: 'wild', value: '+4' });
+  }
+
+  return deck;
+}
+
+function shuffleDeck(deck: Card[]): Card[] {
+  const shuffled = [...deck];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
+  }
+  return shuffled;
 }
