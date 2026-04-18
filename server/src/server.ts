@@ -74,6 +74,10 @@ io.on('connection', (socket) => {
     room.players.push(player);
     rooms.set(roomId, room);
 
+    // ✅ Cria e embaralha baralho quando a sala é criada
+    const newDeck = shuffleDeck(createUnoDeck());
+    serverDecks.set(roomId, newDeck);
+
     socket.join(roomId);
     socket.emit('room:created', { roomId });
     emitRoomState(roomId);
@@ -153,21 +157,87 @@ io.on('connection', (socket) => {
 
   socket.on('card:draw', (_payload: DrawCardPayload) => {
     const actor = players.get(socket.id);
-    if (!actor) {
-      return;
-    }
+    if (!actor) return;
 
     if (!actor.roomId) {
       socket.emit('room:error', { message: 'Entre em uma sala antes de comprar cartas.' });
       return;
     }
 
-    const drawnCard = generateMockCard();
+    const room = rooms.get(actor.roomId);
+    const deck = serverDecks.get(actor.roomId);
+
+    // Verifica se a sala e o baralho secreto existem, e se o baralho não está vazio
+    if (!room || !deck || deck.length === 0) {
+      socket.emit('room:error', { message: 'O baralho está vazio ou não foi encontrado!' });
+      return;
+    }
+
+    // Puxa a última carta do baralho (isso já remove ela do array)
+    const drawnCard = deck.pop()!;
+    
+    // Adiciona a carta na mão do jogador
+    actor.hand.push(drawnCard);
+    
+    // Atualiza a quantidade de cartas restantes no objeto da sala
+    room.drawPileCount = deck.length;
+
     const event = createActionEvent(actor, 'draw', drawnCard);
     console.log(
       `[card:draw] ${actor.nickname} comprou ${drawnCard.color} ${drawnCard.value} na sala ${actor.roomId}`,
     );
+    
+    // Avisa que a carta foi comprada e manda o novo estado da sala para todos
     io.to(actor.roomId).emit('card:drawn', event);
+    emitRoomState(actor.roomId);
+  });
+
+  socket.on('game:start', () => {
+    const actor = players.get(socket.id);
+    if (!actor || !actor.roomId) return;
+
+    const room = rooms.get(actor.roomId);
+    const deck = serverDecks.get(actor.roomId);
+
+    if (!room || !deck) return;
+
+    // Regra: Apenas o dono da sala (quem criou) pode dar o play inicial
+    if (room.hostId !== actor.id) {
+      socket.emit('room:error', { message: 'Apenas o dono da sala pode iniciar o jogo.' });
+      return;
+    }
+
+    // 1. Distribui 10 cartas para cada jogador conectado na sala
+    for (const player of room.players) {
+      player.hand = []; // Limpa a mão (útil caso estejam jogando uma segunda partida)
+      for (let i = 0; i < 10; i++) {
+        if (deck.length > 0) {
+          player.hand.push(deck.pop()!);
+        }
+      }
+    }
+
+    // 2. Tira 1 carta do baralho para ser a primeira da mesa (discardPile)
+    if (deck.length > 0) {
+      const firstCard = deck.pop()!;
+      room.discardPile.push(firstCard);
+      
+      // Se a primeira carta for curinga, o jogo precisa de uma cor base para começar
+      room.currentColor = firstCard.color === 'wild' ? 'red' : firstCard.color;
+    }
+
+    // 3. Atualiza o número de cartas restantes
+    room.drawPileCount = deck.length;
+
+    console.log(`[game:start] O jogo começou na sala ${room.id}!`);
+    
+    // Envia para o Frontend o estado completo (agora com as mãos cheias e carta na mesa)
+    emitRoomState(room.id);
+    io.to(room.id).emit('game:started', {
+      message: '✅ Jogo iniciado!',
+      firstCard: room.discardPile[0],
+      currentPlayerTurn: room.players.find(p => p.isTurn)?.nickname
+    });
   });
 
   socket.on('disconnect', () => {
@@ -244,7 +314,20 @@ function emitRoomState(roomId: string) {
     return;
   }
 
-  io.to(roomId).emit('room:state', room);
+  // ✅ SEGURANÇA: Cada jogador recebe APENAS a SUA própria mão, nunca dos outros
+  for (const player of room.players) {
+    // Cria versão segura do estado da sala
+    const safeRoomState = {
+      ...room,
+      players: room.players.map(p => ({
+        ...p,
+        hand: p.id === player.id ? p.hand : [] // Mão vazia para todos os outros
+      }))
+    };
+
+    // Envia estado seguro individualmente para cada socket
+    io.to(player.id).emit('room:state', safeRoomState);
+  }
 }
 
 function removePlayerFromRoom(roomId: string, playerId: string) {
@@ -257,6 +340,7 @@ function removePlayerFromRoom(roomId: string, playerId: string) {
 
   if (room.players.length === 0) {
     rooms.delete(roomId);
+    serverDecks.delete(roomId); // ✅ Limpa baralho quando sala é fechada
   } else {
     if (room.hostId === playerId) {
       const newHost = room.players[0];

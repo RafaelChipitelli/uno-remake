@@ -6,6 +6,8 @@ export type HudSnapshot = {
   playerList: string;
   logLines: string[];
   leaveEnabled: boolean;
+  startEnabled: boolean;
+  currentTurn: string;
 };
 
 type HudOptions = {
@@ -22,6 +24,7 @@ type HudOptions = {
 
 type HudCallbacks = {
   onLeaveRequested: () => void;
+  onStartRequested: () => void; // <- Novo callback adicionado
 };
 
 export default class GameHud {
@@ -33,9 +36,15 @@ export default class GameHud {
   private roomText?: Phaser.GameObjects.Text;
   private playerListText?: Phaser.GameObjects.Text;
   private actionLog?: Phaser.GameObjects.Text;
+  
   private leaveButtonBg?: Phaser.GameObjects.Rectangle;
   private leaveButtonLabel?: Phaser.GameObjects.Text;
   private leaveButtonZone?: Phaser.GameObjects.Zone;
+
+  private startButtonBg?: Phaser.GameObjects.Rectangle;
+  private startButtonLabel?: Phaser.GameObjects.Text;
+  private startButtonZone?: Phaser.GameObjects.Zone;
+
   private currentState: HudSnapshot;
 
   constructor(scene: Phaser.Scene, options: HudOptions, callbacks: HudCallbacks) {
@@ -49,6 +58,8 @@ export default class GameHud {
       playerList: '',
       logLines: [],
       leaveEnabled: false,
+      startEnabled: true,
+      currentTurn: 'Aguardando jogo começar'
     };
   }
 
@@ -75,6 +86,9 @@ export default class GameHud {
     if (partial.leaveEnabled !== undefined) {
       this.applyLeaveState();
     }
+    if (partial.startEnabled !== undefined) {
+      this.applyStartState();
+    }
   }
 
   resize() {
@@ -86,6 +100,8 @@ export default class GameHud {
     this.elements = [];
     this.leaveButtonZone?.destroy();
     this.leaveButtonZone = undefined;
+    this.startButtonZone?.destroy();
+    this.startButtonZone = undefined;
   }
 
   private build() {
@@ -147,10 +163,15 @@ export default class GameHud {
       })
       .setResolution(this.options.textResolution);
     this.elements.push(this.roomText);
-    cursorY += 50;
+    cursorY += 40;
 
+    // --- Cria o Botão de Iniciar Jogo ---
+    this.createStartButton(panel.x + this.options.width / 2, cursorY);
+    cursorY += 65;
+
+    // --- Cria o Botão de Sair da Sala ---
     this.createLeaveButton(panel.x + this.options.width / 2, cursorY);
-    cursorY += 80;
+    cursorY += 70;
 
     this.elements.push(
       this.createLabel(contentX, cursorY, 'Jogadores', '#cbd5ff', 'bold'),
@@ -167,7 +188,25 @@ export default class GameHud {
       })
       .setResolution(this.options.textResolution);
     this.elements.push(this.playerListText);
-    cursorY += 150;
+    cursorY += 100;
+
+    // ✅ Mostra de quem é a vez
+    this.elements.push(
+      this.createLabel(contentX, cursorY, 'Vez atual', '#34d399', 'bold'),
+    );
+    cursorY += 26;
+
+    this.elements.push(
+      this.scene.add
+        .text(contentX, cursorY, this.currentState.currentTurn, {
+          fontFamily: this.options.fontFamily,
+          fontSize: '17px',
+          color: '#34d399',
+          fontStyle: 'bold'
+        })
+        .setResolution(this.options.textResolution)
+    );
+    cursorY += 50;
 
     this.elements.push(
       this.createLabel(contentX, cursorY, 'Log recente', '#f9a8d4', 'bold'),
@@ -187,15 +226,10 @@ export default class GameHud {
 
     this.applyLog();
     this.applyLeaveState();
+    this.applyStartState();
   }
 
-  private createLabel(
-    x: number,
-    y: number,
-    text: string,
-    color: string,
-    fontStyle?: string,
-  ) {
+  private createLabel(x: number, y: number, text: string, color: string, fontStyle?: string) {
     return this.scene.add
       .text(x, y, text, {
         fontFamily: this.options.fontFamily,
@@ -206,29 +240,22 @@ export default class GameHud {
       .setResolution(this.options.textResolution);
   }
 
+  // Lógica do botão de Sair
   private createLeaveButton(centerX: number, y: number) {
     const width = this.options.width - this.options.padding * 2;
     const height = 54;
 
-    this.leaveButtonBg = this.scene.add
-      .rectangle(centerX, y, width, height, 0xdc2626, 0.9)
-      .setOrigin(0.5);
+    this.leaveButtonBg = this.scene.add.rectangle(centerX, y, width, height, 0xdc2626, 0.9).setOrigin(0.5);
     this.leaveButtonBg.setStrokeStyle(2, 0xffffff, 0.85);
 
-    this.leaveButtonLabel = this.scene.add
-      .text(centerX, y, 'Sair da sala', {
+    this.leaveButtonLabel = this.scene.add.text(centerX, y, 'Sair da sala', {
         fontFamily: this.options.fontFamily,
         fontSize: '18px',
         fontStyle: 'bold',
         color: '#ffffff',
-      })
-      .setOrigin(0.5)
-      .setResolution(this.options.textResolution);
+      }).setOrigin(0.5).setResolution(this.options.textResolution);
 
-    this.leaveButtonZone = this.scene.add
-      .zone(centerX, y, width, height)
-      .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
+    this.leaveButtonZone = this.scene.add.zone(centerX, y, width, height).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
     this.leaveButtonZone.on('pointerover', () => {
       if (!this.currentState.leaveEnabled) return;
@@ -257,11 +284,52 @@ export default class GameHud {
     this.elements.push(this.leaveButtonBg, this.leaveButtonLabel, this.leaveButtonZone);
   }
 
-  private applyLog() {
-    if (!this.actionLog) {
-      return;
-    }
+  // Lógica do novo botão de Iniciar
+  private createStartButton(centerX: number, y: number) {
+    const width = this.options.width - this.options.padding * 2;
+    const height = 54;
 
+    this.startButtonBg = this.scene.add.rectangle(centerX, y, width, height, 0xdc2626, 0.9).setOrigin(0.5);
+    this.startButtonBg.setStrokeStyle(2, 0xffffff, 0.85);
+
+    this.startButtonLabel = this.scene.add.text(centerX, y, 'Iniciar Jogo', {
+        fontFamily: this.options.fontFamily,
+        fontSize: '18px',
+        fontStyle: 'bold',
+        color: '#ffffff',
+      }).setOrigin(0.5).setResolution(this.options.textResolution);
+
+    this.startButtonZone = this.scene.add.zone(centerX, y, width, height).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+    this.startButtonZone.on('pointerover', () => {
+      if (!this.currentState.startEnabled) return;
+      this.startButtonBg?.setFillStyle(0xf87171); // Mesma cor do hover do botão de sair
+    });
+
+    this.startButtonZone.on('pointerout', () => {
+      this.startButtonBg?.setFillStyle(0xdc2626);
+      this.startButtonBg?.setScale(1);
+    });
+
+    this.startButtonZone.on('pointerdown', () => {
+      if (!this.currentState.startEnabled) return;
+      this.startButtonBg?.setScale(0.98);
+    });
+
+    this.startButtonZone.on('pointerup', () => {
+      if (!this.currentState.startEnabled) {
+        this.startButtonBg?.setScale(1);
+        return;
+      }
+      this.startButtonBg?.setScale(1);
+      this.callbacks.onStartRequested(); // Chama a nova função!
+    });
+
+    this.elements.push(this.startButtonBg, this.startButtonLabel, this.startButtonZone);
+  }
+
+  private applyLog() {
+    if (!this.actionLog) return;
     if (!this.currentState.logLines.length) {
       this.actionLog.setText('• Nenhuma ação ainda.');
     } else {
@@ -270,10 +338,7 @@ export default class GameHud {
   }
 
   private applyLeaveState() {
-    if (!this.leaveButtonBg || !this.leaveButtonZone || !this.leaveButtonLabel) {
-      return;
-    }
-
+    if (!this.leaveButtonBg || !this.leaveButtonZone || !this.leaveButtonLabel) return;
     if (this.currentState.leaveEnabled) {
       this.leaveButtonBg.setFillStyle(0xdc2626, 0.95).setAlpha(1);
       this.leaveButtonLabel.setAlpha(1);
@@ -282,6 +347,19 @@ export default class GameHud {
       this.leaveButtonBg.setFillStyle(0x1f2937, 0.6).setAlpha(0.6);
       this.leaveButtonLabel.setAlpha(0.5);
       this.leaveButtonZone.disableInteractive();
+    }
+  }
+
+  private applyStartState() {
+    if (!this.startButtonBg || !this.startButtonZone || !this.startButtonLabel) return;
+    if (this.currentState.startEnabled) {
+      this.startButtonBg.setFillStyle(0xdc2626, 0.95).setAlpha(1);
+      this.startButtonLabel.setAlpha(1);
+      this.startButtonZone.setInteractive({ useHandCursor: true });
+    } else {
+      this.startButtonBg.setFillStyle(0x1f2937, 0.6).setAlpha(0.6);
+      this.startButtonLabel.setAlpha(0.5);
+      this.startButtonZone.disableInteractive();
     }
   }
 }

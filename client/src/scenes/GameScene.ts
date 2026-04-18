@@ -28,6 +28,7 @@ export default class GameScene extends Phaser.Scene {
   private cardStage?: CardStage;
   private player?: Player;
   private roomId?: string;
+  private roomHostId?: string;
   private logLines: string[] = [];
   private statusMessage = 'Conectando...';
   private lastPlayerListMessage = 'Nenhum jogador ainda.';
@@ -60,6 +61,30 @@ export default class GameScene extends Phaser.Scene {
       this.tryAutoAction();
     });
 
+    this.socket.on('game:started', (data: any) => {
+      this.pushLog(data.message);
+      this.pushLog(`🃏 Carta na mesa: ${data.firstCard.color} ${data.firstCard.value}`);
+      this.pushLog(`⏳ Vez de: ${data.currentPlayerTurn}`);
+      
+      // ✅ Atualiza carta que está na mesa para todos verem
+      if (this.cardStage) {
+        this.cardStage.setTableCard(data.firstCard);
+      }
+
+      // ✅ Atualiza HUD com o jogador da vez
+      this.hud?.update({
+        currentTurn: data.currentPlayerTurn
+      });
+      
+      // Mostra cartas que o jogador recebeu
+      if (this.player?.hand && this.player.hand.length > 0) {
+        this.pushLog(`✅ Você recebeu ${this.player.hand.length} cartas!`);
+        this.player.hand.forEach((card, index) => {
+          this.pushLog(`  ${index+1}. ${card.color} - ${card.value}`);
+        });
+      }
+    });
+
     this.socket.on('card:played', (event: CardActionEvent) => {
       this.pushLog(this.describeEvent(event));
     });
@@ -84,9 +109,16 @@ export default class GameScene extends Phaser.Scene {
 
     this.socket.on('room:state', (room: Room) => {
       this.roomId = room.id;
+      this.roomHostId = room.hostId;
       if (this.player) {
         const me = room.players.find((p) => p.id === this.player?.id);
-        if (me) this.player = me;
+        if (me) {
+          this.player = me;
+          // Atualiza visualização das cartas na mão
+          if (this.cardStage) {
+            this.cardStage.setHandCards(me.hand);
+          }
+        }
       }
       this.cardStage?.setPlayerNickname(this.player?.nickname);
       const list =
@@ -138,7 +170,8 @@ export default class GameScene extends Phaser.Scene {
       },
       {
         onLeaveRequested: () => this.promptLeaveRoom(),
-      },
+        onStartRequested: () => this.socket?.emit('game:start'),
+      }
     );
     this.hud.init(this.composeHudState());
 
@@ -316,6 +349,8 @@ export default class GameScene extends Phaser.Scene {
       playerList: this.lastPlayerListMessage,
       logLines: [...this.logLines],
       leaveEnabled: this.canLeaveRoom(),
+      startEnabled: Boolean(this.roomId && this.player?.id === this.roomHostId),
+      currentTurn: 'Aguardando jogo começar'
     };
   }
 
@@ -327,6 +362,7 @@ export default class GameScene extends Phaser.Scene {
       roomLabel: this.getRoomLabel(),
       playerList: this.lastPlayerListMessage,
       leaveEnabled: this.canLeaveRoom(),
+      startEnabled: Boolean(this.roomId && this.player?.id === this.roomHostId),
     });
   }
 
