@@ -154,6 +154,12 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // ✅ Validação de Turno: Verifica se é realmente o turno desse jogador
+    if (!actor.isTurn) {
+      socket.emit('room:error', { message: 'Não é a sua vez de jogar!' });
+      return;
+    }
+
     // ✅ Adiciona carta jogada na pilha de descarte
     room.discardPile.push(payload.card);
     room.currentColor = payload.card.color === 'wild' ? room.currentColor : payload.card.color;
@@ -163,6 +169,9 @@ io.on('connection', (socket) => {
     if (cardIndex !== -1) {
       actor.hand.splice(cardIndex, 1);
     }
+
+    // ✅ Sistema de Turnos: Passa turno para próximo jogador
+    passTurnToNextPlayer(room);
 
     const event = createActionEvent(actor, 'play', payload.card);
     console.log(
@@ -179,6 +188,12 @@ io.on('connection', (socket) => {
 
     if (!actor.roomId) {
       socket.emit('room:error', { message: 'Entre em uma sala antes de comprar cartas.' });
+      return;
+    }
+
+    // ✅ Validação de Turno: Verifica se é realmente o turno desse jogador
+    if (!actor.isTurn) {
+      socket.emit('room:error', { message: 'Não é a sua vez de comprar carta!' });
       return;
     }
 
@@ -199,6 +214,9 @@ io.on('connection', (socket) => {
     
     // Atualiza a quantidade de cartas restantes no objeto da sala
     room.drawPileCount = deck.length;
+
+    // ✅ Sistema de Turnos: Passa turno para próximo jogador
+    passTurnToNextPlayer(room);
 
     const event = createActionEvent(actor, 'draw', drawnCard);
     console.log(
@@ -278,6 +296,18 @@ app.get('/health', (_req, res) => {
 server.listen(3001, () => {
   console.log('Server listening on http://localhost:3001');
 });
+
+function passTurnToNextPlayer(room: Room) {
+  const currentPlayerIndex = room.players.findIndex(p => p.isTurn);
+  if (currentPlayerIndex !== -1 && room.players[currentPlayerIndex]) {
+    room.players[currentPlayerIndex].isTurn = false;
+  }
+  
+  const nextPlayerIndex = (currentPlayerIndex + 1) % room.players.length;
+  if (room.players[nextPlayerIndex]) {
+    room.players[nextPlayerIndex].isTurn = true;
+  }
+}
 
 function createActionEvent(player: Player, action: CardActionEvent['action'], card?: Card) {
   const event: CardActionEvent = {

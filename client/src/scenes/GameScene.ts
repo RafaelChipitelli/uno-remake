@@ -123,6 +123,14 @@ export default class GameScene extends Phaser.Scene {
           if (this.cardStage) {
             this.cardStage.setHandCards(me.hand);
           }
+
+          // ✅ Mostra quando é a vez do jogador
+          if (me.isTurn) {
+            this.hud?.update({ status: '✅ É A SUA VEZ!' });
+          } else {
+            const currentPlayer = room.players.find(p => p.isTurn);
+            this.hud?.update({ status: `⏳ Vez de: ${currentPlayer?.nickname}` });
+          }
         }
       }
       this.cardStage?.setPlayerNickname(this.player?.nickname);
@@ -266,6 +274,11 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
+    if (!this.player.isTurn) {
+      this.pushLog('⏳ Não é a sua vez de jogar! Aguarde sua vez.');
+      return;
+    }
+
     // ✅ PEGA A PRIMEIRA CARTA DA MÃO DO JOGADOR (TEMPORÁRIO ATÉ IMPLEMENTAR SELEÇÃO)
     const selectedCard = this.player.hand[0];
 
@@ -289,6 +302,11 @@ export default class GameScene extends Phaser.Scene {
   private handleDrawCard() {
     if (!this.player || !this.roomId) {
       this.pushLog('Entre ou crie uma sala antes de comprar cartas.');
+      return;
+    }
+
+    if (!this.player.isTurn) {
+      this.pushLog('⏳ Não é a sua vez de comprar carta! Aguarde sua vez.');
       return;
     }
 

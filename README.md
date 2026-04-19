@@ -1,9 +1,10 @@
 # UNO Remake (Prototype)
 
 ## Arrumar:
-   - quando vc joga uma carta atualiza para vc mas nao no servidor
+   - quando vc joga uma carta atualiza para vc mas nao no servidor: done ✅
+   - comprar cartas aparece para todos os jogadores a carta que alguem comprou
    - posicionamento das coisas no HUD
-   - definir vez e so permitir ações na vez do jogador
+   - definir vez e so permitir ações na vez do jogador: done ✅ 
    - limitar comprar ou jogar cartas de acordo com as regras
 
 Prototipo de jogo de cartas multiplayer em tempo real inspirado em UNO. O projeto está dividido entre um **cliente Phaser 3 (Vite + TypeScript)** e um **backend Node.js com Express + Socket.IO**, permitindo criar/entrar em salas e sincronizar ações básicas de cartas.
