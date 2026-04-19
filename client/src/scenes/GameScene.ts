@@ -87,6 +87,11 @@ export default class GameScene extends Phaser.Scene {
 
     this.socket.on('card:played', (event: CardActionEvent) => {
       this.pushLog(this.describeEvent(event));
+      
+      // ✅ Atualiza carta na mesa para TODOS os jogadores
+      if (event.card && this.cardStage) {
+        this.cardStage.setTableCard(event.card);
+      }
     });
 
     this.socket.on('card:drawn', (event: CardActionEvent) => {
