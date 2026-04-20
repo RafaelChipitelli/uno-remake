@@ -239,13 +239,17 @@ io.on('connection', (socket) => {
     // ✅ Sistema de Turnos: Passa turno para próximo jogador
     passTurnToNextPlayer(room);
 
-    const event = createActionEvent(actor, 'draw', drawnCard);
+    const privateEvent = createActionEvent(actor, 'draw', drawnCard);
+    const publicEvent = createActionEvent(actor, 'draw');
     console.log(
       `[card:draw] ${actor.nickname} comprou ${drawnCard.color} ${drawnCard.value} na sala ${actor.roomId}`,
     );
     
-    // Avisa que a carta foi comprada e manda o novo estado da sala para todos
-    io.to(actor.roomId).emit('card:drawn', event);
+    // Avisa compra preservando privacidade da carta:
+    // - jogador que comprou recebe a carta
+    // - demais jogadores recebem apenas que ele comprou "uma carta"
+    io.to(actor.id).emit('card:drawn', privateEvent);
+    socket.to(actor.roomId).emit('card:drawn', publicEvent);
     emitRoomState(actor.roomId);
   });
 
