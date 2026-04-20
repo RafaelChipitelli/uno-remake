@@ -28,6 +28,7 @@ export type CardActionType = 'play' | 'draw';
 export interface PlayCardPayload {
   playerId: string;
   card: Card;
+  selectedColor?: CardColor;
 }
 
 export interface DrawCardPayload {
@@ -39,6 +40,7 @@ export interface CardActionEvent {
   playerId: string;
   nickname: string;
   card?: Card;
+  currentColor?: CardColor;
   timestamp: number;
 }
 

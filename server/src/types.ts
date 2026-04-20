@@ -41,6 +41,7 @@ export interface CardActionEvent {
   playerId: string;
   nickname: string;
   card?: Card;
+  currentColor?: CardColor;
   timestamp: number;
 }
 

@@ -167,6 +167,14 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // ✅ Validação extra: Curinga precisa vir com cor escolhida (não pode ser "wild")
+    if (payload.card.color === 'wild') {
+      if (!payload.selectedColor || payload.selectedColor === 'wild') {
+        socket.emit('room:error', { message: 'Escolha uma cor válida antes de jogar o curinga.' });
+        return;
+      }
+    }
+
     // ✅ Adiciona carta jogada na pilha de descarte
     room.discardPile.push(payload.card);
     
@@ -186,7 +194,7 @@ io.on('connection', (socket) => {
     // ✅ Sistema de Turnos: Passa turno para próximo jogador
     passTurnToNextPlayer(room);
 
-    const event = createActionEvent(actor, 'play', payload.card);
+    const event = createActionEvent(actor, 'play', payload.card, room.currentColor);
     console.log(
       `[card:play] ${actor.nickname} jogou ${payload.card.color} ${payload.card.value} na sala ${actor.roomId}`,
     );
@@ -285,6 +293,7 @@ io.on('connection', (socket) => {
     io.to(room.id).emit('game:started', {
       message: '✅ Jogo iniciado!',
       firstCard: room.discardPile[0],
+      currentColor: room.currentColor,
       currentPlayerTurn: room.players.find(p => p.isTurn)?.nickname
     });
   });
@@ -345,13 +354,19 @@ function passTurnToNextPlayer(room: Room) {
   }
 }
 
-function createActionEvent(player: Player, action: CardActionEvent['action'], card?: Card) {
+function createActionEvent(
+  player: Player,
+  action: CardActionEvent['action'],
+  card?: Card,
+  currentColor?: Card['color'],
+) {
   const event: CardActionEvent = {
     action,
     playerId: player.id,
     nickname: player.nickname,
     timestamp: Date.now(),
     ...(card ? { card } : {}),
+    ...(currentColor ? { currentColor } : {}),
   };
 
   return event;
