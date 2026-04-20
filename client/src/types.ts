@@ -21,6 +21,7 @@ export interface Room {
   drawPileCount: number;
   currentColor: CardColor;
   hostId: string;
+  turnDirection: 1 | -1;
 }
 
 export type CardActionType = 'play' | 'draw';
@@ -28,6 +29,7 @@ export type CardActionType = 'play' | 'draw';
 export interface PlayCardPayload {
   playerId: string;
   card: Card;
+  selectedColor?: CardColor;
 }
 
 export interface DrawCardPayload {
@@ -39,6 +41,7 @@ export interface CardActionEvent {
   playerId: string;
   nickname: string;
   card?: Card;
+  currentColor?: CardColor;
   timestamp: number;
 }
 

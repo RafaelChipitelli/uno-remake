@@ -1,78 +1,91 @@
-# UNO Remake (Prototype)
+# UNO Remake
 
-Prototipo de jogo de cartas multiplayer em tempo real inspirado em UNO. O projeto está dividido entre um **cliente Phaser 3 (Vite + TypeScript)** e um **backend Node.js com Express + Socket.IO**, permitindo criar/entrar em salas e sincronizar ações básicas de cartas.
+Protótipo de jogo multiplayer em tempo real inspirado em UNO, com **cliente Phaser 3 (Vite + TypeScript)** e **servidor Node.js + Express + Socket.IO**.
 
-## Funcionalidades atuais
+## Status atual
 
-- Lobby em canvas para criar sala ou entrar via código.
-- HUD in-game com log de ações, lista de jogadores e status do jogador local.
-- Sistema de criação/entrada/saída de salas com códigos aleatórios de 4 caracteres.
-- Eventos simulados de compra e descarte (`P` e `D`) propagados em tempo real via Socket.IO.
-- Placeholder visual de carta e badge com nickname, com texto escalando para high-DPI.
-- Botão de sair da sala que retorna ao lobby e sincroniza o estado do servidor.
+### ✅ Já implementado
+- Criação e entrada em salas com código curto.
+- Lobby e partida sincronizados em tempo real via Socket.IO.
+- Distribuição de cartas no início da partida.
+- Controle de turnos validado no servidor.
+- Segurança de mão: cada jogador recebe apenas suas próprias cartas.
+- Validação de jogada no cliente e no servidor (cor, valor e curingas).
+- Curinga com seleção obrigatória de cor.
+- Efeitos de cartas especiais:
+  - `skip`: pula o próximo jogador.
+  - `+2`: próximo jogador compra 2 cartas e perde a vez.
+  - `+4`: próximo jogador compra 4 cartas e perde a vez.
+  - `reverse`:
+    - com **2 jogadores**: funciona como `skip`.
+    - com **3+ jogadores**: inverte o sentido dos turnos.
+
+### 🧩 Em andamento / próximos passos
+- Condição de vitória (encerrar rodada quando alguém zera a mão).
+- Regra de UNO (anúncio e penalidade).
+- Reaproveitar descarte quando o baralho acabar.
+- Polimento visual/animações e UX da mesa.
 
 ## Arquitetura
 
-```
+```text
 uno-remake/
-├── client/   # Phaser 3 + Vite (TypeScript)
-└── server/   # Express + Socket.IO (TypeScript, ts-node)
+├── client/   # Phaser 3 + Vite + TypeScript
+└── server/   # Express + Socket.IO + TypeScript
 ```
 
-Cada pasta possui um README próprio com detalhes específicos.
+> Cada pasta possui README próprio com detalhes específicos.
 
 ## Requisitos
 
 - Node.js 20+
 - npm 10+
 
-## Passo a passo
+## Como rodar o projeto
 
-1. **Instale dependências**
+### 1) Instalar dependências
 
-   ```bash
-   cd server && npm install
-   cd ../client && npm install
-   ```
+```bash
+npm --prefix server install
+npm --prefix client install
+```
 
-2. **Suba o servidor**
+### 2) Subir o servidor
 
-   ```bash
-   cd server
-   npx ts-node src/server.ts
-   ```
+```bash
+npx --prefix server ts-node server/src/server.ts
+```
 
-   O backend ficará em `http://localhost:3001` (ajuste a origem em `src/server.ts` se necessário).
+Servidor em: `http://localhost:3001`
 
-3. **Rode o cliente**
+### 3) Subir o cliente
 
-   ```bash
-   cd client
-   npm run dev
-   ```
+```bash
+npm --prefix client run dev
+```
 
-   Acesse `http://localhost:5173` no navegador. Abra a URL em duas abas para testar o fluxo multiplayer.
+Cliente em: `http://localhost:5173`
 
-## Controles de teste
+Para testar multiplayer local, abra em duas abas (ou dois navegadores).
 
-- **Lobby**
-  - Clique em “Criar Sala” → gera código e entra automaticamente.
-  - Clique em “Entrar com Código” → informa código (ex.: `ABCD`) e nickname.
-- **Mesa**
-  - `P`: simula jogar carta (broadcast `card:play`).
-  - `D`: simula comprar carta (broadcast `card:draw`).
-  - Botão “Sair da sala”: confirma saída e retorna ao lobby.
+## Controles atuais
 
-## Próximos Passos Sugeridos
+- Clique em uma carta da mão para jogar.
+- `P`: joga uma carta válida (atalho).
+- `D`: compra uma carta (somente na sua vez).
+- Botão de sair da sala disponível no HUD.
 
-- Implementar regras completas do UNO customizado (turnos, compra obrigatória, bloqueios, etc.).
-- Melhorar o visual da tela inicial e do jogo
-- Incorporar assets visuais das cartas e animações da mesa.
+## Validação rápida (build/tipos)
 
-## Sugestões de Funcionalidades para o Futuro
-- Implementação de decks customizados para partidas (Deck base uno + cartas criadas)
-   - Criação de cartas customizadas com anexo de imagem e criação de efeito para adicionar nos decks
+```bash
+npx --prefix server tsc -p server/tsconfig.json --noEmit
+npm --prefix client run build
+```
 
----
+## Roadmap sugerido
 
-Para mais detalhes específicos consulte `client/README.md` e `server/README.md`.
+1. Condição de vitória + fluxo de fim de rodada.
+2. Regra de UNO (botão/anúncio + janela de punição).
+3. Reciclagem do descarte quando o baralho zerar.
+4. Melhorias visuais (animações, layout de mesa, feedback de ações).
+5. Recursos extras (timer de turno, pontuação, bots, etc.).

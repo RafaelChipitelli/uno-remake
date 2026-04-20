@@ -67,6 +67,7 @@ io.on('connection', (socket) => {
       drawPileCount: 0,
       currentColor: 'red',
       hostId: player.id,
+      turnDirection: 1,
     };
 
     player.roomId = roomId;
@@ -148,11 +149,99 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const event = createActionEvent(actor, 'play', payload.card);
+    const room = rooms.get(actor.roomId);
+    if (!room) {
+      socket.emit('room:error', { message: 'Sala não encontrada.' });
+      return;
+    }
+
+    // ✅ Validação de Turno: Verifica se é realmente o turno desse jogador
+    if (!actor.isTurn) {
+      socket.emit('room:error', { message: 'Não é a sua vez de jogar!' });
+      return;
+    }
+
+    // ✅ VALIDAÇÃO DAS REGRAS UNO: Verifica se jogada é permitida
+    const topCard = room.discardPile[room.discardPile.length - 1];
+    if (topCard && !isValidCardPlay(payload.card, topCard, room.currentColor)) {
+      socket.emit('room:error', { message: '❌ Jogada inválida! Essa carta não combina com a mesa.' });
+      return;
+    }
+
+    // ✅ Validação extra: Curinga precisa vir com cor escolhida (não pode ser "wild")
+    if (payload.card.color === 'wild') {
+      if (!payload.selectedColor || payload.selectedColor === 'wild') {
+        socket.emit('room:error', { message: 'Escolha uma cor válida antes de jogar o curinga.' });
+        return;
+      }
+    }
+
+    // ✅ Adiciona carta jogada na pilha de descarte
+    room.discardPile.push(payload.card);
+    
+    // ✅ Se for CURINGA: usa a cor que o jogador escolheu
+    if (payload.card.color === 'wild' && payload.selectedColor) {
+      room.currentColor = payload.selectedColor;
+    } else {
+      room.currentColor = payload.card.color;
+    }
+
+    // ✅ Remove carta da mão do jogador no servidor
+    const cardIndex = actor.hand.findIndex(c => c.id === payload.card.id);
+    if (cardIndex !== -1) {
+      actor.hand.splice(cardIndex, 1);
+    }
+
+    // ✅ Sistema de Turnos + efeitos de cartas especiais
+    const currentPlayerIndex = room.players.findIndex((p) => p.id === actor.id);
+    let stepsToAdvance = 1;
+
+    switch (payload.card.value) {
+      case 'skip': {
+        // Pula o próximo jogador
+        stepsToAdvance = 2;
+        break;
+      }
+      case 'reverse': {
+        if (room.players.length <= 2) {
+          // Com 2 jogadores, reverse funciona como skip
+          stepsToAdvance = 2;
+        } else {
+          room.turnDirection = room.turnDirection === 1 ? -1 : 1;
+        }
+        break;
+      }
+      case '+2': {
+        const targetPlayer = getNextPlayer(room, currentPlayerIndex);
+        if (targetPlayer) {
+          drawCardsForPlayer(actor.roomId, room, targetPlayer, 2);
+        }
+        // Quem comprou perde a vez
+        stepsToAdvance = 2;
+        break;
+      }
+      case '+4': {
+        const targetPlayer = getNextPlayer(room, currentPlayerIndex);
+        if (targetPlayer) {
+          drawCardsForPlayer(actor.roomId, room, targetPlayer, 4);
+        }
+        // Quem comprou perde a vez
+        stepsToAdvance = 2;
+        break;
+      }
+      default:
+        break;
+    }
+
+    passTurnToNextPlayer(room, stepsToAdvance);
+
+    const event = createActionEvent(actor, 'play', payload.card, room.currentColor);
     console.log(
       `[card:play] ${actor.nickname} jogou ${payload.card.color} ${payload.card.value} na sala ${actor.roomId}`,
     );
+    
     io.to(actor.roomId).emit('card:played', event);
+    emitRoomState(actor.roomId);
   });
 
   socket.on('card:draw', (_payload: DrawCardPayload) => {
@@ -161,6 +250,12 @@ io.on('connection', (socket) => {
 
     if (!actor.roomId) {
       socket.emit('room:error', { message: 'Entre em uma sala antes de comprar cartas.' });
+      return;
+    }
+
+    // ✅ Validação de Turno: Verifica se é realmente o turno desse jogador
+    if (!actor.isTurn) {
+      socket.emit('room:error', { message: 'Não é a sua vez de comprar carta!' });
       return;
     }
 
@@ -182,13 +277,20 @@ io.on('connection', (socket) => {
     // Atualiza a quantidade de cartas restantes no objeto da sala
     room.drawPileCount = deck.length;
 
-    const event = createActionEvent(actor, 'draw', drawnCard);
+    // ✅ Sistema de Turnos: Passa turno para próximo jogador
+    passTurnToNextPlayer(room);
+
+    const privateEvent = createActionEvent(actor, 'draw', drawnCard);
+    const publicEvent = createActionEvent(actor, 'draw');
     console.log(
       `[card:draw] ${actor.nickname} comprou ${drawnCard.color} ${drawnCard.value} na sala ${actor.roomId}`,
     );
     
-    // Avisa que a carta foi comprada e manda o novo estado da sala para todos
-    io.to(actor.roomId).emit('card:drawn', event);
+    // Avisa compra preservando privacidade da carta:
+    // - jogador que comprou recebe a carta
+    // - demais jogadores recebem apenas que ele comprou "uma carta"
+    io.to(actor.id).emit('card:drawn', privateEvent);
+    socket.to(actor.roomId).emit('card:drawn', publicEvent);
     emitRoomState(actor.roomId);
   });
 
@@ -236,6 +338,7 @@ io.on('connection', (socket) => {
     io.to(room.id).emit('game:started', {
       message: '✅ Jogo iniciado!',
       firstCard: room.discardPile[0],
+      currentColor: room.currentColor,
       currentPlayerTurn: room.players.find(p => p.isTurn)?.nickname
     });
   });
@@ -261,13 +364,100 @@ server.listen(3001, () => {
   console.log('Server listening on http://localhost:3001');
 });
 
-function createActionEvent(player: Player, action: CardActionEvent['action'], card?: Card) {
+/**
+ * ✅ Valida se uma carta pode ser jogada seguindo as regras oficiais do UNO
+ */
+function isValidCardPlay(card: Card, topCard: Card, currentColor: Card['color']): boolean {
+  // Curinga e Curinga +4 SEMPRE podem ser jogados
+  if (card.color === 'wild') {
+    return true;
+  }
+
+  // REGRA 1: Cores combinam
+  if (card.color === currentColor) {
+    return true;
+  }
+
+  // REGRA 2: Valores/Numero combinam
+  if (card.value === topCard.value) {
+    return true;
+  }
+
+  // Nenhuma condição atendida: JOGADA INVÁLIDA
+  return false;
+}
+
+function passTurnToNextPlayer(room: Room, steps = 1) {
+  if (room.players.length === 0) {
+    return;
+  }
+
+  const currentPlayerIndex = room.players.findIndex(p => p.isTurn);
+  if (currentPlayerIndex !== -1 && room.players[currentPlayerIndex]) {
+    room.players[currentPlayerIndex].isTurn = false;
+  }
+
+  const startIndex = currentPlayerIndex === -1 ? 0 : currentPlayerIndex;
+  const nextPlayerIndex = getNextPlayerIndex(room, startIndex, steps);
+  if (room.players[nextPlayerIndex]) {
+    room.players[nextPlayerIndex].isTurn = true;
+  }
+}
+
+function getNextPlayerIndex(room: Room, currentPlayerIndex: number, steps = 1) {
+  const playerCount = room.players.length;
+  if (playerCount === 0) {
+    return -1;
+  }
+
+  const normalizedSteps = ((steps % playerCount) + playerCount) % playerCount;
+  const movement = room.turnDirection * normalizedSteps;
+  return (((currentPlayerIndex + movement) % playerCount) + playerCount) % playerCount;
+}
+
+function getNextPlayer(room: Room, currentPlayerIndex: number) {
+  const nextPlayerIndex = getNextPlayerIndex(room, currentPlayerIndex, 1);
+  if (nextPlayerIndex === -1) {
+    return undefined;
+  }
+
+  return room.players[nextPlayerIndex];
+}
+
+function drawCardsForPlayer(roomId: string, room: Room, player: Player, count: number) {
+  const deck = serverDecks.get(roomId);
+  if (!deck) {
+    return [];
+  }
+
+  const drawnCards: Card[] = [];
+  for (let i = 0; i < count; i++) {
+    const drawnCard = deck.pop();
+    if (!drawnCard) {
+      break;
+    }
+
+    player.hand.push(drawnCard);
+    drawnCards.push(drawnCard);
+  }
+
+  room.drawPileCount = deck.length;
+  return drawnCards;
+}
+
+function createActionEvent(
+  player: Player,
+  action: CardActionEvent['action'],
+  card?: Card,
+  currentColor?: Card['color'],
+) {
   const event: CardActionEvent = {
     action,
     playerId: player.id,
     nickname: player.nickname,
     timestamp: Date.now(),
     ...(card ? { card } : {}),
+    ...(currentColor ? { currentColor } : {}),
   };
 
   return event;
