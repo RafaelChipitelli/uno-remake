@@ -27,12 +27,17 @@ npm install
 
 ## Estrutura resumida
 
-- `src/main.ts` – boot do Phaser com as cenas e configuração de escala.  
-- `src/scenes/TitleScene.ts` – lobby em canvas para criar/entrar em salas.  
-- `src/scenes/GameScene.ts` – HUD do jogo, comunicação via Socket.IO e placeholders.  
+- `src/main.ts` – ponto de entrada do Phaser.
+- `src/config/phaser.ts` – criação da configuração principal do jogo.
+- `src/config/network.ts` – URL do backend (`VITE_SERVER_URL` com fallback local).
+- `src/game/` – regras/utilitários de domínio (cores e validações de jogada).
+- `src/scenes/TitleScene.ts` – lobby para criar/entrar em salas.
+- `src/scenes/GameScene.ts` – orquestração da partida em tempo real.
+- `src/scenes/game/` – módulos auxiliares da GameScene (constantes, handlers de socket, modal de curinga).
+- `src/scenes/ui/` – componentes visuais reutilizáveis (HUD e mesa/cartas).
 - `src/types.ts` – contratos compartilhados com o backend.
 
 ## Personalização
 
-- Para apontar para outro backend, ajuste a URL usada pelo `io()` em `src/scenes/GameScene.ts`.
-- As fontes e cores principais estão concentradas nos arquivos de cena para facilitar o refino visual.
+- Para apontar para outro backend, defina `VITE_SERVER_URL` (ex.: `.env.local`) ou altere `src/config/network.ts`.
+- As fontes/cores principais estão centralizadas em módulos de `src/scenes/game` e `src/game` para facilitar manutenção.

@@ -24,14 +24,18 @@ npx ts-node src/server.ts
 
 O servidor escuta em `http://localhost:3001` e expõe:
 
-- Socket.IO com eventos `room:create`, `room:join`, `room:leave`, `card:play` e `card:draw`.  
+- Socket.IO com eventos `room:create`, `room:join`, `room:leave`, `card:play`, `card:draw` e `game:start`.  
 - Endpoint REST `GET /health` para health-check simples.
 
-> Ajuste a origem permitida no construtor do `Server` em `src/server.ts` caso o front seja servido em outra URL.
+> Configure `CLIENT_ORIGIN` e `PORT` via variáveis de ambiente (com fallback para `http://localhost:5173` e `3001`).
 
 ## Estrutura resumida
 
-- `src/server.ts` – inicialização do Express/Socket.IO e toda a lógica de sala e eventos.  
+- `src/server.ts` – inicialização do Express/Socket.IO e orquestração dos eventos.
+- `src/config/env.ts` – resolução de configurações de ambiente.
+- `src/core/` – regras de cartas, turnos, compra de cartas, eventos e códigos de sala.
+- `src/state/store.ts` – estado em memória (jogadores, salas e baralhos).
+- `src/state/roomState.ts` – emissão de estado seguro por jogador e remoção de jogadores de sala.
 - `src/types.ts` – contratos compartilhados com o client (cartas, salas, payloads).
 
 ## Próximos passos sugeridos

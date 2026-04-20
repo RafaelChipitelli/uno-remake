@@ -24,7 +24,7 @@ type HudOptions = {
 
 type HudCallbacks = {
   onLeaveRequested: () => void;
-  onStartRequested: () => void; // <- Novo callback adicionado
+  onStartRequested: () => void;
 };
 
 export default class GameHud {
@@ -35,6 +35,7 @@ export default class GameHud {
   private statusText?: Phaser.GameObjects.Text;
   private roomText?: Phaser.GameObjects.Text;
   private playerListText?: Phaser.GameObjects.Text;
+  private currentTurnText?: Phaser.GameObjects.Text;
   private actionLog?: Phaser.GameObjects.Text;
   
   private leaveButtonBg?: Phaser.GameObjects.Rectangle;
@@ -59,7 +60,7 @@ export default class GameHud {
       logLines: [],
       leaveEnabled: false,
       startEnabled: true,
-      currentTurn: 'Aguardando jogo começar'
+      currentTurn: 'Aguardando jogo começar',
     };
   }
 
@@ -79,6 +80,9 @@ export default class GameHud {
     }
     if (partial.playerList !== undefined) {
       this.playerListText?.setText(this.currentState.playerList);
+    }
+    if (partial.currentTurn !== undefined) {
+      this.currentTurnText?.setText(this.currentState.currentTurn);
     }
     if (partial.logLines !== undefined) {
       this.applyLog();
@@ -102,6 +106,7 @@ export default class GameHud {
     this.leaveButtonZone = undefined;
     this.startButtonZone?.destroy();
     this.startButtonZone = undefined;
+    this.currentTurnText = undefined;
   }
 
   private build() {
@@ -165,11 +170,9 @@ export default class GameHud {
     this.elements.push(this.roomText);
     cursorY += 40;
 
-    // --- Cria o Botão de Iniciar Jogo ---
     this.createStartButton(panel.x + this.options.width / 2, cursorY);
     cursorY += 65;
 
-    // --- Cria o Botão de Sair da Sala ---
     this.createLeaveButton(panel.x + this.options.width / 2, cursorY);
     cursorY += 70;
 
@@ -190,22 +193,20 @@ export default class GameHud {
     this.elements.push(this.playerListText);
     cursorY += 100;
 
-    // ✅ Mostra de quem é a vez
     this.elements.push(
       this.createLabel(contentX, cursorY, 'Vez atual', '#34d399', 'bold'),
     );
     cursorY += 26;
 
-    this.elements.push(
-      this.scene.add
-        .text(contentX, cursorY, this.currentState.currentTurn, {
-          fontFamily: this.options.fontFamily,
-          fontSize: '17px',
-          color: '#34d399',
-          fontStyle: 'bold'
-        })
-        .setResolution(this.options.textResolution)
-    );
+    this.currentTurnText = this.scene.add
+      .text(contentX, cursorY, this.currentState.currentTurn, {
+        fontFamily: this.options.fontFamily,
+        fontSize: '17px',
+        color: '#34d399',
+        fontStyle: 'bold',
+      })
+      .setResolution(this.options.textResolution);
+    this.elements.push(this.currentTurnText);
     cursorY += 50;
 
     this.elements.push(
@@ -322,7 +323,7 @@ export default class GameHud {
         return;
       }
       this.startButtonBg?.setScale(1);
-      this.callbacks.onStartRequested(); // Chama a nova função!
+      this.callbacks.onStartRequested();
     });
 
     this.elements.push(this.startButtonBg, this.startButtonLabel, this.startButtonZone);

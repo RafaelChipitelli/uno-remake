@@ -31,7 +31,13 @@ Protótipo de jogo multiplayer em tempo real inspirado em UNO, com **cliente Pha
 ```text
 uno-remake/
 ├── client/   # Phaser 3 + Vite + TypeScript
+│   ├── src/config/        # Configuração central (Phaser e URL do backend)
+│   ├── src/game/          # Regras/utilitários de domínio (cores, validação UNO)
+│   └── src/scenes/game/   # Módulos auxiliares da GameScene (constantes, modal, sockets)
 └── server/   # Express + Socket.IO + TypeScript
+    ├── src/config/        # Variáveis de ambiente e defaults
+    ├── src/core/          # Lógica de jogo (cartas, turnos, eventos, sala)
+    └── src/state/         # Store em memória e emissão de estado seguro
 ```
 
 > Cada pasta possui README próprio com detalhes específicos.
