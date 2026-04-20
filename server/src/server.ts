@@ -67,6 +67,7 @@ io.on('connection', (socket) => {
       drawPileCount: 0,
       currentColor: 'red',
       hostId: player.id,
+      turnDirection: 1,
     };
 
     player.roomId = roomId;
@@ -191,8 +192,48 @@ io.on('connection', (socket) => {
       actor.hand.splice(cardIndex, 1);
     }
 
-    // ✅ Sistema de Turnos: Passa turno para próximo jogador
-    passTurnToNextPlayer(room);
+    // ✅ Sistema de Turnos + efeitos de cartas especiais
+    const currentPlayerIndex = room.players.findIndex((p) => p.id === actor.id);
+    let stepsToAdvance = 1;
+
+    switch (payload.card.value) {
+      case 'skip': {
+        // Pula o próximo jogador
+        stepsToAdvance = 2;
+        break;
+      }
+      case 'reverse': {
+        if (room.players.length <= 2) {
+          // Com 2 jogadores, reverse funciona como skip
+          stepsToAdvance = 2;
+        } else {
+          room.turnDirection = room.turnDirection === 1 ? -1 : 1;
+        }
+        break;
+      }
+      case '+2': {
+        const targetPlayer = getNextPlayer(room, currentPlayerIndex);
+        if (targetPlayer) {
+          drawCardsForPlayer(actor.roomId, room, targetPlayer, 2);
+        }
+        // Quem comprou perde a vez
+        stepsToAdvance = 2;
+        break;
+      }
+      case '+4': {
+        const targetPlayer = getNextPlayer(room, currentPlayerIndex);
+        if (targetPlayer) {
+          drawCardsForPlayer(actor.roomId, room, targetPlayer, 4);
+        }
+        // Quem comprou perde a vez
+        stepsToAdvance = 2;
+        break;
+      }
+      default:
+        break;
+    }
+
+    passTurnToNextPlayer(room, stepsToAdvance);
 
     const event = createActionEvent(actor, 'play', payload.card, room.currentColor);
     console.log(
@@ -346,16 +387,62 @@ function isValidCardPlay(card: Card, topCard: Card, currentColor: Card['color'])
   return false;
 }
 
-function passTurnToNextPlayer(room: Room) {
+function passTurnToNextPlayer(room: Room, steps = 1) {
+  if (room.players.length === 0) {
+    return;
+  }
+
   const currentPlayerIndex = room.players.findIndex(p => p.isTurn);
   if (currentPlayerIndex !== -1 && room.players[currentPlayerIndex]) {
     room.players[currentPlayerIndex].isTurn = false;
   }
-  
-  const nextPlayerIndex = (currentPlayerIndex + 1) % room.players.length;
+
+  const startIndex = currentPlayerIndex === -1 ? 0 : currentPlayerIndex;
+  const nextPlayerIndex = getNextPlayerIndex(room, startIndex, steps);
   if (room.players[nextPlayerIndex]) {
     room.players[nextPlayerIndex].isTurn = true;
   }
+}
+
+function getNextPlayerIndex(room: Room, currentPlayerIndex: number, steps = 1) {
+  const playerCount = room.players.length;
+  if (playerCount === 0) {
+    return -1;
+  }
+
+  const normalizedSteps = ((steps % playerCount) + playerCount) % playerCount;
+  const movement = room.turnDirection * normalizedSteps;
+  return (((currentPlayerIndex + movement) % playerCount) + playerCount) % playerCount;
+}
+
+function getNextPlayer(room: Room, currentPlayerIndex: number) {
+  const nextPlayerIndex = getNextPlayerIndex(room, currentPlayerIndex, 1);
+  if (nextPlayerIndex === -1) {
+    return undefined;
+  }
+
+  return room.players[nextPlayerIndex];
+}
+
+function drawCardsForPlayer(roomId: string, room: Room, player: Player, count: number) {
+  const deck = serverDecks.get(roomId);
+  if (!deck) {
+    return [];
+  }
+
+  const drawnCards: Card[] = [];
+  for (let i = 0; i < count; i++) {
+    const drawnCard = deck.pop();
+    if (!drawnCard) {
+      break;
+    }
+
+    player.hand.push(drawnCard);
+    drawnCards.push(drawnCard);
+  }
+
+  room.drawPileCount = deck.length;
+  return drawnCards;
 }
 
 function createActionEvent(

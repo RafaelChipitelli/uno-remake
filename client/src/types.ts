@@ -21,6 +21,7 @@ export interface Room {
   drawPileCount: number;
   currentColor: CardColor;
   hostId: string;
+  turnDirection: 1 | -1;
 }
 
 export type CardActionType = 'play' | 'draw';
