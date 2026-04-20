@@ -193,6 +193,7 @@ export default class GameScene extends Phaser.Scene {
       hudMargin: HUD_MARGIN,
       fontFamily: FONT_FAMILY,
       textResolution: TEXT_RESOLUTION,
+      onCardSelected: (card, index) => this.handleCardClick(card, index),
     });
     this.cardStage.build();
     this.registerKeyboardShortcuts();
@@ -263,6 +264,39 @@ export default class GameScene extends Phaser.Scene {
     this.pendingRoomCode = undefined;
   }
 
+  private handleCardClick(card: any, index: number) {
+    if (!this.player || !this.roomId) {
+      this.pushLog('Entre ou crie uma sala antes de jogar cartas.');
+      return;
+    }
+
+    if (!this.player.hand || this.player.hand.length === 0) {
+      this.pushLog('Você não tem cartas para jogar!');
+      return;
+    }
+
+    if (!this.player.isTurn) {
+      this.pushLog('⏳ Não é a sua vez de jogar! Aguarde sua vez.');
+      return;
+    }
+
+    // Remove carta selecionada da mão local
+    this.player.hand.splice(index, 1);
+
+    this.socket.emit('card:play', {
+      playerId: this.player.id,
+      card: card,
+    });
+
+    this.pushLog(`Você jogou ${card.color} ${card.value}`);
+    
+    // Atualiza visualização
+    if (this.cardStage) {
+      this.cardStage.setHandCards(this.player.hand);
+      this.cardStage.setTableCard(card);
+    }
+  }
+
   private handlePlayCard() {
     if (!this.player || !this.roomId) {
       this.pushLog('Entre ou crie uma sala antes de jogar cartas.');
@@ -279,24 +313,8 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
-    // ✅ PEGA A PRIMEIRA CARTA DA MÃO DO JOGADOR (TEMPORÁRIO ATÉ IMPLEMENTAR SELEÇÃO)
-    const selectedCard = this.player.hand[0];
-
-    // Remove carta da mão local
-    this.player.hand.shift();
-
-    this.socket.emit('card:play', {
-      playerId: this.player.id,
-      card: selectedCard,
-    });
-
-    this.pushLog(`Você jogou ${selectedCard.color} ${selectedCard.value}`);
-    
-    // Atualiza visualização
-    if (this.cardStage) {
-      this.cardStage.setHandCards(this.player.hand);
-      this.cardStage.setTableCard(selectedCard);
-    }
+    // ✅ Pega a primeira carta para atalho de teclado
+    this.handleCardClick(this.player.hand[0], 0);
   }
 
   private handleDrawCard() {

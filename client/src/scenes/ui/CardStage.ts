@@ -6,6 +6,7 @@ type CardStageOptions = {
   fontFamily: string;
   textResolution: number;
   stagePadding?: number;
+  onCardSelected?: (card: any, index: number) => void;
 };
 
 export default class CardStage {
@@ -22,11 +23,13 @@ export default class CardStage {
   private tableCard?: Phaser.GameObjects.Rectangle;
   private tableCardText?: Phaser.GameObjects.Text;
   private tableCardShadow?: Phaser.GameObjects.Rectangle;
+  private onCardSelected?: (card: any, index: number) => void;
 
   constructor(scene: Phaser.Scene, options: CardStageOptions) {
     this.scene = scene;
     this.options = options;
     this.elements = [];
+    this.onCardSelected = options.onCardSelected;
   }
 
   build() {
@@ -172,6 +175,37 @@ export default class CardStage {
         fontStyle: 'bold',
         color: '#ffffff'
       }).setOrigin(0.5).setResolution(this.options.textResolution);
+
+      // Habilita interação
+      bg.setInteractive({ useHandCursor: true });
+      
+      // Efeito hover
+      bg.on('pointerover', () => {
+        this.scene.tweens.add({
+          targets: [bg, valueText],
+          y: baseY - 15,
+          duration: 150,
+          ease: 'Power1'
+        });
+        bg.setStrokeStyle(3, 0xfcd34d);
+      });
+
+      bg.on('pointerout', () => {
+        this.scene.tweens.add({
+          targets: [bg, valueText],
+          y: baseY,
+          duration: 150,
+          ease: 'Power1'
+        });
+        bg.setStrokeStyle(2, 0xffffff);
+      });
+
+      // Evento de clique
+      bg.on('pointerdown', () => {
+        if (this.onCardSelected) {
+          this.onCardSelected(card, index);
+        }
+      });
 
       this.handElements.push(bg, valueText);
     });
