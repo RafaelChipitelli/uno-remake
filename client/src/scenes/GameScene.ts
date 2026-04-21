@@ -3,13 +3,18 @@ import { io, type Socket } from 'socket.io-client';
 import { SOCKET_SERVER_URL } from '../config/network';
 import { COLOR_LABELS, type SelectableColor } from '../game/colors';
 import { getFirstPlayableCardIndex, isValidCardPlay } from '../game/rules';
-import type { Card, CardActionEvent, Player, Room, RoomErrorPayload } from '../types';
+import type {
+  Card,
+  CardActionEvent,
+  GameEndedPayload,
+  GameStatus,
+  Player,
+  Room,
+  RoomErrorPayload,
+} from '../types';
 import {
   EMPTY_PLAYER_LIST_MESSAGE,
   FONT_FAMILY,
-  HUD_MARGIN,
-  HUD_PADDING,
-  HUD_WIDTH,
   INITIAL_STATUS_MESSAGE,
   INITIAL_TURN_MESSAGE,
   INSTRUCTION_TEXT,
@@ -21,6 +26,7 @@ import {
   type GameStartedPayload,
   type SceneLaunchData,
 } from './game/constants';
+import { getResponsiveGameLayout, type ResponsiveGameLayout } from './game/responsiveLayout';
 import {
   describeCardActionEvent,
   registerGameSceneSocketHandlers,
@@ -34,10 +40,12 @@ export default class GameScene extends Phaser.Scene {
   private backgroundElements: Phaser.GameObjects.GameObject[] = [];
   private hud?: GameHud;
   private cardStage?: CardStage;
+  private responsiveLayout!: ResponsiveGameLayout;
 
   private player?: Player;
   private roomId?: string;
   private roomHostId?: string;
+  private roomGameStatus: GameStatus = 'waiting';
 
   private logLines: string[] = [];
   private statusMessage = INITIAL_STATUS_MESSAGE;
@@ -66,6 +74,7 @@ export default class GameScene extends Phaser.Scene {
     this.lastPlayerListMessage = EMPTY_PLAYER_LIST_MESSAGE;
     this.roomId = undefined;
     this.roomHostId = undefined;
+    this.roomGameStatus = 'waiting';
     this.isLeavingRoom = false;
     this.hasReturnedToLobby = false;
     this.clearColorSelectionModal();
@@ -79,6 +88,7 @@ export default class GameScene extends Phaser.Scene {
       onGameStarted: (payload) => this.handleGameStarted(payload),
       onCardPlayed: (event) => this.handleCardPlayed(event),
       onCardDrawn: (event) => this.handleCardDrawn(event),
+      onGameEnded: (payload) => this.handleGameEnded(payload),
       onRoomCreated: ({ roomId }) => this.handleRoomCreated(roomId),
       onRoomJoined: ({ roomId }) => this.handleRoomJoined(roomId),
       onRoomState: (room) => this.handleRoomState(room),
@@ -89,14 +99,17 @@ export default class GameScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.responsiveLayout = getResponsiveGameLayout(this.scale.width, this.scale.height);
     this.drawBackdrop();
 
     this.hud = new GameHud(
       this,
       {
-        width: HUD_WIDTH,
-        margin: HUD_MARGIN,
-        padding: HUD_PADDING,
+        width: this.responsiveLayout.hudWidth,
+        margin: this.responsiveLayout.hudMargin,
+        padding: this.responsiveLayout.hudPadding,
+        compact: this.responsiveLayout.compact,
+        fontScale: this.responsiveLayout.fontScale,
         panelColor: PANEL_COLOR,
         panelBorder: PANEL_BORDER,
         accentColor: PANEL_ACCENT,
@@ -112,10 +125,15 @@ export default class GameScene extends Phaser.Scene {
     this.hud.init(this.composeHudState());
 
     this.cardStage = new CardStage(this, {
-      hudWidth: HUD_WIDTH,
-      hudMargin: HUD_MARGIN,
+      hudWidth: this.responsiveLayout.hudWidth,
+      hudMargin: this.responsiveLayout.hudMargin,
       fontFamily: FONT_FAMILY,
       textResolution: TEXT_RESOLUTION,
+      stagePadding: this.responsiveLayout.stagePadding,
+      handBottomOffset: this.responsiveLayout.handBottomOffset,
+      tableCardScale: this.responsiveLayout.tableCardScale,
+      fontScale: this.responsiveLayout.fontScale,
+      compact: this.responsiveLayout.compact,
       onCardSelected: (card, index) => this.handleCardClick(card, index),
     });
     this.cardStage.build();
@@ -145,6 +163,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private handleGameStarted(payload: GameStartedPayload): void {
+    this.roomGameStatus = 'in_progress';
     this.pushLog(payload.message);
     this.pushLog(`🃏 Carta na mesa: ${payload.firstCard.color} ${payload.firstCard.value}`);
     if (payload.currentPlayerTurn) {
@@ -156,6 +175,7 @@ export default class GameScene extends Phaser.Scene {
     this.cardStage?.setTableCard(payload.firstCard, payload.currentColor);
     this.hud?.update({
       currentTurn: payload.currentPlayerTurn ?? INITIAL_TURN_MESSAGE,
+      status: '✅ Partida em andamento',
     });
 
     if (this.player?.hand && this.player.hand.length > 0) {
@@ -164,6 +184,18 @@ export default class GameScene extends Phaser.Scene {
         this.pushLog(`  ${index + 1}. ${card.color} - ${card.value}`);
       });
     }
+  }
+
+  private handleGameEnded(payload: GameEndedPayload): void {
+    this.roomGameStatus = 'finished';
+    this.clearColorSelectionModal();
+
+    this.pushLog(payload.message);
+    this.pushLog('⏸️ Aguardando o dono da sala iniciar a próxima partida...');
+    this.hud?.update({
+      status: payload.message,
+      currentTurn: 'Partida encerrada',
+    });
   }
 
   private handleCardPlayed(event: CardActionEvent): void {
@@ -202,6 +234,7 @@ export default class GameScene extends Phaser.Scene {
   private handleRoomState(room: Room): void {
     this.roomId = room.id;
     this.roomHostId = room.hostId;
+    this.roomGameStatus = room.gameStatus;
 
     const me = room.players.find((player) => player.id === this.player?.id);
     if (me) {
@@ -213,9 +246,17 @@ export default class GameScene extends Phaser.Scene {
       }
 
       const currentPlayer = room.players.find((player) => player.isTurn);
-      this.statusMessage = me.isTurn
-        ? '✅ É A SUA VEZ!'
-        : `⏳ Vez de: ${currentPlayer?.nickname ?? INITIAL_TURN_MESSAGE}`;
+      if (room.gameStatus === 'finished') {
+        this.statusMessage = room.winnerNickname
+          ? `🏆 O ${room.winnerNickname} ganhou o jogo!`
+          : '🏆 Partida encerrada';
+      } else if (room.gameStatus === 'waiting') {
+        this.statusMessage = 'Aguardando o dono da sala iniciar a partida';
+      } else {
+        this.statusMessage = me.isTurn
+          ? '✅ É A SUA VEZ!'
+          : `⏳ Vez de: ${currentPlayer?.nickname ?? INITIAL_TURN_MESSAGE}`;
+      }
       this.hud?.update({
         status: this.statusMessage,
         currentTurn: currentPlayer?.nickname ?? INITIAL_TURN_MESSAGE,
@@ -249,6 +290,7 @@ export default class GameScene extends Phaser.Scene {
   private handleRoomLeft(): void {
     this.roomId = undefined;
     this.roomHostId = undefined;
+    this.roomGameStatus = 'waiting';
     this.isLeavingRoom = false;
 
     this.clearColorSelectionModal();
@@ -267,14 +309,11 @@ export default class GameScene extends Phaser.Scene {
     this.clearGroup(this.backgroundElements);
 
     const { width, height } = this.scale;
-    const layerOne = this.add
-      .rectangle(width * 0.65, height / 2, width * 0.75, height, 0x0d1628, 0.45)
-      .setOrigin(0.5);
-    const layerTwo = this.add
-      .rectangle(width * 0.78, height / 2, width * 0.4, height, 0x14213d, 0.45)
-      .setOrigin(0.5);
+    const fullBg = this.add.rectangle(width / 2, height / 2, width, height, 0x081226, 1).setOrigin(0.5);
+    const glowLeft = this.add.ellipse(width * 0.12, height * 0.2, width * 0.5, height * 0.55, 0x132643, 0.26);
+    const glowRight = this.add.ellipse(width * 0.88, height * 0.78, width * 0.46, height * 0.5, 0x10223d, 0.22);
 
-    this.backgroundElements.push(layerOne, layerTwo);
+    this.backgroundElements.push(fullBg, glowLeft, glowRight);
   }
 
   private drawPlaceholderCard(nickname: string): void {
@@ -342,6 +381,11 @@ export default class GameScene extends Phaser.Scene {
 
     if (this.isColorSelectionOpen) {
       this.pushLog('🎨 Escolha uma cor para o curinga antes de continuar.');
+      return;
+    }
+
+    if (!this.isRoundInProgress()) {
+      this.pushLog('⏸️ Rodada encerrada. Aguarde o próximo jogo.');
       return;
     }
 
@@ -443,6 +487,11 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
+    if (!this.isRoundInProgress()) {
+      this.pushLog('⏸️ Rodada encerrada. Aguarde o próximo jogo.');
+      return;
+    }
+
     if (!this.player.hand || this.player.hand.length === 0) {
       this.pushLog('Você não tem cartas para jogar!');
       return;
@@ -480,6 +529,11 @@ export default class GameScene extends Phaser.Scene {
 
     if (this.isColorSelectionOpen) {
       this.pushLog('🎨 Escolha uma cor para o curinga antes de comprar.');
+      return;
+    }
+
+    if (!this.isRoundInProgress()) {
+      this.pushLog('⏸️ Rodada encerrada. Aguarde o próximo jogo.');
       return;
     }
 
@@ -522,6 +576,10 @@ export default class GameScene extends Phaser.Scene {
     return Boolean(this.roomId) && !this.isLeavingRoom;
   }
 
+  private isRoundInProgress(): boolean {
+    return this.roomGameStatus === 'in_progress';
+  }
+
   private promptLeaveRoom(): void {
     if (!this.roomId) {
       this.pushLog('Nenhuma sala ativa para sair.');
@@ -557,10 +615,25 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private handleResize(size: Phaser.Structs.Size): void {
+    this.responsiveLayout = getResponsiveGameLayout(size.width, size.height);
     this.cameras.resize(size.width, size.height);
     this.drawBackdrop();
-    this.hud?.resize();
-    this.cardStage?.resize();
+    this.hud?.setLayoutMetrics({
+      width: this.responsiveLayout.hudWidth,
+      margin: this.responsiveLayout.hudMargin,
+      padding: this.responsiveLayout.hudPadding,
+      compact: this.responsiveLayout.compact,
+      fontScale: this.responsiveLayout.fontScale,
+    });
+    this.cardStage?.setLayoutMetrics({
+      hudWidth: this.responsiveLayout.hudWidth,
+      hudMargin: this.responsiveLayout.hudMargin,
+      stagePadding: this.responsiveLayout.stagePadding,
+      handBottomOffset: this.responsiveLayout.handBottomOffset,
+      tableCardScale: this.responsiveLayout.tableCardScale,
+      fontScale: this.responsiveLayout.fontScale,
+      compact: this.responsiveLayout.compact,
+    });
   }
 
   private clearGroup(group: Phaser.GameObjects.GameObject[]): void {
@@ -597,5 +670,9 @@ export default class GameScene extends Phaser.Scene {
     return this.roomId ? `Sala atual: ${this.roomId}` : 'Nenhuma sala ativa.';
   }
 }
+
+
+
+
 
 

@@ -13,6 +13,7 @@ import { createGameStore } from './state/store';
 import type {
   CreateRoomPayload,
   DrawCardPayload,
+  GameEndedPayload,
   JoinRoomPayload,
   PlayCardPayload,
   Player,
@@ -29,6 +30,7 @@ const io = new Server(server, {
 });
 
 const store = createGameStore();
+const STARTING_HAND_SIZE = 10;
 
 io.on('connection', (socket) => {
   console.log(`Player connected: ${socket.id}`);
@@ -66,6 +68,9 @@ io.on('connection', (socket) => {
       currentColor: 'red',
       hostId: player.id,
       turnDirection: 1,
+      gameStatus: 'waiting',
+      winnerId: undefined,
+      winnerNickname: undefined,
     };
 
     player.roomId = roomId;
@@ -154,6 +159,11 @@ io.on('connection', (socket) => {
       return;
     }
 
+    if (room.gameStatus !== 'in_progress') {
+      socket.emit('room:error', { message: 'A rodada não está em andamento. Aguarde o próximo jogo.' });
+      return;
+    }
+
     if (!actor.isTurn) {
       socket.emit('room:error', { message: 'Não é a sua vez de jogar!' });
       return;
@@ -181,6 +191,31 @@ io.on('connection', (socket) => {
     const cardIndex = actor.hand.findIndex((card) => card.id === payload.card.id);
     if (cardIndex !== -1) {
       actor.hand.splice(cardIndex, 1);
+    }
+
+    if (actor.hand.length === 0) {
+      room.gameStatus = 'finished';
+      room.winnerId = actor.id;
+      room.winnerNickname = actor.nickname;
+
+      room.players.forEach((roomPlayer) => {
+        roomPlayer.isTurn = false;
+      });
+
+      const event = createActionEvent(actor, 'play', payload.card, room.currentColor);
+      io.to(actor.roomId).emit('card:played', event);
+
+      const endedPayload: GameEndedPayload = {
+        winnerId: actor.id,
+        winnerNickname: actor.nickname,
+        message: `🏆 O ${actor.nickname} ganhou o jogo!`,
+      };
+
+      io.to(actor.roomId).emit('game:ended', endedPayload);
+      emitRoomState(io, store.rooms, actor.roomId);
+
+      console.log(`[game:end] ${actor.nickname} venceu na sala ${actor.roomId}`);
+      return;
     }
 
     const currentPlayerIndex = room.players.findIndex((roomPlayer) => roomPlayer.id === actor.id);
@@ -239,12 +274,22 @@ io.on('connection', (socket) => {
       return;
     }
 
+    const room = store.rooms.get(actor.roomId);
+    if (!room) {
+      socket.emit('room:error', { message: 'Sala não encontrada.' });
+      return;
+    }
+
+    if (room.gameStatus !== 'in_progress') {
+      socket.emit('room:error', { message: 'A rodada não está em andamento. Aguarde o próximo jogo.' });
+      return;
+    }
+
     if (!actor.isTurn) {
       socket.emit('room:error', { message: 'Não é a sua vez de comprar carta!' });
       return;
     }
 
-    const room = store.rooms.get(actor.roomId);
     const deck = store.serverDecks.get(actor.roomId);
     if (!room || !deck || deck.length === 0) {
       socket.emit('room:error', { message: 'O baralho está vazio ou não foi encontrado!' });
@@ -281,8 +326,7 @@ io.on('connection', (socket) => {
     }
 
     const room = store.rooms.get(actor.roomId);
-    const deck = store.serverDecks.get(actor.roomId);
-    if (!room || !deck) {
+    if (!room) {
       return;
     }
 
@@ -291,9 +335,34 @@ io.on('connection', (socket) => {
       return;
     }
 
+    const deck = shuffleDeck(createUnoDeck());
+    const requiredCards = room.players.length * STARTING_HAND_SIZE + 1;
+    if (deck.length < requiredCards) {
+      const maxSupportedPlayers = Math.floor((deck.length - 1) / STARTING_HAND_SIZE);
+      socket.emit('room:error', {
+        message: `Não há cartas suficientes para distribuir ${STARTING_HAND_SIZE} cartas por jogador. Máximo suportado: ${maxSupportedPlayers} jogadores.`,
+      });
+      return;
+    }
+
+    store.serverDecks.set(actor.roomId, deck);
+
+    room.gameStatus = 'in_progress';
+    room.winnerId = undefined;
+    room.winnerNickname = undefined;
+    room.discardPile = [];
+    room.turnDirection = 1;
+
+    room.players.forEach((roomPlayer) => {
+      roomPlayer.isTurn = false;
+    });
+    if (room.players[0]) {
+      room.players[0].isTurn = true;
+    }
+
     for (const roomPlayer of room.players) {
       roomPlayer.hand = [];
-      for (let index = 0; index < 10; index += 1) {
+      for (let index = 0; index < STARTING_HAND_SIZE; index += 1) {
         const card = deck.pop();
         if (!card) {
           break;
@@ -341,5 +410,7 @@ app.get('/health', (_req, res) => {
 server.listen(SERVER_PORT, () => {
   console.log(`Server listening on http://localhost:${SERVER_PORT}`);
 });
+
+
 
 

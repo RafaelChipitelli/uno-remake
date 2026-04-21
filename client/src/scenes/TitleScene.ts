@@ -34,16 +34,27 @@ export default class TitleScene extends Phaser.Scene {
 
     const { width, height } = this.scale;
     const centerX = width / 2;
+    const compact = width < 640 || height < 640;
+    const fontScale = Math.max(0.75, Math.min(1, Math.min(width, height) / 900));
+    const titleSize = Math.max(32, Math.round(Math.min(64, width * 0.06) * fontScale));
+    const subtitleSize = Math.max(14, Math.round((compact ? 17 : 22) * fontScale));
+    const infoSize = Math.max(12, Math.round((compact ? 14 : 18) * fontScale));
+    const panelWidth = width * (compact ? 0.92 : 0.8);
+    const cardHeight = Math.min(height * (compact ? 0.92 : 0.8), compact ? 700 : 660);
+    const panelTop = (height - cardHeight) / 2;
+    const panelBottom = panelTop + cardHeight;
+    const verticalPadding = Math.round(Math.max(24, Math.min(72, cardHeight * (compact ? 0.09 : 0.11))));
+    const topY = panelTop + verticalPadding;
 
     const background = this.add
-      .rectangle(centerX, height / 2, width * 0.8, height * 0.8, 0x0b1222, 0.55)
+      .rectangle(centerX, height / 2, panelWidth, cardHeight, 0x0b1222, 0.55)
       .setStrokeStyle(2, 0x172036, 0.8);
     this.staticElements.push(background);
 
     const title = this.add
-      .text(centerX, height * 0.25, 'UNO REMAKE', {
+      .text(centerX, topY, 'UNO REMAKE', {
         fontFamily: FONT,
-        fontSize: Math.min(64, width * 0.06),
+        fontSize: titleSize,
         fontStyle: 'bold',
         color: '#f4f4f5',
         letterSpacing: 4,
@@ -53,9 +64,9 @@ export default class TitleScene extends Phaser.Scene {
     this.staticElements.push(title);
 
     const subtitle = this.add
-      .text(centerX, title.y + 52, 'Multiplayer em tempo real', {
+      .text(centerX, title.y + Math.max(30, Math.round(52 * fontScale)), 'Multiplayer em tempo real', {
         fontFamily: FONT,
-        fontSize: 22,
+        fontSize: subtitleSize,
         color: '#cbd5f5',
       })
       .setOrigin(0.5)
@@ -67,15 +78,25 @@ export default class TitleScene extends Phaser.Scene {
       { label: 'Entrar com Código', onClick: () => this.handleJoinRoom() },
     ];
 
+    const buttonHeight = compact ? 54 : 64;
+    const buttonGap = compact ? 20 : 28;
+    const subtitleToButtonsGap = Math.max(26, Math.round(42 * fontScale));
+    const buttonsBlockHeight = buttons.length * buttonHeight + (buttons.length - 1) * buttonGap;
+
+    const minInfoY = subtitle.y + subtitleToButtonsGap + buttonsBlockHeight + Math.max(24, Math.round(40 * fontScale));
+    const idealInfoY = panelBottom - verticalPadding;
+    const infoY = Math.max(minInfoY, idealInfoY);
+
+    const buttonBaseY = subtitle.y + subtitleToButtonsGap + buttonHeight / 2;
     buttons.forEach((config, index) => {
-      const posY = height * 0.45 + index * 100;
+      const posY = buttonBaseY + index * (buttonHeight + buttonGap);
       this.createButton(centerX, posY, config);
     });
 
     this.infoText = this.add
-      .text(centerX, height * 0.75, 'Escolha uma opção para continuar', {
+      .text(centerX, infoY, 'Escolha uma opção para continuar', {
         fontFamily: FONT,
-        fontSize: 18,
+        fontSize: infoSize,
         color: '#f9a8d4',
       })
       .setOrigin(0.5)
@@ -89,8 +110,11 @@ export default class TitleScene extends Phaser.Scene {
   }
 
   private createButton(x: number, y: number, config: ButtonConfig) {
-    const width = Math.min(320, this.scale.width * 0.6);
-    const height = 64;
+    const compact = this.scale.width < 640 || this.scale.height < 640;
+    const fontScale = Math.max(0.75, Math.min(1, Math.min(this.scale.width, this.scale.height) / 900));
+    const width = Math.min(compact ? 280 : 320, this.scale.width * (compact ? 0.76 : 0.6));
+    const height = compact ? 54 : 64;
+    const fontSize = Math.max(14, Math.round((compact ? 16 : 20) * fontScale));
 
     const buttonRect = this.add
       .rectangle(x, y, width, height, 0xf97316, 0.9)
@@ -99,7 +123,7 @@ export default class TitleScene extends Phaser.Scene {
     const label = this.add
       .text(x, y, config.label, {
         fontFamily: FONT,
-        fontSize: 20,
+        fontSize,
         color: '#ffffff',
       })
       .setOrigin(0.5)
