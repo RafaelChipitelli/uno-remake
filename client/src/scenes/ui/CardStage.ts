@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { CARD_COLOR_HEX } from '../../game/colors';
 import type { Card } from '../../types';
 
 type CardStageOptions = {
@@ -130,14 +131,6 @@ export default class CardStage {
     this.currentTableCard = card;
     this.currentTableColor = currentColor ?? card.color;
 
-    const colorMap: Record<string, number> = {
-      red: 0xdc2626,
-      green: 0x16a34a,
-      blue: 0x2563eb,
-      yellow: 0xeab308,
-      wild: 0x1f2937
-    };
-
     const stageX = this.scene.scale.width / 2 + this.options.hudWidth / 2;
     const stageY = this.scene.scale.height / 2;
 
@@ -146,7 +139,7 @@ export default class CardStage {
       .setOrigin(0.5);
 
     this.tableCardShape = this.scene.add
-      .rectangle(stageX, stageY, 150, 210, colorMap[displayColor] || 0x333333)
+      .rectangle(stageX, stageY, 150, 210, CARD_COLOR_HEX[displayColor] ?? 0x333333)
       .setOrigin(0.5)
       .setStrokeStyle(3, 0xffffff);
 
@@ -172,18 +165,11 @@ export default class CardStage {
     const startX = this.scene.scale.width / 2 - totalWidth / 2;
     const baseY = this.scene.scale.height - 100;
 
-    const colorMap: Record<string, number> = {
-      red: 0xdc2626,
-      green: 0x16a34a,
-      blue: 0x2563eb,
-      yellow: 0xeab308,
-      wild: 0x1f2937
-    };
-
     this.handCards.forEach((card, index) => {
       const x = startX + index * (cardWidth + spacing) + cardWidth / 2;
       
-      const bg = this.scene.add.rectangle(x, baseY, cardWidth, cardHeight, colorMap[card.color] || 0x333333)
+      const bg = this.scene.add
+        .rectangle(x, baseY, cardWidth, cardHeight, CARD_COLOR_HEX[card.color] ?? 0x333333)
         .setOrigin(0.5)
         .setStrokeStyle(2, 0xffffff);
 
