@@ -3,7 +3,15 @@ import { io, type Socket } from 'socket.io-client';
 import { SOCKET_SERVER_URL } from '../config/network';
 import { COLOR_LABELS, type SelectableColor } from '../game/colors';
 import { getFirstPlayableCardIndex, isValidCardPlay } from '../game/rules';
-import type { Card, CardActionEvent, Player, Room, RoomErrorPayload } from '../types';
+import type {
+  Card,
+  CardActionEvent,
+  GameEndedPayload,
+  GameStatus,
+  Player,
+  Room,
+  RoomErrorPayload,
+} from '../types';
 import {
   EMPTY_PLAYER_LIST_MESSAGE,
   FONT_FAMILY,
@@ -37,6 +45,7 @@ export default class GameScene extends Phaser.Scene {
   private player?: Player;
   private roomId?: string;
   private roomHostId?: string;
+  private roomGameStatus: GameStatus = 'waiting';
 
   private logLines: string[] = [];
   private statusMessage = INITIAL_STATUS_MESSAGE;
@@ -65,6 +74,7 @@ export default class GameScene extends Phaser.Scene {
     this.lastPlayerListMessage = EMPTY_PLAYER_LIST_MESSAGE;
     this.roomId = undefined;
     this.roomHostId = undefined;
+    this.roomGameStatus = 'waiting';
     this.isLeavingRoom = false;
     this.hasReturnedToLobby = false;
     this.clearColorSelectionModal();
@@ -78,6 +88,7 @@ export default class GameScene extends Phaser.Scene {
       onGameStarted: (payload) => this.handleGameStarted(payload),
       onCardPlayed: (event) => this.handleCardPlayed(event),
       onCardDrawn: (event) => this.handleCardDrawn(event),
+      onGameEnded: (payload) => this.handleGameEnded(payload),
       onRoomCreated: ({ roomId }) => this.handleRoomCreated(roomId),
       onRoomJoined: ({ roomId }) => this.handleRoomJoined(roomId),
       onRoomState: (room) => this.handleRoomState(room),
@@ -152,6 +163,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private handleGameStarted(payload: GameStartedPayload): void {
+    this.roomGameStatus = 'in_progress';
     this.pushLog(payload.message);
     this.pushLog(`🃏 Carta na mesa: ${payload.firstCard.color} ${payload.firstCard.value}`);
     if (payload.currentPlayerTurn) {
@@ -163,6 +175,7 @@ export default class GameScene extends Phaser.Scene {
     this.cardStage?.setTableCard(payload.firstCard, payload.currentColor);
     this.hud?.update({
       currentTurn: payload.currentPlayerTurn ?? INITIAL_TURN_MESSAGE,
+      status: '✅ Partida em andamento',
     });
 
     if (this.player?.hand && this.player.hand.length > 0) {
@@ -171,6 +184,18 @@ export default class GameScene extends Phaser.Scene {
         this.pushLog(`  ${index + 1}. ${card.color} - ${card.value}`);
       });
     }
+  }
+
+  private handleGameEnded(payload: GameEndedPayload): void {
+    this.roomGameStatus = 'finished';
+    this.clearColorSelectionModal();
+
+    this.pushLog(payload.message);
+    this.pushLog('⏸️ Aguardando o dono da sala iniciar a próxima partida...');
+    this.hud?.update({
+      status: payload.message,
+      currentTurn: 'Partida encerrada',
+    });
   }
 
   private handleCardPlayed(event: CardActionEvent): void {
@@ -209,6 +234,7 @@ export default class GameScene extends Phaser.Scene {
   private handleRoomState(room: Room): void {
     this.roomId = room.id;
     this.roomHostId = room.hostId;
+    this.roomGameStatus = room.gameStatus;
 
     const me = room.players.find((player) => player.id === this.player?.id);
     if (me) {
@@ -220,9 +246,17 @@ export default class GameScene extends Phaser.Scene {
       }
 
       const currentPlayer = room.players.find((player) => player.isTurn);
-      this.statusMessage = me.isTurn
-        ? '✅ É A SUA VEZ!'
-        : `⏳ Vez de: ${currentPlayer?.nickname ?? INITIAL_TURN_MESSAGE}`;
+      if (room.gameStatus === 'finished') {
+        this.statusMessage = room.winnerNickname
+          ? `🏆 O ${room.winnerNickname} ganhou o jogo!`
+          : '🏆 Partida encerrada';
+      } else if (room.gameStatus === 'waiting') {
+        this.statusMessage = 'Aguardando o dono da sala iniciar a partida';
+      } else {
+        this.statusMessage = me.isTurn
+          ? '✅ É A SUA VEZ!'
+          : `⏳ Vez de: ${currentPlayer?.nickname ?? INITIAL_TURN_MESSAGE}`;
+      }
       this.hud?.update({
         status: this.statusMessage,
         currentTurn: currentPlayer?.nickname ?? INITIAL_TURN_MESSAGE,
@@ -256,6 +290,7 @@ export default class GameScene extends Phaser.Scene {
   private handleRoomLeft(): void {
     this.roomId = undefined;
     this.roomHostId = undefined;
+    this.roomGameStatus = 'waiting';
     this.isLeavingRoom = false;
 
     this.clearColorSelectionModal();
@@ -346,6 +381,11 @@ export default class GameScene extends Phaser.Scene {
 
     if (this.isColorSelectionOpen) {
       this.pushLog('🎨 Escolha uma cor para o curinga antes de continuar.');
+      return;
+    }
+
+    if (!this.isRoundInProgress()) {
+      this.pushLog('⏸️ Rodada encerrada. Aguarde o próximo jogo.');
       return;
     }
 
@@ -447,6 +487,11 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
+    if (!this.isRoundInProgress()) {
+      this.pushLog('⏸️ Rodada encerrada. Aguarde o próximo jogo.');
+      return;
+    }
+
     if (!this.player.hand || this.player.hand.length === 0) {
       this.pushLog('Você não tem cartas para jogar!');
       return;
@@ -487,6 +532,11 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
+    if (!this.isRoundInProgress()) {
+      this.pushLog('⏸️ Rodada encerrada. Aguarde o próximo jogo.');
+      return;
+    }
+
     if (!this.player.isTurn) {
       this.pushLog('⏳ Não é a sua vez de comprar carta! Aguarde sua vez.');
       return;
@@ -524,6 +574,10 @@ export default class GameScene extends Phaser.Scene {
 
   private canLeaveRoom(): boolean {
     return Boolean(this.roomId) && !this.isLeavingRoom;
+  }
+
+  private isRoundInProgress(): boolean {
+    return this.roomGameStatus === 'in_progress';
   }
 
   private promptLeaveRoom(): void {
@@ -616,6 +670,7 @@ export default class GameScene extends Phaser.Scene {
     return this.roomId ? `Sala atual: ${this.roomId}` : 'Nenhuma sala ativa.';
   }
 }
+
 
 
 

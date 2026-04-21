@@ -1,5 +1,6 @@
 // Estruturas compartilhadas entre servidor e cliente
 export type CardColor = 'red' | 'green' | 'blue' | 'yellow' | 'wild';
+export type GameStatus = 'waiting' | 'in_progress' | 'finished';
 
 export interface Card {
   id: string;
@@ -23,6 +24,9 @@ export interface Room {
   currentColor: CardColor;
   hostId: string;
   turnDirection: 1 | -1;
+  gameStatus: GameStatus;
+  winnerId?: string | undefined;
+  winnerNickname?: string | undefined;
 }
 
 export type CardActionType = 'play' | 'draw';
@@ -64,5 +68,11 @@ export interface RoomJoinedPayload {
 }
 
 export interface RoomErrorPayload {
+  message: string;
+}
+
+export interface GameEndedPayload {
+  winnerId: string;
+  winnerNickname: string;
   message: string;
 }
