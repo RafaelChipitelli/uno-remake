@@ -14,6 +14,8 @@ type HudOptions = {
   width: number;
   margin: number;
   padding: number;
+  compact?: boolean;
+  fontScale?: number;
   panelColor: number;
   panelBorder: number;
   accentColor: string;
@@ -33,9 +35,7 @@ export default class GameHud {
   private callbacks: HudCallbacks;
   private elements: Phaser.GameObjects.GameObject[];
   private statusText?: Phaser.GameObjects.Text;
-  private roomText?: Phaser.GameObjects.Text;
   private playerListText?: Phaser.GameObjects.Text;
-  private currentTurnText?: Phaser.GameObjects.Text;
   private actionLog?: Phaser.GameObjects.Text;
   
   private leaveButtonBg?: Phaser.GameObjects.Rectangle;
@@ -69,24 +69,26 @@ export default class GameHud {
     this.build();
   }
 
+  setLayoutMetrics(partial: Pick<HudOptions, 'width' | 'margin' | 'padding' | 'compact' | 'fontScale'>) {
+    this.options = { ...this.options, ...partial };
+    this.build();
+  }
+
   update(partial: Partial<HudSnapshot>) {
     this.currentState = { ...this.currentState, ...partial };
 
-    if (partial.status !== undefined) {
-      this.statusText?.setText(this.currentState.status);
+    const shouldRebuild =
+      partial.status !== undefined ||
+      partial.roomLabel !== undefined ||
+      partial.playerList !== undefined ||
+      partial.currentTurn !== undefined ||
+      partial.logLines !== undefined;
+
+    if (shouldRebuild) {
+      this.build();
+      return;
     }
-    if (partial.roomLabel !== undefined) {
-      this.roomText?.setText(this.currentState.roomLabel);
-    }
-    if (partial.playerList !== undefined) {
-      this.playerListText?.setText(this.currentState.playerList);
-    }
-    if (partial.currentTurn !== undefined) {
-      this.currentTurnText?.setText(this.currentState.currentTurn);
-    }
-    if (partial.logLines !== undefined) {
-      this.applyLog();
-    }
+
     if (partial.leaveEnabled !== undefined) {
       this.applyLeaveState();
     }
@@ -106,7 +108,6 @@ export default class GameHud {
     this.leaveButtonZone = undefined;
     this.startButtonZone?.destroy();
     this.startButtonZone = undefined;
-    this.currentTurnText = undefined;
   }
 
   private build() {
@@ -114,6 +115,9 @@ export default class GameHud {
 
     const { height: gameHeight } = this.scene.scale;
     const panelHeight = gameHeight - this.options.margin * 2;
+    const fontScale = this.options.fontScale ?? 1;
+    const compact = Boolean(this.options.compact);
+    const lineGap = compact ? 4 : 6;
 
     const panel = this.scene.add
       .rectangle(
@@ -130,96 +134,122 @@ export default class GameHud {
     const contentX = panel.x + this.options.padding;
     let cursorY = panel.y + this.options.padding;
     const wrapWidth = this.options.width - this.options.padding * 2;
+    const toFontSize = (px: number) => `${Math.max(11, Math.round(px * fontScale))}px`;
+    const pushAndAdvance = (object: Phaser.GameObjects.Text, gap: number) => {
+      this.elements.push(object);
+      cursorY = object.y + object.height + gap;
+    };
 
     this.statusText = this.scene.add
       .text(contentX, cursorY, this.currentState.status, {
         fontFamily: this.options.fontFamily,
-        fontSize: '20px',
+        fontSize: toFontSize(compact ? 16 : 20),
         color: '#ffffff',
-      })
-      .setResolution(this.options.textResolution);
-
-    cursorY += 40;
-
-    this.elements.push(
-      panel,
-      this.statusText,
-      this.createLabel(contentX, cursorY, 'Controles rápidos', '#a5b4fc', 'bold'),
-    );
-    cursorY += 28;
-
-    this.elements.push(
-      this.scene.add
-        .text(contentX, cursorY, this.options.instructions, {
-          fontFamily: this.options.fontFamily,
-          fontSize: '16px',
-          color: '#e2e8f0',
-          lineSpacing: 8,
-        })
-        .setResolution(this.options.textResolution),
-    );
-    cursorY += 90;
-
-    this.roomText = this.scene.add
-      .text(contentX, cursorY, this.currentState.roomLabel, {
-        fontFamily: this.options.fontFamily,
-        fontSize: '18px',
-        color: this.options.accentColor,
-      })
-      .setResolution(this.options.textResolution);
-    this.elements.push(this.roomText);
-    cursorY += 40;
-
-    this.createStartButton(panel.x + this.options.width / 2, cursorY);
-    cursorY += 65;
-
-    this.createLeaveButton(panel.x + this.options.width / 2, cursorY);
-    cursorY += 70;
-
-    this.elements.push(
-      this.createLabel(contentX, cursorY, 'Jogadores', '#cbd5ff', 'bold'),
-    );
-    cursorY += 26;
-
-    this.playerListText = this.scene.add
-      .text(contentX, cursorY, this.currentState.playerList, {
-        fontFamily: this.options.fontFamily,
-        fontSize: '16px',
-        color: '#cbd5f5',
-        lineSpacing: 6,
         wordWrap: { width: wrapWidth },
       })
       .setResolution(this.options.textResolution);
-    this.elements.push(this.playerListText);
-    cursorY += 100;
 
-    this.elements.push(
-      this.createLabel(contentX, cursorY, 'Vez atual', '#34d399', 'bold'),
+    this.elements.push(panel);
+    pushAndAdvance(this.statusText, compact ? 12 : 16);
+
+    const roomLabel = this.createLabel(
+      contentX,
+      cursorY,
+      this.currentState.roomLabel,
+      this.options.accentColor,
+      'bold',
+      toFontSize(compact ? 13 : 15),
     );
-    cursorY += 26;
+    pushAndAdvance(roomLabel, compact ? 10 : 12);
 
-    this.currentTurnText = this.scene.add
-      .text(contentX, cursorY, this.currentState.currentTurn, {
+    const turnNowLabel = this.createLabel(
+      contentX,
+      cursorY,
+      `Vez: ${this.currentState.currentTurn}`,
+      '#34d399',
+      'bold',
+      toFontSize(compact ? 13 : 15),
+    );
+    pushAndAdvance(turnNowLabel, compact ? 10 : 12);
+
+    const controlsLabel = this.createLabel(
+      contentX,
+      cursorY,
+      'Controles rápidos',
+      '#a5b4fc',
+      'bold',
+      toFontSize(16),
+    );
+    pushAndAdvance(controlsLabel, compact ? 4 : 6);
+
+    const controlsText = this.scene.add
+      .text(contentX, cursorY, this.options.instructions, {
         fontFamily: this.options.fontFamily,
-        fontSize: '17px',
-        color: '#34d399',
-        fontStyle: 'bold',
+        fontSize: toFontSize(compact ? 13 : 15),
+        color: '#e2e8f0',
+        lineSpacing: lineGap,
+        wordWrap: { width: wrapWidth },
       })
       .setResolution(this.options.textResolution);
-    this.elements.push(this.currentTurnText);
-    cursorY += 50;
+    pushAndAdvance(controlsText, compact ? 10 : 14);
 
-    this.elements.push(
-      this.createLabel(contentX, cursorY, 'Log recente', '#f9a8d4', 'bold'),
+    const startButtonHeight = compact ? 46 : 54;
+    const leaveButtonHeight = compact ? 46 : 54;
+    const actionButtonsGap = compact ? 10 : 12;
+
+    this.createStartButton(
+      panel.x + this.options.width / 2,
+      cursorY + startButtonHeight / 2,
+      compact,
+      toFontSize(16),
     );
-    cursorY += 26;
+    cursorY += startButtonHeight + actionButtonsGap;
+
+    this.createLeaveButton(
+      panel.x + this.options.width / 2,
+      cursorY + leaveButtonHeight / 2,
+      compact,
+      toFontSize(16),
+    );
+    cursorY += leaveButtonHeight + (compact ? 12 : 16);
+
+    const playersLabel = this.createLabel(
+      contentX,
+      cursorY,
+      'Jogadores',
+      '#cbd5ff',
+      'bold',
+      toFontSize(15),
+    );
+    pushAndAdvance(playersLabel, 6);
+
+    this.playerListText = this.scene.add
+      .text(contentX, cursorY, this.getVisiblePlayerList(), {
+        fontFamily: this.options.fontFamily,
+        fontSize: toFontSize(compact ? 12 : 15),
+        color: '#cbd5f5',
+        lineSpacing: lineGap,
+        wordWrap: { width: wrapWidth },
+      })
+      .setResolution(this.options.textResolution);
+    pushAndAdvance(this.playerListText, compact ? 10 : 14);
+
+    const logLabel = this.createLabel(
+      contentX,
+      cursorY,
+      'Log recente',
+      '#f9a8d4',
+      'bold',
+      toFontSize(15),
+    );
+    pushAndAdvance(logLabel, 6);
 
     this.actionLog = this.scene.add
       .text(contentX, cursorY, 'Nenhuma ação ainda.', {
         fontFamily: this.options.fontFamily,
-        fontSize: '16px',
+        fontSize: toFontSize(compact ? 12 : 15),
         color: '#f472b6',
-        lineSpacing: 6,
+        lineSpacing: lineGap,
         wordWrap: { width: wrapWidth },
       })
       .setResolution(this.options.textResolution);
@@ -230,11 +260,18 @@ export default class GameHud {
     this.applyStartState();
   }
 
-  private createLabel(x: number, y: number, text: string, color: string, fontStyle?: string) {
+  private createLabel(
+    x: number,
+    y: number,
+    text: string,
+    color: string,
+    fontStyle: string | undefined,
+    fontSize: string,
+  ) {
     return this.scene.add
       .text(x, y, text, {
         fontFamily: this.options.fontFamily,
-        fontSize: '16px',
+        fontSize,
         fontStyle,
         color,
       })
@@ -242,16 +279,16 @@ export default class GameHud {
   }
 
   // Lógica do botão de Sair
-  private createLeaveButton(centerX: number, y: number) {
+  private createLeaveButton(centerX: number, y: number, compact: boolean, labelFontSize: string) {
     const width = this.options.width - this.options.padding * 2;
-    const height = 54;
+    const height = compact ? 46 : 54;
 
     this.leaveButtonBg = this.scene.add.rectangle(centerX, y, width, height, 0xdc2626, 0.9).setOrigin(0.5);
     this.leaveButtonBg.setStrokeStyle(2, 0xffffff, 0.85);
 
     this.leaveButtonLabel = this.scene.add.text(centerX, y, 'Sair da sala', {
         fontFamily: this.options.fontFamily,
-        fontSize: '18px',
+        fontSize: labelFontSize,
         fontStyle: 'bold',
         color: '#ffffff',
       }).setOrigin(0.5).setResolution(this.options.textResolution);
@@ -286,16 +323,16 @@ export default class GameHud {
   }
 
   // Lógica do novo botão de Iniciar
-  private createStartButton(centerX: number, y: number) {
+  private createStartButton(centerX: number, y: number, compact: boolean, labelFontSize: string) {
     const width = this.options.width - this.options.padding * 2;
-    const height = 54;
+    const height = compact ? 46 : 54;
 
     this.startButtonBg = this.scene.add.rectangle(centerX, y, width, height, 0xdc2626, 0.9).setOrigin(0.5);
     this.startButtonBg.setStrokeStyle(2, 0xffffff, 0.85);
 
     this.startButtonLabel = this.scene.add.text(centerX, y, 'Iniciar Jogo', {
         fontFamily: this.options.fontFamily,
-        fontSize: '18px',
+        fontSize: labelFontSize,
         fontStyle: 'bold',
         color: '#ffffff',
       }).setOrigin(0.5).setResolution(this.options.textResolution);
@@ -331,11 +368,28 @@ export default class GameHud {
 
   private applyLog() {
     if (!this.actionLog) return;
-    if (!this.currentState.logLines.length) {
+    const lines = this.getVisibleLogLines();
+
+    if (!lines.length) {
       this.actionLog.setText('• Nenhuma ação ainda.');
     } else {
-      this.actionLog.setText(this.currentState.logLines.map((line) => `• ${line}`).join('\n'));
+      this.actionLog.setText(lines.map((line) => `• ${line}`).join('\n'));
     }
+  }
+
+  private getVisiblePlayerList(): string {
+    const maxLines = this.options.compact ? 3 : 5;
+    const lines = this.currentState.playerList.split('\n').filter(Boolean);
+    if (lines.length <= maxLines) {
+      return this.currentState.playerList;
+    }
+
+    return `${lines.slice(0, maxLines).join('\n')}\n…`;
+  }
+
+  private getVisibleLogLines(): string[] {
+    const maxLines = this.options.compact ? 3 : 5;
+    return this.currentState.logLines.slice(0, maxLines);
   }
 
   private applyLeaveState() {

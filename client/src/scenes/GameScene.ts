@@ -7,9 +7,6 @@ import type { Card, CardActionEvent, Player, Room, RoomErrorPayload } from '../t
 import {
   EMPTY_PLAYER_LIST_MESSAGE,
   FONT_FAMILY,
-  HUD_MARGIN,
-  HUD_PADDING,
-  HUD_WIDTH,
   INITIAL_STATUS_MESSAGE,
   INITIAL_TURN_MESSAGE,
   INSTRUCTION_TEXT,
@@ -21,6 +18,7 @@ import {
   type GameStartedPayload,
   type SceneLaunchData,
 } from './game/constants';
+import { getResponsiveGameLayout, type ResponsiveGameLayout } from './game/responsiveLayout';
 import {
   describeCardActionEvent,
   registerGameSceneSocketHandlers,
@@ -34,6 +32,7 @@ export default class GameScene extends Phaser.Scene {
   private backgroundElements: Phaser.GameObjects.GameObject[] = [];
   private hud?: GameHud;
   private cardStage?: CardStage;
+  private responsiveLayout!: ResponsiveGameLayout;
 
   private player?: Player;
   private roomId?: string;
@@ -89,14 +88,17 @@ export default class GameScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.responsiveLayout = getResponsiveGameLayout(this.scale.width, this.scale.height);
     this.drawBackdrop();
 
     this.hud = new GameHud(
       this,
       {
-        width: HUD_WIDTH,
-        margin: HUD_MARGIN,
-        padding: HUD_PADDING,
+        width: this.responsiveLayout.hudWidth,
+        margin: this.responsiveLayout.hudMargin,
+        padding: this.responsiveLayout.hudPadding,
+        compact: this.responsiveLayout.compact,
+        fontScale: this.responsiveLayout.fontScale,
         panelColor: PANEL_COLOR,
         panelBorder: PANEL_BORDER,
         accentColor: PANEL_ACCENT,
@@ -112,10 +114,15 @@ export default class GameScene extends Phaser.Scene {
     this.hud.init(this.composeHudState());
 
     this.cardStage = new CardStage(this, {
-      hudWidth: HUD_WIDTH,
-      hudMargin: HUD_MARGIN,
+      hudWidth: this.responsiveLayout.hudWidth,
+      hudMargin: this.responsiveLayout.hudMargin,
       fontFamily: FONT_FAMILY,
       textResolution: TEXT_RESOLUTION,
+      stagePadding: this.responsiveLayout.stagePadding,
+      handBottomOffset: this.responsiveLayout.handBottomOffset,
+      tableCardScale: this.responsiveLayout.tableCardScale,
+      fontScale: this.responsiveLayout.fontScale,
+      compact: this.responsiveLayout.compact,
       onCardSelected: (card, index) => this.handleCardClick(card, index),
     });
     this.cardStage.build();
@@ -267,14 +274,11 @@ export default class GameScene extends Phaser.Scene {
     this.clearGroup(this.backgroundElements);
 
     const { width, height } = this.scale;
-    const layerOne = this.add
-      .rectangle(width * 0.65, height / 2, width * 0.75, height, 0x0d1628, 0.45)
-      .setOrigin(0.5);
-    const layerTwo = this.add
-      .rectangle(width * 0.78, height / 2, width * 0.4, height, 0x14213d, 0.45)
-      .setOrigin(0.5);
+    const fullBg = this.add.rectangle(width / 2, height / 2, width, height, 0x081226, 1).setOrigin(0.5);
+    const glowLeft = this.add.ellipse(width * 0.12, height * 0.2, width * 0.5, height * 0.55, 0x132643, 0.26);
+    const glowRight = this.add.ellipse(width * 0.88, height * 0.78, width * 0.46, height * 0.5, 0x10223d, 0.22);
 
-    this.backgroundElements.push(layerOne, layerTwo);
+    this.backgroundElements.push(fullBg, glowLeft, glowRight);
   }
 
   private drawPlaceholderCard(nickname: string): void {
@@ -557,10 +561,25 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private handleResize(size: Phaser.Structs.Size): void {
+    this.responsiveLayout = getResponsiveGameLayout(size.width, size.height);
     this.cameras.resize(size.width, size.height);
     this.drawBackdrop();
-    this.hud?.resize();
-    this.cardStage?.resize();
+    this.hud?.setLayoutMetrics({
+      width: this.responsiveLayout.hudWidth,
+      margin: this.responsiveLayout.hudMargin,
+      padding: this.responsiveLayout.hudPadding,
+      compact: this.responsiveLayout.compact,
+      fontScale: this.responsiveLayout.fontScale,
+    });
+    this.cardStage?.setLayoutMetrics({
+      hudWidth: this.responsiveLayout.hudWidth,
+      hudMargin: this.responsiveLayout.hudMargin,
+      stagePadding: this.responsiveLayout.stagePadding,
+      handBottomOffset: this.responsiveLayout.handBottomOffset,
+      tableCardScale: this.responsiveLayout.tableCardScale,
+      fontScale: this.responsiveLayout.fontScale,
+      compact: this.responsiveLayout.compact,
+    });
   }
 
   private clearGroup(group: Phaser.GameObjects.GameObject[]): void {
@@ -597,5 +616,8 @@ export default class GameScene extends Phaser.Scene {
     return this.roomId ? `Sala atual: ${this.roomId}` : 'Nenhuma sala ativa.';
   }
 }
+
+
+
 
 
