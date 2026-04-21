@@ -41,3 +41,77 @@ npm install
 
 - Para apontar para outro backend, defina `VITE_SERVER_URL` (ex.: `.env.local`) ou altere `src/config/network.ts`.
 - As fontes/cores principais estão centralizadas em módulos de `src/scenes/game` e `src/game` para facilitar manutenção.
+
+## Login com Google + Firestore (Firebase)
+
+O cliente agora está preparado para autenticação com Google e persistência de perfil/estatísticas em Firestore.
+
+### 1) Instale dependências (se ainda não instalou)
+
+```bash
+npm install
+```
+
+### 2) Configure suas credenciais de ambiente
+
+Copie `client/.env.example` para `client/.env.local` e preencha os valores do seu projeto Firebase:
+
+```bash
+copy .env.example .env.local
+```
+
+Variáveis esperadas:
+
+- `VITE_FIREBASE_API_KEY`
+- `VITE_FIREBASE_AUTH_DOMAIN`
+- `VITE_FIREBASE_PROJECT_ID`
+- `VITE_FIREBASE_STORAGE_BUCKET`
+- `VITE_FIREBASE_MESSAGING_SENDER_ID`
+- `VITE_FIREBASE_APP_ID`
+- `VITE_FIREBASE_MEASUREMENT_ID` (opcional)
+
+> Sem essas variáveis, o jogo continua rodando, mas login/estatísticas ficam desativados.
+
+### 3) Ative recursos no Firebase Console
+
+1. **Authentication > Sign-in method**: habilite **Google**.
+2. **Authentication > Settings > Authorized domains**: confirme `localhost`.
+3. **Firestore Database**: crie o banco (modo teste ou produção).
+
+### 4) Estrutura de dados utilizada
+
+Coleção: `users`  
+Documento: `users/{uid}`
+
+Campos principais:
+
+- `uid`
+- `nickname`
+- `email`
+- `photoURL`
+- `stats.gamesPlayed`
+- `stats.gamesWon`
+- `stats.gamesLost`
+- `createdAt`
+- `updatedAt`
+- `lastLoginAt`
+
+### 5) Regras iniciais sugeridas (Firestore Rules)
+
+```txt
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}
+```
+
+### 6) O que já foi integrado no jogo
+
+- Botão **Entrar com Google** na `TitleScene`.
+- Botão de **logout** quando autenticado.
+- Nickname carregado/salvo no Firestore.
+- Estatísticas atualizadas no fim da partida (`jogos jogados`, `ganhos`, `perdidos`).

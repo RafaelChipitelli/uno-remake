@@ -34,6 +34,10 @@ import {
 import { createWildColorModal, type WildColorModalHandle } from './game/wildColorModal';
 import CardStage from './ui/CardStage';
 import GameHud, { type HudSnapshot } from './ui/GameHud';
+import {
+  describeFirebasePersistenceError,
+  recordCurrentUserMatchResult,
+} from '../services/playerAccount';
 
 export default class GameScene extends Phaser.Scene {
   private socket!: Socket;
@@ -59,6 +63,8 @@ export default class GameScene extends Phaser.Scene {
   private hasReturnedToLobby = false;
   private isColorSelectionOpen = false;
   private wildColorModal?: WildColorModalHandle;
+  private hasRecordedCurrentRoundResult = false;
+  private isRecordingCurrentRoundResult = false;
 
   constructor() {
     super(SCENE_KEYS.game);
@@ -77,6 +83,8 @@ export default class GameScene extends Phaser.Scene {
     this.roomGameStatus = 'waiting';
     this.isLeavingRoom = false;
     this.hasReturnedToLobby = false;
+    this.hasRecordedCurrentRoundResult = false;
+    this.isRecordingCurrentRoundResult = false;
     this.clearColorSelectionModal();
 
     this.socket = io(SOCKET_SERVER_URL, {
@@ -164,6 +172,8 @@ export default class GameScene extends Phaser.Scene {
 
   private handleGameStarted(payload: GameStartedPayload): void {
     this.roomGameStatus = 'in_progress';
+    this.hasRecordedCurrentRoundResult = false;
+    this.isRecordingCurrentRoundResult = false;
     this.pushLog(payload.message);
     this.pushLog(`🃏 Carta na mesa: ${payload.firstCard.color} ${payload.firstCard.value}`);
     if (payload.currentPlayerTurn) {
@@ -196,6 +206,34 @@ export default class GameScene extends Phaser.Scene {
       status: payload.message,
       currentTurn: 'Partida encerrada',
     });
+
+    void this.recordAuthenticatedMatchResult(payload);
+  }
+
+  private async recordAuthenticatedMatchResult(payload: GameEndedPayload): Promise<void> {
+    if (this.hasRecordedCurrentRoundResult || this.isRecordingCurrentRoundResult) {
+      return;
+    }
+
+    this.isRecordingCurrentRoundResult = true;
+
+    try {
+      const didWin = payload.winnerId === this.player?.id;
+      const profile = await recordCurrentUserMatchResult(didWin);
+      if (!profile) {
+        return;
+      }
+
+      this.hasRecordedCurrentRoundResult = true;
+      this.pushLog(
+        `📈 Stats atualizadas: ${profile.stats.gamesPlayed} partidas • ${profile.stats.gamesWon} vitórias`,
+      );
+    } catch (error) {
+      console.error('[firebase] Falha ao salvar estatísticas da partida.', error);
+      this.pushLog(`⚠️ ${describeFirebasePersistenceError(error)}`);
+    } finally {
+      this.isRecordingCurrentRoundResult = false;
+    }
   }
 
   private handleCardPlayed(event: CardActionEvent): void {
@@ -509,7 +547,8 @@ export default class GameScene extends Phaser.Scene {
     );
 
     if (playableIndex === -1) {
-      this.pushLog('❌ Nenhuma carta da sua mão corresponde à mesa.');
+      this.pushLog('❌ Nenhuma carta jogável. Comprando uma carta automaticamente...');
+      this.handleDrawCard();
       return;
     }
 
@@ -670,6 +709,9 @@ export default class GameScene extends Phaser.Scene {
     return this.roomId ? `Sala atual: ${this.roomId}` : 'Nenhuma sala ativa.';
   }
 }
+
+
+
 
 
 

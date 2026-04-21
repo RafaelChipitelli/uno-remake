@@ -1,8 +1,17 @@
 import Phaser from 'phaser';
+import {
+  getCurrentAuthSession,
+  isAuthenticationAvailable,
+  signInWithGoogle,
+  signOutCurrentUser,
+  subscribeAuthSession,
+  updateCurrentUserNickname,
+  type AuthSession,
+} from '../services/playerAccount';
 
 type ButtonConfig = {
   label: string;
-  onClick: () => void;
+  onClick: () => void | Promise<void>;
 };
 
 const FONT = '"Space Mono", "Fira Code", monospace';
@@ -13,6 +22,8 @@ export default class TitleScene extends Phaser.Scene {
   private buttons: Phaser.GameObjects.Zone[] = [];
   private infoText?: Phaser.GameObjects.Text;
   private lastNickname = '';
+  private authSession: AuthSession = getCurrentAuthSession();
+  private unsubscribeAuthSession?: () => void;
 
   constructor() {
     super('TitleScene');
@@ -20,11 +31,19 @@ export default class TitleScene extends Phaser.Scene {
 
   create() {
     this.cameras.main.setBackgroundColor('#030712');
+
+    this.unsubscribeAuthSession = subscribeAuthSession((session) => {
+      this.authSession = session;
+      this.buildLayout();
+    });
+
     this.buildLayout();
 
     this.scale.on('resize', this.handleResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off('resize', this.handleResize, this);
+      this.unsubscribeAuthSession?.();
+      this.unsubscribeAuthSession = undefined;
       this.clearLayout();
     });
   }
@@ -73,28 +92,39 @@ export default class TitleScene extends Phaser.Scene {
       .setResolution(TEXT_RESOLUTION);
     this.staticElements.push(subtitle);
 
-    const buttons: ButtonConfig[] = [
-      { label: 'Criar Sala', onClick: () => this.handleCreateRoom() },
-      { label: 'Entrar com Código', onClick: () => this.handleJoinRoom() },
-    ];
+    const authHint = this.add
+      .text(centerX, subtitle.y + Math.max(24, Math.round(32 * fontScale)), this.getAuthSummaryMessage(), {
+        fontFamily: FONT,
+        fontSize: Math.max(12, Math.round((compact ? 13 : 16) * fontScale)),
+        color: '#c4b5fd',
+        align: 'center',
+        wordWrap: { width: panelWidth * 0.84, useAdvancedWrap: true },
+      })
+      .setOrigin(0.5, 0)
+      .setResolution(TEXT_RESOLUTION);
+    this.staticElements.push(authHint);
+
+    const buttons = this.getButtonConfigs();
 
     const buttonHeight = compact ? 54 : 64;
     const buttonGap = compact ? 20 : 28;
-    const subtitleToButtonsGap = Math.max(26, Math.round(42 * fontScale));
+    const subtitleToButtonsGap = Math.max(20, Math.round(28 * fontScale));
     const buttonsBlockHeight = buttons.length * buttonHeight + (buttons.length - 1) * buttonGap;
 
-    const minInfoY = subtitle.y + subtitleToButtonsGap + buttonsBlockHeight + Math.max(24, Math.round(40 * fontScale));
+    const buttonsAnchorY = authHint.y + authHint.height + subtitleToButtonsGap;
+
+    const minInfoY = buttonsAnchorY + buttonsBlockHeight + Math.max(24, Math.round(40 * fontScale));
     const idealInfoY = panelBottom - verticalPadding;
     const infoY = Math.max(minInfoY, idealInfoY);
 
-    const buttonBaseY = subtitle.y + subtitleToButtonsGap + buttonHeight / 2;
+    const buttonBaseY = buttonsAnchorY + buttonHeight / 2;
     buttons.forEach((config, index) => {
       const posY = buttonBaseY + index * (buttonHeight + buttonGap);
       this.createButton(centerX, posY, config);
     });
 
     this.infoText = this.add
-      .text(centerX, infoY, 'Escolha uma opção para continuar', {
+      .text(centerX, infoY, this.getDefaultInfoMessage(), {
         fontFamily: FONT,
         fontSize: infoSize,
         color: '#f9a8d4',
@@ -142,7 +172,7 @@ export default class TitleScene extends Phaser.Scene {
     zone.on('pointerdown', () => buttonRect.setScale(0.98));
     zone.on('pointerup', () => {
       buttonRect.setScale(1);
-      config.onClick();
+      void config.onClick();
     });
 
     this.staticElements.push(buttonRect, label);
@@ -150,26 +180,136 @@ export default class TitleScene extends Phaser.Scene {
   }
 
   private handleCreateRoom() {
-    const nickname = this.promptNickname();
-    this.scene.start('GameScene', {
-      autoAction: 'create',
-      nickname,
-    });
+    void this.startGameScene('create');
   }
 
   private handleJoinRoom() {
-    const roomCode = window.prompt('Digite o código da sala (ex: ABCD)')?.trim().toUpperCase();
-    if (!roomCode) {
-      this.showInfo('Informe um código válido.');
+    void this.startGameScene('join');
+  }
+
+  private async startGameScene(autoAction: 'create' | 'join'): Promise<void> {
+    if (isAuthenticationAvailable() && !this.authSession.user) {
+      this.showInfo('Faça login com Google para jogar e salvar progresso.');
       return;
     }
 
-    const nickname = this.promptNickname();
+    let roomCode: string | undefined;
+    if (autoAction === 'join') {
+      roomCode = window.prompt('Digite o código da sala (ex: ABCD)')?.trim().toUpperCase();
+      if (!roomCode) {
+        this.showInfo('Informe um código válido.');
+        return;
+      }
+    }
+
+    const nickname = await this.promptNickname();
+    if (!nickname && isAuthenticationAvailable()) {
+      this.showInfo('Não foi possível iniciar sem nickname.');
+      return;
+    }
+
     this.scene.start('GameScene', {
-      autoAction: 'join',
+      autoAction,
       nickname,
       roomCode,
     });
+  }
+
+  private getButtonConfigs(): ButtonConfig[] {
+    if (isAuthenticationAvailable()) {
+      if (this.authSession.isLoading) {
+        return [{ label: 'Carregando sessão...', onClick: () => this.showInfo('Aguarde a sessão carregar.') }];
+      }
+
+      if (!this.authSession.user) {
+        return [{ label: 'Entrar com Google', onClick: () => this.handleGoogleSignIn() }];
+      }
+
+      return [
+        { label: 'Criar Sala', onClick: () => this.handleCreateRoom() },
+        { label: 'Entrar com Código', onClick: () => this.handleJoinRoom() },
+        { label: 'Sair da Conta Google', onClick: () => this.handleGoogleSignOut() },
+      ];
+    }
+
+    return [
+      { label: 'Criar Sala', onClick: () => this.handleCreateRoom() },
+      { label: 'Entrar com Código', onClick: () => this.handleJoinRoom() },
+    ];
+  }
+
+  private getAuthSummaryMessage(): string {
+    if (!isAuthenticationAvailable()) {
+      return 'Firebase não configurado no .env.local. Login e estatísticas ficam desativados.';
+    }
+
+    if (this.authSession.isLoading) {
+      return 'Verificando sessão de login...';
+    }
+
+    if (!this.authSession.user) {
+      return 'Faça login com Google para salvar nickname e estatísticas.';
+    }
+
+    const nickname = this.authSession.profile?.nickname ?? this.authSession.user.displayName ?? 'Jogador';
+    const stats = this.authSession.profile?.stats;
+    const statsMessage = stats
+      ? `Partidas: ${stats.gamesPlayed} • Vitórias: ${stats.gamesWon}`
+      : 'Sincronizando estatísticas...';
+
+    return `Conectado como ${nickname}\n${statsMessage}`;
+  }
+
+  private getDefaultInfoMessage(): string {
+    if (isAuthenticationAvailable() && !this.authSession.user) {
+      return 'Entre com Google para continuar';
+    }
+
+    return 'Escolha uma opção para continuar';
+  }
+
+  private async handleGoogleSignIn(): Promise<void> {
+    try {
+      await signInWithGoogle();
+      this.showInfo('Login efetuado com sucesso.');
+    } catch (error) {
+      console.error('[auth] Falha no login com Google', error);
+      this.showInfo(this.getGoogleSignInErrorMessage(error));
+    }
+  }
+
+  private getGoogleSignInErrorMessage(error: unknown): string {
+    const firebaseLikeError = error as { code?: string; message?: string } | null;
+    const code = firebaseLikeError?.code;
+
+    switch (code) {
+      case 'auth/unauthorized-domain':
+        return 'Domínio não autorizado no Firebase. Adicione localhost (e 127.0.0.1, se usar) em Authentication > Settings > Authorized domains.';
+      case 'auth/operation-not-allowed':
+        return 'Login Google desativado no Firebase. Ative em Authentication > Sign-in method > Google.';
+      case 'auth/popup-blocked':
+        return 'O navegador bloqueou o popup de login. Permita popups para este site e tente novamente.';
+      case 'auth/popup-closed-by-user':
+        return 'Popup de login fechado antes de concluir. Tente novamente.';
+      case 'auth/cancelled-popup-request':
+        return 'Tentativa anterior de popup foi cancelada. Tente clicar no botão novamente.';
+      case 'auth/network-request-failed':
+        return 'Falha de rede ao conectar com Firebase. Verifique internet/VPN/firewall e tente novamente.';
+      default:
+        return code
+          ? `Não foi possível fazer login com Google (${code}). Veja o console para mais detalhes.`
+          : 'Não foi possível fazer login com Google. Veja o console para mais detalhes.';
+    }
+  }
+
+  private async handleGoogleSignOut(): Promise<void> {
+    try {
+      await signOutCurrentUser();
+      this.showInfo('Você saiu da conta Google.');
+    } catch (error) {
+      console.error('[auth] Falha ao sair da conta', error);
+      this.showInfo('Não foi possível sair da conta agora.');
+    }
   }
 
   private showInfo(message: string) {
@@ -185,12 +325,38 @@ export default class TitleScene extends Phaser.Scene {
     }
   }
 
-  private promptNickname() {
-    const input =
-      window.prompt('Qual nickname deseja usar?', this.lastNickname || 'Player')?.trim() ?? '';
+  private async promptNickname(): Promise<string | undefined> {
+    if (isAuthenticationAvailable()) {
+      const profileNickname = this.authSession.profile?.nickname;
+      const fallbackNickname =
+        profileNickname ?? this.authSession.user?.displayName ?? this.lastNickname ?? 'Player';
+
+      const input = window.prompt('Qual nickname deseja usar?', fallbackNickname)?.trim() ?? '';
+      const finalNickname = input || fallbackNickname;
+
+      if (!finalNickname) {
+        return undefined;
+      }
+
+      this.lastNickname = finalNickname;
+
+      if (finalNickname !== profileNickname && this.authSession.user) {
+        try {
+          await updateCurrentUserNickname(finalNickname);
+        } catch (error) {
+          console.error('[auth] Falha ao atualizar nickname no Firestore', error);
+          this.showInfo('Nickname aplicado localmente, mas não foi salvo na nuvem.');
+        }
+      }
+
+      return finalNickname;
+    }
+
+    const input = window.prompt('Qual nickname deseja usar?', this.lastNickname || 'Player')?.trim() ?? '';
     if (input) {
       this.lastNickname = input;
     }
+
     return input || undefined;
   }
 
