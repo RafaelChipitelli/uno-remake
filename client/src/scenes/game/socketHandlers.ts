@@ -2,6 +2,7 @@ import type { Socket } from 'socket.io-client';
 import type {
   Card,
   CardActionEvent,
+  GameEndedPayload,
   Player,
   Room,
   RoomErrorPayload,
@@ -13,6 +14,7 @@ export type GameSceneSocketCallbacks = {
   onGameStarted: (payload: GameStartedPayload) => void;
   onCardPlayed: (event: CardActionEvent) => void;
   onCardDrawn: (event: CardActionEvent) => void;
+  onGameEnded: (payload: GameEndedPayload) => void;
   onRoomCreated: (payload: { roomId: string }) => void;
   onRoomJoined: (payload: { roomId: string }) => void;
   onRoomState: (room: Room) => void;
@@ -29,6 +31,7 @@ export function registerGameSceneSocketHandlers(
   socket.on('game:started', callbacks.onGameStarted);
   socket.on('card:played', callbacks.onCardPlayed);
   socket.on('card:drawn', callbacks.onCardDrawn);
+  socket.on('game:ended', callbacks.onGameEnded);
   socket.on('room:created', callbacks.onRoomCreated);
   socket.on('room:joined', callbacks.onRoomJoined);
   socket.on('room:state', callbacks.onRoomState);
