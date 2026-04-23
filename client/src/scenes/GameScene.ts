@@ -275,6 +275,18 @@ export default class GameScene extends Phaser.Scene {
     this.roomGameStatus = room.gameStatus;
 
     const me = room.players.find((player) => player.id === this.player?.id);
+    const opponents = room.players
+      .filter((player) => player.id !== this.player?.id)
+      .slice(0, 3)
+      .map((player) => ({
+        id: player.id,
+        nickname: player.nickname,
+        cardCount: player.handCount ?? player.hand.length,
+        isTurn: player.isTurn,
+      }));
+
+    this.cardStage?.setOpponents(opponents);
+
     if (me) {
       this.player = me;
       this.cardStage?.setHandCards(me.hand);
@@ -334,6 +346,7 @@ export default class GameScene extends Phaser.Scene {
     this.clearColorSelectionModal();
     this.updateRoomDetails(EMPTY_PLAYER_LIST_MESSAGE);
     this.cardStage?.setPlayerNickname(undefined);
+    this.cardStage?.setOpponents([]);
     this.goBackToLobby('Você saiu da sala.');
   }
 
@@ -709,6 +722,8 @@ export default class GameScene extends Phaser.Scene {
     return this.roomId ? `Sala atual: ${this.roomId}` : 'Nenhuma sala ativa.';
   }
 }
+
+
 
 
 

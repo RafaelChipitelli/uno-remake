@@ -11,6 +11,7 @@ export interface Player {
   id: string;
   nickname: string;
   hand: Card[];
+  handCount?: number;
   isTurn: boolean;
   roomId?: string | undefined;
 }

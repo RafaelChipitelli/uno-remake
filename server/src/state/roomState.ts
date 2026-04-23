@@ -18,6 +18,7 @@ export function emitRoomState(io: Server, rooms: Map<string, Room>, roomId: stri
       ...room,
       players: room.players.map((currentPlayer) => ({
         ...currentPlayer,
+        handCount: currentPlayer.hand.length,
         hand: currentPlayer.id === player.id ? currentPlayer.hand : [],
       })),
     };
