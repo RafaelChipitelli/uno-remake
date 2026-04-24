@@ -146,7 +146,7 @@ canvas:focus-visible {
   font-weight: 600;
   padding: 10px 16px;
   min-width: 110px;
-  color: #fff;
+  color: var(--color-text-inverse);
   cursor: pointer;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
   transition: all 0.2s ease;
@@ -162,15 +162,15 @@ canvas:focus-visible {
 }
 
 .ui-modal-btn--primary {
-  background: linear-gradient(180deg, #7c6cff 0%, var(--primary) 100%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 78%, white) 0%, var(--primary) 100%);
 }
 
 .ui-modal-btn--secondary {
-  background: linear-gradient(180deg, #5aa0ff 0%, var(--secondary) 100%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--secondary) 78%, white) 0%, var(--secondary) 100%);
 }
 
 .ui-modal-btn--danger {
-  background: linear-gradient(180deg, #ff7070 0%, var(--danger) 100%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--danger) 78%, white) 0%, var(--danger) 100%);
 }
 
 .ui-modal-btn--ghost {

@@ -5,6 +5,7 @@ import {
   SELECTABLE_WILD_COLORS,
   type SelectableColor,
 } from '../../game/colors';
+import { phaserTheme, theme } from '../../theme/tokens';
 
 type WildColorModalOptions = {
   fontFamily: string;
@@ -48,7 +49,7 @@ export function createWildColorModal(
     .setInteractive();
 
   const panel = scene.add
-    .rectangle(panelX, panelY, panelWidth, panelHeight, 0x0f172a, 0.96)
+    .rectangle(panelX, panelY, panelWidth, panelHeight, phaserTheme.colors.bg.game, 0.96)
     .setOrigin(0.5)
     .setStrokeStyle(2, 0xffffff, 0.35)
     .setDepth(2001);
@@ -57,7 +58,7 @@ export function createWildColorModal(
     .text(panelX, panelY - 70, 'Escolha a cor do curinga', {
       fontFamily: options.fontFamily,
       fontSize: '24px',
-      color: '#f8fafc',
+      color: theme.colors.text.primary,
       fontStyle: 'bold',
     })
     .setOrigin(0.5)
@@ -84,7 +85,7 @@ export function createWildColorModal(
       .text(x, y, COLOR_LABELS[color], {
         fontFamily: options.fontFamily,
         fontSize: '14px',
-        color: '#ffffff',
+        color: theme.colors.text.inverse,
         fontStyle: 'bold',
       })
       .setOrigin(0.5)

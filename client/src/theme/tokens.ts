@@ -15,12 +15,19 @@ export const theme = {
       disabled: '#374151',
     },
     text: {
-      primary: '#e5e7eb',
+      primary: '#ebe5e5',
       secondary: '#c9d4ea',
       muted: '#9ca3af',
       subtle: '#8fa0bb',
       inverse: '#ffffff',
       success: '#d1fae5',
+    },
+    decor: {
+      cardBackLeft: '#263042',
+      cardBackRight: '#24314c',
+      sparkle: '#9ec1ff',
+      shadowDeep: '#101723',
+      overlay: '#000000',
     },
     action: {
       primary: {
@@ -53,6 +60,13 @@ export const theme = {
       danger: '#ff4d4d',
       info: '#3a86ff',
     },
+    card: {
+      red: '#dc2626',
+      green: '#16a34a',
+      blue: '#2563eb',
+      yellow: '#eab308',
+      wild: '#1f2937',
+    },
   },
 } as const;
 
@@ -69,6 +83,21 @@ export const phaserTheme = {
       cardAlt: hexToNumber(theme.colors.surface.cardAlt),
       raised: hexToNumber(theme.colors.surface.raised),
       disabled: hexToNumber(theme.colors.surface.disabled),
+    },
+    text: {
+      primary: hexToNumber(theme.colors.text.primary),
+      secondary: hexToNumber(theme.colors.text.secondary),
+      muted: hexToNumber(theme.colors.text.muted),
+      subtle: hexToNumber(theme.colors.text.subtle),
+      inverse: hexToNumber(theme.colors.text.inverse),
+      success: hexToNumber(theme.colors.text.success),
+    },
+    decor: {
+      cardBackLeft: hexToNumber(theme.colors.decor.cardBackLeft),
+      cardBackRight: hexToNumber(theme.colors.decor.cardBackRight),
+      sparkle: hexToNumber(theme.colors.decor.sparkle),
+      shadowDeep: hexToNumber(theme.colors.decor.shadowDeep),
+      overlay: hexToNumber(theme.colors.decor.overlay),
     },
     action: {
       primary: {
@@ -101,6 +130,13 @@ export const phaserTheme = {
       danger: hexToNumber(theme.colors.status.danger),
       info: hexToNumber(theme.colors.status.info),
     },
+    card: {
+      red: hexToNumber(theme.colors.card.red),
+      green: hexToNumber(theme.colors.card.green),
+      blue: hexToNumber(theme.colors.card.blue),
+      yellow: hexToNumber(theme.colors.card.yellow),
+      wild: hexToNumber(theme.colors.card.wild),
+    },
   },
 } as const;
 
@@ -114,6 +150,7 @@ export const themeCssVariables: Record<string, string> = {
   '--color-text-primary': theme.colors.text.primary,
   '--color-text-muted': theme.colors.text.muted,
   '--color-text-secondary': theme.colors.text.secondary,
+  '--color-text-inverse': theme.colors.text.inverse,
   '--color-action-primary': theme.colors.action.primary.base,
   '--color-action-secondary': theme.colors.action.secondary.base,
   '--color-action-danger': theme.colors.action.danger.base,

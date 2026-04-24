@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { CARD_COLOR_HEX } from '../../game/colors';
+import { phaserTheme, theme } from '../../theme/tokens';
 import type { Card } from '../../types';
 
 type CardStageOptions = {
@@ -128,21 +129,28 @@ export default class CardStage {
     const cardWidth = clamp(146 * (this.options.tableCardScale ?? 1), 104, 152);
     const cardHeight = cardWidth * 1.44;
 
-    const tableGlow = this.scene.add.ellipse(metrics.stageX, centerY + 16, cardWidth * 2.5, cardHeight * 1.2, 0x6c5ce7, 0.13);
+    const tableGlow = this.scene.add.ellipse(
+      metrics.stageX,
+      centerY + 16,
+      cardWidth * 2.5,
+      cardHeight * 1.2,
+      phaserTheme.colors.action.primary.base,
+      0.13,
+    );
     this.elements.push(tableGlow);
 
     if (!this.tableCard) {
       const container = this.scene.add.container(metrics.stageX, centerY);
       const shadow = this.scene.add.rectangle(4, 6, cardWidth, cardHeight, 0x000000, 0.35).setOrigin(0.5);
       const card = this.scene.add
-        .rectangle(0, 0, cardWidth, cardHeight, 0x1f2937, 0.96)
+        .rectangle(0, 0, cardWidth, cardHeight, phaserTheme.colors.card.wild, 0.96)
         .setOrigin(0.5)
-        .setStrokeStyle(2, 0x9ca3af, 0.5);
+        .setStrokeStyle(2, phaserTheme.colors.surface.disabled, 0.5);
       const text = this.scene.add
         .text(0, 0, 'UNO', {
           fontFamily: this.options.fontFamily,
           fontSize: `${Math.round(clamp(36 * (this.options.fontScale ?? 1), 24, 38))}px`,
-          color: '#E5E7EB',
+          color: theme.colors.text.primary,
           fontStyle: '700',
         })
         .setOrigin(0.5)
@@ -160,7 +168,7 @@ export default class CardStage {
       const container = this.scene.add.container(metrics.stageX, centerY);
       const shadow = this.scene.add.rectangle(5, 7, cardWidth, cardHeight, 0x000000, 0.38).setOrigin(0.5);
       const card = this.scene.add
-        .rectangle(0, 0, cardWidth, cardHeight, CARD_COLOR_HEX[resolvedColor] ?? 0x374151)
+        .rectangle(0, 0, cardWidth, cardHeight, CARD_COLOR_HEX[resolvedColor] ?? phaserTheme.colors.surface.disabled)
         .setOrigin(0.5)
         .setStrokeStyle(3, 0xffffff, 0.9);
       const innerHighlight = this.scene.add.ellipse(0, -cardHeight * 0.2, cardWidth * 0.74, cardHeight * 0.28, 0xffffff, 0.15);
@@ -168,7 +176,7 @@ export default class CardStage {
         .text(0, 0, this.tableCard.value, {
           fontFamily: this.options.fontFamily,
           fontSize: `${Math.round(clamp(52 * (this.options.fontScale ?? 1), 30, 56))}px`,
-          color: '#ffffff',
+          color: theme.colors.text.inverse,
           fontStyle: '800',
         })
         .setOrigin(0.5)
@@ -193,7 +201,7 @@ export default class CardStage {
       .text(metrics.stageX, centerY + cardHeight / 2 + 24, this.playerNickname ? `Você: ${this.playerNickname}` : 'Aguardando conexão...', {
         fontFamily: this.options.fontFamily,
         fontSize: `${Math.round(clamp(16 * (this.options.fontScale ?? 1), 12, 18))}px`,
-        color: '#9CA3AF',
+        color: theme.colors.text.muted,
       })
       .setOrigin(0.5)
       .setResolution(this.options.textResolution);
@@ -226,7 +234,7 @@ export default class CardStage {
 
       const shadow = this.scene.add.rectangle(2, 4, cardWidth, cardHeight, 0x000000, 0.34).setOrigin(0.5);
       const base = this.scene.add
-        .rectangle(0, 0, cardWidth, cardHeight, CARD_COLOR_HEX[card.color] ?? 0x374151)
+        .rectangle(0, 0, cardWidth, cardHeight, CARD_COLOR_HEX[card.color] ?? phaserTheme.colors.surface.disabled)
         .setOrigin(0.5)
         .setStrokeStyle(2, 0xffffff, 0.9);
       const highlight = this.scene.add.ellipse(0, -cardHeight * 0.24, cardWidth * 0.7, cardHeight * 0.28, 0xffffff, 0.14);
@@ -234,7 +242,7 @@ export default class CardStage {
         .text(0, 0, card.value, {
           fontFamily: this.options.fontFamily,
           fontSize: `${Math.round(clamp(cardWidth * 0.32, 13, 24))}px`,
-          color: '#ffffff',
+          color: theme.colors.text.inverse,
           fontStyle: '800',
         })
         .setOrigin(0.5)
@@ -257,7 +265,7 @@ export default class CardStage {
 
       container.on('pointerover', () => {
         this.scene.tweens.add({ targets: container, y: baseY - 16, scaleX: 1.03, scaleY: 1.03, duration: 180, ease: 'Quad.easeOut' });
-        base.setStrokeStyle(3, 0xf8fafc, 1);
+        base.setStrokeStyle(3, 0xffffff, 1);
       });
 
       container.on('pointerout', () => {
@@ -302,14 +310,18 @@ export default class CardStage {
 
       const container = this.scene.add.container(seat.x, seat.y);
       const badge = this.scene.add
-        .rectangle(0, 0, 124, 58, 0x111827, 0.9)
+        .rectangle(0, 0, 124, 58, phaserTheme.colors.surface.card, 0.9)
         .setOrigin(0.5)
-        .setStrokeStyle(1, opponent.isTurn ? 0x22c55e : 0x2b3852, opponent.isTurn ? 1 : 0.8);
+        .setStrokeStyle(
+          1,
+          opponent.isTurn ? phaserTheme.colors.status.success : phaserTheme.colors.surface.panelBorder,
+          opponent.isTurn ? 1 : 0.8,
+        );
       const name = this.scene.add
         .text(0, -10, opponent.nickname, {
           fontFamily: this.options.fontFamily,
           fontSize: `${Math.round(clamp(13 * (this.options.fontScale ?? 1), 11, 14))}px`,
-          color: opponent.isTurn ? '#22C55E' : '#E5E7EB',
+          color: opponent.isTurn ? theme.colors.status.success : theme.colors.text.primary,
           fontStyle: opponent.isTurn ? '700' : '500',
         })
         .setOrigin(0.5)
@@ -318,7 +330,7 @@ export default class CardStage {
         .text(0, 13, `🃏 ${opponent.cardCount}`, {
           fontFamily: this.options.fontFamily,
           fontSize: `${Math.round(clamp(12 * (this.options.fontScale ?? 1), 10, 13))}px`,
-          color: '#9CA3AF',
+          color: theme.colors.text.muted,
         })
         .setOrigin(0.5)
         .setResolution(this.options.textResolution);

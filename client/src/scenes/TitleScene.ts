@@ -8,6 +8,7 @@ import {
   updateCurrentUserNickname,
   type AuthSession,
 } from '../services/playerAccount';
+import { phaserTheme, theme } from '../theme/tokens';
 import { askTextInput } from '../ui/modal';
 
 type ButtonConfig = {
@@ -39,7 +40,7 @@ export default class TitleScene extends Phaser.Scene {
   }
 
   create() {
-    this.cameras.main.setBackgroundColor('#0B0F1A');
+    this.cameras.main.setBackgroundColor(theme.colors.bg.canvas);
 
     this.unsubscribeAuthSession = subscribeAuthSession((session) => {
       this.authSession = session;
@@ -120,34 +121,36 @@ export default class TitleScene extends Phaser.Scene {
     let cursorY = layoutCenterY - blockHeight / 2;
 
     const iconContainer = this.add.container(centerX, cursorY + iconRadius);
-    const iconGlow = this.add.ellipse(0, 4, iconRadius * 2.8, iconRadius * 1.8, 0x6c5ce7, 0.2);
+    const iconGlow = this.add.ellipse(0, 4, iconRadius * 2.8, iconRadius * 1.8, phaserTheme.colors.action.primary.base, 0.2);
     const cardBackLeft = this.add
-      .rectangle(-16, 2, iconRadius * 1.1, iconRadius * 1.5, 0x263042, 0.95)
-      .setStrokeStyle(2, 0x3a86ff, 0.45)
+      .rectangle(-16, 2, iconRadius * 1.1, iconRadius * 1.5, phaserTheme.colors.decor.cardBackLeft, 0.95)
+      .setStrokeStyle(2, phaserTheme.colors.action.secondary.base, 0.45)
       .setAngle(-20)
       .setOrigin(0.5);
     const cardBackRight = this.add
-      .rectangle(14, 3, iconRadius * 1.1, iconRadius * 1.5, 0x24314c, 0.95)
-      .setStrokeStyle(2, 0x7ba8ff, 0.45)
+      .rectangle(14, 3, iconRadius * 1.1, iconRadius * 1.5, phaserTheme.colors.decor.cardBackRight, 0.95)
+      .setStrokeStyle(2, phaserTheme.colors.action.secondary.hover, 0.45)
       .setAngle(16)
       .setOrigin(0.5);
     const cardFront = this.add
-      .rectangle(0, -2, iconRadius * 1.2, iconRadius * 1.65, 0x6c5ce7, 1)
-      .setStrokeStyle(2, 0xffffff, 0.75)
+      .rectangle(0, -2, iconRadius * 1.2, iconRadius * 1.65, phaserTheme.colors.action.primary.base, 1)
+      .setStrokeStyle(2, phaserTheme.colors.text.inverse, 0.75)
       .setAngle(-8)
       .setOrigin(0.5);
-    const cardFrontMark = this.add.ellipse(0, -2, iconRadius * 0.95, iconRadius * 0.45, 0xffffff, 0.18).setAngle(-22);
+    const cardFrontMark = this.add
+      .ellipse(0, -2, iconRadius * 0.95, iconRadius * 0.45, phaserTheme.colors.text.inverse, 0.18)
+      .setAngle(-22);
     const cardFrontText = this.add
       .text(0, -2, 'UNO', {
         fontFamily: FONT,
         fontSize: Math.round(rem * 0.9),
         fontStyle: '800',
-        color: '#ffffff',
+        color: theme.colors.text.inverse,
       })
       .setOrigin(0.5)
       .setAngle(-8)
       .setResolution(TEXT_RESOLUTION);
-    const sparkle = this.add.circle(iconRadius * 0.9, -iconRadius * 0.7, 3, 0x9ec1ff, 0.95);
+    const sparkle = this.add.circle(iconRadius * 0.9, -iconRadius * 0.7, 3, phaserTheme.colors.decor.sparkle, 0.95);
 
     iconContainer.add([iconGlow, cardBackLeft, cardBackRight, cardFront, cardFrontMark, cardFrontText, sparkle]);
     this.iconFloatContainer = iconContainer;
@@ -161,7 +164,7 @@ export default class TitleScene extends Phaser.Scene {
         fontFamily: FONT,
         fontSize: titleSize,
         fontStyle: '800',
-        color: '#E5E7EB',
+        color: theme.colors.text.primary,
         letterSpacing: 3,
       })
       .setOrigin(0.5)
@@ -171,7 +174,7 @@ export default class TitleScene extends Phaser.Scene {
         fontFamily: FONT,
         fontSize: titleSize,
         fontStyle: '800',
-        color: '#7BA8FF',
+        color: theme.colors.action.secondary.hover,
         letterSpacing: 3,
       })
       .setOrigin(0.5)
@@ -188,7 +191,7 @@ export default class TitleScene extends Phaser.Scene {
       .text(centerX, cursorY, 'Multiplayer em tempo real', {
         fontFamily: FONT,
         fontSize: subtitleSize,
-        color: '#A8B3C8',
+        color: theme.colors.text.secondary,
       })
       .setOrigin(0.5)
       .setResolution(TEXT_RESOLUTION);
@@ -199,17 +202,24 @@ export default class TitleScene extends Phaser.Scene {
     const profileBoxWidth = contentWidth;
     const profileBoxHeight = inputBlockHeight;
     const profileShadow = this.add
-      .rectangle(centerX, cursorY + profileBoxHeight / 2 + 3, profileBoxWidth, profileBoxHeight, 0x101723, 0.42)
+      .rectangle(
+        centerX,
+        cursorY + profileBoxHeight / 2 + 3,
+        profileBoxWidth,
+        profileBoxHeight,
+        phaserTheme.colors.decor.shadowDeep,
+        0.42,
+      )
       .setOrigin(0.5);
     const profileBox = this.add
-      .rectangle(centerX, cursorY + profileBoxHeight / 2, profileBoxWidth, profileBoxHeight, 0x111827, 0.92)
-      .setStrokeStyle(1, 0x2b3852, 0.9)
+      .rectangle(centerX, cursorY + profileBoxHeight / 2, profileBoxWidth, profileBoxHeight, phaserTheme.colors.surface.card, 0.92)
+      .setStrokeStyle(1, phaserTheme.colors.surface.panelBorder, 0.9)
       .setOrigin(0.5);
     const profileName = this.add
       .text(centerX - profileBoxWidth / 2 + 14, cursorY + profileBoxHeight / 2, identity.nickname, {
         fontFamily: FONT,
         fontSize: `${inputFontSize}px`,
-        color: '#E5E7EB',
+        color: theme.colors.text.primary,
         fontStyle: '600',
       })
       .setOrigin(0, 0.5)
@@ -222,7 +232,7 @@ export default class TitleScene extends Phaser.Scene {
       .text(centerX, cursorY, identity.statsLabel, {
         fontFamily: FONT,
         fontSize: `${metaTextSize}px`,
-        color: '#8FA0BB',
+        color: theme.colors.text.subtle,
       })
       .setOrigin(0.5)
       .setResolution(TEXT_RESOLUTION);
@@ -236,7 +246,7 @@ export default class TitleScene extends Phaser.Scene {
         .text(centerX, cursorY, identity.hint, {
           fontFamily: FONT,
           fontSize: infoSize,
-          color: '#9CA3AF',
+          color: theme.colors.text.muted,
           align: 'center',
           wordWrap: { width: contentWidth, useAdvancedWrap: true },
         })
@@ -293,7 +303,7 @@ export default class TitleScene extends Phaser.Scene {
       .text(centerX, cursorY, this.getDefaultInfoMessage(), {
         fontFamily: FONT,
         fontSize: infoSize,
-        color: '#9CA3AF',
+        color: theme.colors.text.muted,
       })
       .setOrigin(0.5)
       .setResolution(TEXT_RESOLUTION);
@@ -314,7 +324,7 @@ export default class TitleScene extends Phaser.Scene {
       .text(width - 32, 28, 'Sair da Conta Google', {
         fontFamily: FONT,
         fontSize: '13px',
-        color: '#9CA3AF',
+        color: theme.colors.text.muted,
       })
       .setOrigin(1, 0)
       .setResolution(TEXT_RESOLUTION);
@@ -325,11 +335,11 @@ export default class TitleScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
 
     zone.on('pointerover', () => {
-      label.setColor('#E5E7EB');
+      label.setColor(theme.colors.text.primary);
       this.tweens.add({ targets: label, alpha: 1, duration: 150, ease: 'Sine.easeOut' });
     });
     zone.on('pointerout', () => {
-      label.setColor('#9CA3AF');
+      label.setColor(theme.colors.text.muted);
     });
     zone.on('pointerup', () => {
       void this.handleGoogleSignOut();
@@ -342,26 +352,26 @@ export default class TitleScene extends Phaser.Scene {
 
   private createBackgroundDecorations(width: number, height: number) {
     const leftGlow = this.add
-      .ellipse(width * 0.16, height * 0.24, width * 0.4, height * 0.44, 0x3a86ff, 0.08)
+      .ellipse(width * 0.16, height * 0.24, width * 0.4, height * 0.44, phaserTheme.colors.action.secondary.base, 0.08)
       .setDepth(DECOR_DEPTH);
     const rightGlow = this.add
-      .ellipse(width * 0.86, height * 0.76, width * 0.44, height * 0.48, 0x6c5ce7, 0.08)
+      .ellipse(width * 0.86, height * 0.76, width * 0.44, height * 0.48, phaserTheme.colors.action.primary.base, 0.08)
       .setDepth(DECOR_DEPTH);
 
     const ambientDecor = [
-      { text: '⟲', x: width * 0.1, y: height * 0.18, size: 76, color: '#3A86FF', alpha: 0.08, angle: -18 },
-      { text: '⊘', x: width * 0.9, y: height * 0.18, size: 70, color: '#6C5CE7', alpha: 0.07, angle: 16 },
-      { text: '+4', x: width * 0.83, y: height * 0.52, size: 58, color: '#FF4D4D', alpha: 0.08, angle: -14 },
-      { text: 'UNO', x: width * 0.16, y: height * 0.58, size: 52, color: '#22C55E', alpha: 0.06, angle: -12 },
-      { text: '↺', x: width * 0.5, y: height * 0.12, size: 58, color: '#9CA3AF', alpha: 0.05, angle: 0 },
+      { text: '⟲', x: width * 0.1, y: height * 0.18, size: 76, color: theme.colors.action.secondary.base, alpha: 0.08, angle: -18 },
+      { text: '⊘', x: width * 0.9, y: height * 0.18, size: 70, color: theme.colors.action.primary.base, alpha: 0.07, angle: 16 },
+      { text: '+4', x: width * 0.83, y: height * 0.52, size: 58, color: theme.colors.action.danger.base, alpha: 0.08, angle: -14 },
+      { text: 'UNO', x: width * 0.16, y: height * 0.58, size: 52, color: theme.colors.status.success, alpha: 0.06, angle: -12 },
+      { text: '↺', x: width * 0.5, y: height * 0.12, size: 58, color: theme.colors.text.muted, alpha: 0.05, angle: 0 },
     ];
 
     const bottomCards = [
-      { x: width * 0.42, y: height + 32, w: 104, h: 146, color: 0x3a86ff, angle: -24, label: 'SKIP' },
-      { x: width * 0.48, y: height + 24, w: 108, h: 150, color: 0xff4d4d, angle: -10, label: 'REVERSE' },
-      { x: width * 0.54, y: height + 22, w: 110, h: 154, color: 0x6c5ce7, angle: 8, label: '+4' },
-      { x: width * 0.6, y: height + 30, w: 104, h: 146, color: 0x22c55e, angle: 18, label: 'UNO' },
-      { x: width * 0.66, y: height + 44, w: 96, h: 136, color: 0x3a86ff, angle: 28, label: 'DECK' },
+      { x: width * 0.42, y: height + 32, w: 104, h: 146, color: phaserTheme.colors.action.secondary.base, angle: -24, label: 'SKIP' },
+      { x: width * 0.48, y: height + 24, w: 108, h: 150, color: phaserTheme.colors.action.danger.base, angle: -10, label: 'REVERSE' },
+      { x: width * 0.54, y: height + 22, w: 110, h: 154, color: phaserTheme.colors.action.primary.base, angle: 8, label: '+4' },
+      { x: width * 0.6, y: height + 30, w: 104, h: 146, color: phaserTheme.colors.status.success, angle: 18, label: 'UNO' },
+      { x: width * 0.66, y: height + 44, w: 96, h: 136, color: phaserTheme.colors.action.secondary.base, angle: 28, label: 'DECK' },
     ];
 
     this.staticElements.push(leftGlow, rightGlow);
@@ -388,7 +398,7 @@ export default class TitleScene extends Phaser.Scene {
         .setDepth(DECOR_DEPTH);
       const card = this.add
         .rectangle(item.x, item.y, item.w, item.h, item.color, 0.1)
-        .setStrokeStyle(2, 0xffffff, 0.12)
+        .setStrokeStyle(2, phaserTheme.colors.text.inverse, 0.12)
         .setAngle(item.angle)
         .setDepth(DECOR_DEPTH);
       const cardLabel = this.add
@@ -396,7 +406,7 @@ export default class TitleScene extends Phaser.Scene {
           fontFamily: FONT,
           fontSize: '15px',
           fontStyle: '700',
-          color: '#E5E7EB',
+          color: theme.colors.text.primary,
         })
         .setOrigin(0.5)
         .setAngle(item.angle)
@@ -440,7 +450,12 @@ export default class TitleScene extends Phaser.Scene {
     fontSize: number,
     config: ButtonConfig,
   ) {
-    const palette = { base: 0x6c5ce7, hover: 0x7f70ef, border: 0x4f46b6, shadow: 0x2b2368 };
+    const palette = {
+      base: phaserTheme.colors.action.primary.base,
+      hover: phaserTheme.colors.action.primary.hover,
+      border: phaserTheme.colors.action.primary.border,
+      shadow: phaserTheme.colors.action.primary.shadow,
+    };
     const shadow = this.add.rectangle(x, y + 4, width, height, palette.shadow, 0.45).setOrigin(0.5);
 
     const buttonRect = this.add
@@ -451,7 +466,7 @@ export default class TitleScene extends Phaser.Scene {
       .text(x, y, config.label, {
         fontFamily: FONT,
         fontSize,
-        color: '#ffffff',
+        color: theme.colors.text.inverse,
         fontStyle: '700',
       })
       .setOrigin(0.5)
@@ -493,7 +508,12 @@ export default class TitleScene extends Phaser.Scene {
     fontSize: number,
     config: ButtonConfig,
   ) {
-    const palette = { base: 0x22253a, hover: 0x2a2f4a, border: 0x404a6a, shadow: 0x131722 };
+    const palette = {
+      base: phaserTheme.colors.action.neutral.base,
+      hover: phaserTheme.colors.action.neutral.hover,
+      border: phaserTheme.colors.action.neutral.border,
+      shadow: phaserTheme.colors.action.neutral.shadow,
+    };
 
     const shadow = this.add.rectangle(x, y + 3, width, height, palette.shadow, 0.42).setOrigin(0.5);
     const buttonRect = this.add
@@ -504,7 +524,7 @@ export default class TitleScene extends Phaser.Scene {
       .text(x, y, config.label, {
         fontFamily: FONT,
         fontSize: `${fontSize}px`,
-        color: '#C9D4EA',
+        color: theme.colors.text.secondary,
         fontStyle: '600',
       })
       .setOrigin(0.5)
@@ -648,15 +668,15 @@ export default class TitleScene extends Phaser.Scene {
     const { width } = this.scale;
     const toast = this.add.container(width / 2, 24).setDepth(60).setAlpha(0);
     const bg = this.add.graphics();
-    bg.fillStyle(0x14532d, 0.34);
-    bg.lineStyle(1, 0x22c55e, 0.65);
+    bg.fillStyle(phaserTheme.colors.status.success, 0.34);
+    bg.lineStyle(1, phaserTheme.colors.status.success, 0.65);
     bg.fillRoundedRect(-128, -18, 256, 36, 8);
     bg.strokeRoundedRect(-128, -18, 256, 36, 8);
     const label = this.add
       .text(0, 0, message, {
         fontFamily: FONT,
         fontSize: '14px',
-        color: '#d1fae5',
+        color: theme.colors.text.success,
         fontStyle: '600',
       })
       .setOrigin(0.5)
