@@ -250,9 +250,10 @@ export default class CardStage {
     );
 
     const scale = this.options.tableCardScale ?? 1;
-    const idealCardWidth = clamp(80 * scale, 58, 94);
-    const idealSpacing = clamp(14 * scale, 8, 18);
-    const minVisibleCards = this.options.compact ? 3 : 5;
+    const isMobileViewport = this.scene.scale.width < 640;
+    const idealCardWidth = clamp(74 * scale, isMobileViewport ? 48 : 54, 90);
+    const idealSpacing = clamp(12 * scale, isMobileViewport ? 5 : 7, 16);
+    const minVisibleCards = isMobileViewport ? 5 : this.options.compact ? 4 : 5;
     const idealVisibleCount = Math.max(
       minVisibleCards,
       Math.floor((handViewportWidth + idealSpacing) / (idealCardWidth + idealSpacing)),
