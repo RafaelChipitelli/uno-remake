@@ -53,6 +53,7 @@ function clamp(value: number, min: number, max: number) {
 
 export default class CardStage {
   private static readonly CARD_HOVER_OFFSET_Y = 16;
+  private static readonly HAND_SCROLL_STEP = 1;
 
   private scene: Phaser.Scene;
   private options: CardStageOptions;
@@ -67,6 +68,7 @@ export default class CardStage {
   private allObjects: Phaser.GameObjects.GameObject[] = [];
   private handViews = new Map<string, HandCardView>();
   private visibleHandIds: string[] = [];
+  private handWindowStart = 0;
 
   private tableGlow?: Phaser.GameObjects.Ellipse;
   private placeholderContainer?: Phaser.GameObjects.Container;
@@ -74,8 +76,11 @@ export default class CardStage {
   private tableCardRect?: Phaser.GameObjects.Rectangle;
   private tableCardText?: Phaser.GameObjects.Text;
   private nicknameText?: Phaser.GameObjects.Text;
+  private handNavLeft?: Phaser.GameObjects.Text;
+  private handNavRight?: Phaser.GameObjects.Text;
 
   private opponentViews: OpponentView[] = [];
+  private wheelListenerRegistered = false;
 
   constructor(scene: Phaser.Scene, options: CardStageOptions) {
     this.scene = scene;
@@ -96,6 +101,7 @@ export default class CardStage {
   build() {
     this.clearStageObjects();
     this.createStaticObjects();
+    this.ensureWheelNavigationListener();
     this.syncTableArea(true);
     this.syncOpponents(true);
     this.syncHand(true);
@@ -124,6 +130,25 @@ export default class CardStage {
 
   setHandCards(cards: Card[]) {
     this.handCards = cards;
+    this.syncHand();
+  }
+
+  shiftHandWindow(delta: number): void {
+    if (delta === 0) return;
+
+    const { maxVisible } = this.getHandLayout(this.getMetrics());
+    const maxStart = Math.max(0, this.handCards.length - maxVisible);
+    if (maxStart <= 0) {
+      this.handWindowStart = 0;
+      return;
+    }
+
+    const nextStart = clamp(this.handWindowStart + delta, 0, maxStart);
+    if (nextStart === this.handWindowStart) {
+      return;
+    }
+
+    this.handWindowStart = nextStart;
     this.syncHand();
   }
 
@@ -220,6 +245,33 @@ export default class CardStage {
       .setResolution(this.options.textResolution);
     this.allObjects.push(this.nicknameText);
 
+    this.handNavLeft = this.scene.add
+      .text(0, 0, '<', {
+        fontFamily: this.options.fontFamily,
+        fontSize: `${Math.round(clamp(28 * (this.options.fontScale ?? 1), 20, 34))}px`,
+        color: theme.colors.text.primary,
+        fontStyle: '700',
+      })
+      .setOrigin(0.5)
+      .setResolution(this.options.textResolution)
+      .setInteractive({ useHandCursor: true });
+
+    this.handNavRight = this.scene.add
+      .text(0, 0, '>', {
+        fontFamily: this.options.fontFamily,
+        fontSize: `${Math.round(clamp(28 * (this.options.fontScale ?? 1), 20, 34))}px`,
+        color: theme.colors.text.primary,
+        fontStyle: '700',
+      })
+      .setOrigin(0.5)
+      .setResolution(this.options.textResolution)
+      .setInteractive({ useHandCursor: true });
+
+    this.handNavLeft.on('pointerup', () => this.shiftHandWindow(-1));
+    this.handNavRight.on('pointerup', () => this.shiftHandWindow(1));
+
+    this.allObjects.push(this.handNavLeft, this.handNavRight);
+
     this.createOpponentSlots();
   }
 
@@ -305,14 +357,11 @@ export default class CardStage {
 
   private syncHand(withIntroAnimation = false): void {
     const metrics = this.getMetrics();
-    const baseY = this.scene.scale.height - (this.options.handBottomOffset ?? 92);
-    const isCompact = Boolean(this.options.compact);
-    const cardWidth = clamp(74 * (this.options.tableCardScale ?? 1), isCompact ? 48 : 54, 90);
-    const cardHeight = cardWidth * 1.42;
-    const cardGap = clamp(10 * (this.options.tableCardScale ?? 1), 6, 14);
-    const maxVisible = clamp(Math.floor(metrics.stageWidth / (cardWidth + cardGap)), 4, 11);
+    const { baseY, cardWidth, cardHeight, cardGap, maxVisible } = this.getHandLayout(metrics);
+    const maxStart = Math.max(0, this.handCards.length - maxVisible);
+    this.handWindowStart = clamp(this.handWindowStart, 0, maxStart);
 
-    const cards = this.handCards.slice(0, maxVisible);
+    const cards = this.handCards.slice(this.handWindowStart, this.handWindowStart + maxVisible);
     const visibleIds = new Set(cards.map((card) => card.id));
 
     this.visibleHandIds
@@ -368,6 +417,108 @@ export default class CardStage {
     });
 
     this.visibleHandIds = cards.map((card) => card.id);
+    this.syncHandNavigationUi(metrics, baseY, cardWidth, cardHeight, totalWidth, maxStart);
+  }
+
+  private syncHandNavigationUi(
+    metrics: StageMetrics,
+    baseY: number,
+    cardWidth: number,
+    cardHeight: number,
+    totalWidth: number,
+    maxStart: number,
+  ): void {
+    if (!this.handNavLeft || !this.handNavRight) {
+      return;
+    }
+
+    const hasOverflow = maxStart > 0;
+    if (!hasOverflow) {
+      this.handNavLeft.setVisible(false).disableInteractive();
+      this.handNavRight.setVisible(false).disableInteractive();
+      return;
+    }
+
+    const leftEdge = metrics.stageX - totalWidth / 2;
+    const rightEdge = metrics.stageX + totalWidth / 2;
+    const y = baseY;
+    const offset = cardWidth * 0.75;
+
+    this.handNavLeft.setPosition(leftEdge - offset, y).setVisible(true);
+    this.handNavRight.setPosition(rightEdge + offset, y).setVisible(true);
+
+    const canGoLeft = this.handWindowStart > 0;
+    const canGoRight = this.handWindowStart < maxStart;
+
+    if (canGoLeft) {
+      this.handNavLeft.setAlpha(1).setInteractive({ useHandCursor: true });
+    } else {
+      this.handNavLeft.setAlpha(0.35).disableInteractive();
+    }
+
+    if (canGoRight) {
+      this.handNavRight.setAlpha(1).setInteractive({ useHandCursor: true });
+    } else {
+      this.handNavRight.setAlpha(0.35).disableInteractive();
+    }
+
+    this.handNavLeft.setScale(1);
+    this.handNavRight.setScale(1);
+    this.handNavLeft.setY(y - cardHeight * 0.05);
+    this.handNavRight.setY(y - cardHeight * 0.05);
+  }
+
+  private getHandLayout(metrics: StageMetrics): {
+    baseY: number;
+    cardWidth: number;
+    cardHeight: number;
+    cardGap: number;
+    maxVisible: number;
+  } {
+    const baseY = this.scene.scale.height - (this.options.handBottomOffset ?? 92);
+    const isCompact = Boolean(this.options.compact);
+    const cardWidth = clamp(74 * (this.options.tableCardScale ?? 1), isCompact ? 48 : 54, 90);
+    const cardHeight = cardWidth * 1.42;
+    const cardGap = clamp(10 * (this.options.tableCardScale ?? 1), 6, 14);
+    const maxVisible = clamp(Math.floor(metrics.stageWidth / (cardWidth + cardGap)), 4, 11);
+
+    return { baseY, cardWidth, cardHeight, cardGap, maxVisible };
+  }
+
+  private ensureWheelNavigationListener(): void {
+    if (this.wheelListenerRegistered) {
+      return;
+    }
+
+    this.scene.input.on('wheel', this.handleMouseWheel, this);
+    this.wheelListenerRegistered = true;
+  }
+
+  private handleMouseWheel(
+    pointer: Phaser.Input.Pointer,
+    _gameObjects: Phaser.GameObjects.GameObject[],
+    deltaX: number,
+    deltaY: number,
+  ): void {
+    const metrics = this.getMetrics();
+    const { baseY, cardHeight, maxVisible } = this.getHandLayout(metrics);
+    const hasOverflow = this.handCards.length > maxVisible;
+    if (!hasOverflow) {
+      return;
+    }
+
+    const pointerY = pointer.worldY ?? pointer.y;
+    const isOverHandBand = pointerY >= baseY - cardHeight * 1.2 && pointerY <= baseY + cardHeight * 0.9;
+    if (!isOverHandBand) {
+      return;
+    }
+
+    const dominantDelta = Math.abs(deltaY) >= Math.abs(deltaX) ? deltaY : deltaX;
+    if (dominantDelta > 0) {
+      this.shiftHandWindow(CardStage.HAND_SCROLL_STEP);
+    } else if (dominantDelta < 0) {
+      this.shiftHandWindow(-CardStage.HAND_SCROLL_STEP);
+    }
   }
 
   private createHandCardView(card: Card, cardWidth: number, cardHeight: number): HandCardView {
@@ -525,9 +676,21 @@ export default class CardStage {
     this.tableCardRect = undefined;
     this.tableCardText = undefined;
     this.nicknameText = undefined;
+    this.handNavLeft = undefined;
+    this.handNavRight = undefined;
+  }
+
+  private unregisterWheelNavigationListener(): void {
+    if (!this.wheelListenerRegistered) {
+      return;
+    }
+
+    this.scene.input.off('wheel', this.handleMouseWheel, this);
+    this.wheelListenerRegistered = false;
   }
 
   destroy() {
+    this.unregisterWheelNavigationListener();
     this.clearStageObjects();
   }
 }
