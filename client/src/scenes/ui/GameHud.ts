@@ -31,34 +31,23 @@ type HudCallbacks = {
   onDrawRequested: () => void;
 };
 
+type HudButtonTone = 'primary' | 'secondary' | 'danger';
+
 export default class GameHud {
   private scene: Phaser.Scene;
   private options: HudOptions;
   private callbacks: HudCallbacks;
-  private elements: Phaser.GameObjects.GameObject[];
-  private statusText?: Phaser.GameObjects.Text;
-  private playerListText?: Phaser.GameObjects.Text;
-  private actionLog?: Phaser.GameObjects.Text;
-  
-  private leaveButtonBg?: Phaser.GameObjects.Rectangle;
-  private leaveButtonLabel?: Phaser.GameObjects.Text;
-  private leaveButtonZone?: Phaser.GameObjects.Zone;
-
-  private startButtonBg?: Phaser.GameObjects.Rectangle;
-  private startButtonLabel?: Phaser.GameObjects.Text;
-  private startButtonZone?: Phaser.GameObjects.Zone;
-
-  private drawButtonBg?: Phaser.GameObjects.Rectangle;
-  private drawButtonLabel?: Phaser.GameObjects.Text;
-  private drawButtonZone?: Phaser.GameObjects.Zone;
-
+  private elements: Phaser.GameObjects.GameObject[] = [];
   private currentState: HudSnapshot;
+
+  private startButton?: { bg: Phaser.GameObjects.Rectangle; label: Phaser.GameObjects.Text; zone: Phaser.GameObjects.Zone; tone: HudButtonTone };
+  private drawButton?: { bg: Phaser.GameObjects.Rectangle; label: Phaser.GameObjects.Text; zone: Phaser.GameObjects.Zone; tone: HudButtonTone };
+  private leaveButton?: { bg: Phaser.GameObjects.Rectangle; label: Phaser.GameObjects.Text; zone: Phaser.GameObjects.Zone; tone: HudButtonTone };
 
   constructor(scene: Phaser.Scene, options: HudOptions, callbacks: HudCallbacks) {
     this.scene = scene;
     this.options = options;
     this.callbacks = callbacks;
-    this.elements = [];
     this.currentState = {
       status: '',
       roomLabel: '',
@@ -83,28 +72,7 @@ export default class GameHud {
 
   update(partial: Partial<HudSnapshot>) {
     this.currentState = { ...this.currentState, ...partial };
-
-    const shouldRebuild =
-      partial.status !== undefined ||
-      partial.roomLabel !== undefined ||
-      partial.playerList !== undefined ||
-      partial.currentTurn !== undefined ||
-      partial.logLines !== undefined;
-
-    if (shouldRebuild) {
-      this.build();
-      return;
-    }
-
-    if (partial.leaveEnabled !== undefined) {
-      this.applyLeaveState();
-    }
-    if (partial.startEnabled !== undefined) {
-      this.applyStartState();
-    }
-    if (partial.drawEnabled !== undefined) {
-      this.applyDrawState();
-    }
+    this.build();
   }
 
   resize() {
@@ -114,391 +82,269 @@ export default class GameHud {
   destroy() {
     this.elements.forEach((obj) => obj.destroy());
     this.elements = [];
-    this.leaveButtonZone?.destroy();
-    this.leaveButtonZone = undefined;
-    this.startButtonZone?.destroy();
-    this.startButtonZone = undefined;
-    this.drawButtonZone?.destroy();
-    this.drawButtonZone = undefined;
+    this.startButton = undefined;
+    this.drawButton = undefined;
+    this.leaveButton = undefined;
   }
 
   private build() {
     this.destroy();
 
-    const { height: gameHeight } = this.scene.scale;
-    const panelHeight = gameHeight - this.options.margin * 2;
-    const fontScale = this.options.fontScale ?? 1;
     const compact = Boolean(this.options.compact);
-    const lineGap = compact ? 4 : 6;
-
-    const panel = this.scene.add
-      .rectangle(
-        this.options.margin,
-        this.options.margin,
-        this.options.width,
-        panelHeight,
-        this.options.panelColor,
-        0.92,
-      )
-      .setOrigin(0);
-    panel.setStrokeStyle(1, 0x1e293b, 0.4);
-
-    const contentX = panel.x + this.options.padding;
-    let cursorY = panel.y + this.options.padding;
-    const wrapWidth = this.options.width - this.options.padding * 2;
-    const toFontSize = (px: number) => `${Math.max(11, Math.round(px * fontScale))}px`;
-    const pushAndAdvance = (object: Phaser.GameObjects.Text, gap: number) => {
-      this.elements.push(object);
-      cursorY = object.y + object.height + gap;
+    const panelHeight = this.scene.scale.height - this.options.margin * 2;
+    const panelX = this.options.margin;
+    const panelY = this.options.margin;
+    const innerX = panelX + this.options.padding;
+    const innerWidth = this.options.width - this.options.padding * 2;
+    const fontScale = this.options.fontScale ?? 1;
+    const spacing = {
+      s: 8,
+      m: 16,
     };
 
-    this.statusText = this.scene.add
-      .text(contentX, cursorY, this.currentState.status, {
+    const panelShadow = this.scene.add
+      .rectangle(panelX + 3, panelY + 6, this.options.width, panelHeight, 0x000000, 0.3)
+      .setOrigin(0);
+    const panel = this.scene.add
+      .rectangle(panelX, panelY, this.options.width, panelHeight, this.options.panelColor, 0.94)
+      .setOrigin(0)
+      .setStrokeStyle(1, this.options.panelBorder, 0.9);
+    const panelTopGlow = this.scene.add
+      .rectangle(panelX, panelY, this.options.width, 52, 0x6c5ce7, 0.08)
+      .setOrigin(0);
+
+    this.elements.push(panelShadow, panel, panelTopGlow);
+
+    let y = panelY + this.options.padding;
+    const makeText = (text: string, size: number, color: string, fontStyle?: string) =>
+      this.scene.add
+        .text(innerX, y, text, {
+          fontFamily: this.options.fontFamily,
+          fontSize: `${Math.max(11, Math.round(size * fontScale))}px`,
+          color,
+          fontStyle,
+          wordWrap: { width: innerWidth, useAdvancedWrap: true },
+        })
+        .setResolution(this.options.textResolution);
+
+    const title = makeText('👤 Player Panel', compact ? 17 : 19, '#E5E7EB', '700');
+    this.elements.push(title);
+    y += title.height + spacing.m;
+
+    const status = makeText(this.currentState.status || 'Conectando...', compact ? 13 : 14, '#E5E7EB', '600');
+    this.elements.push(status);
+    y += status.height + spacing.s;
+
+    const roomLabel = this.scene.add
+      .text(innerX, y, `🏷 ${this.currentState.roomLabel}`, {
         fontFamily: this.options.fontFamily,
-        fontSize: toFontSize(compact ? 16 : 20),
-        color: '#ffffff',
-        wordWrap: { width: wrapWidth },
+        fontSize: `${Math.max(11, Math.round((compact ? 12 : 13) * fontScale))}px`,
+        color: '#9CA3AF',
       })
       .setResolution(this.options.textResolution);
+    this.elements.push(roomLabel);
+    y += roomLabel.height + spacing.s;
 
-    this.elements.push(panel);
-    pushAndAdvance(this.statusText, compact ? 12 : 16);
-
-    const roomLabel = this.createLabel(
-      contentX,
-      cursorY,
-      this.currentState.roomLabel,
-      this.options.accentColor,
-      'bold',
-      toFontSize(compact ? 13 : 15),
-    );
-    pushAndAdvance(roomLabel, compact ? 10 : 12);
-
-    const turnNowLabel = this.createLabel(
-      contentX,
-      cursorY,
-      `Vez: ${this.currentState.currentTurn}`,
-      '#34d399',
-      'bold',
-      toFontSize(compact ? 13 : 15),
-    );
-    pushAndAdvance(turnNowLabel, compact ? 10 : 12);
-
-    const controlsLabel = this.createLabel(
-      contentX,
-      cursorY,
-      'Controles rápidos',
-      '#a5b4fc',
-      'bold',
-      toFontSize(16),
-    );
-    pushAndAdvance(controlsLabel, compact ? 4 : 6);
-
-    const controlsText = this.scene.add
-      .text(contentX, cursorY, this.options.instructions, {
+    const turnLabel = this.scene.add
+      .text(innerX, y, `⏱ Vez: ${this.currentState.currentTurn}`, {
         fontFamily: this.options.fontFamily,
-        fontSize: toFontSize(compact ? 13 : 15),
-        color: '#e2e8f0',
-        lineSpacing: lineGap,
-        wordWrap: { width: wrapWidth },
+        fontSize: `${Math.max(11, Math.round((compact ? 12 : 13) * fontScale))}px`,
+        color: '#22C55E',
+        fontStyle: '600',
       })
       .setResolution(this.options.textResolution);
-    pushAndAdvance(controlsText, compact ? 10 : 14);
+    this.elements.push(turnLabel);
+    y += turnLabel.height + spacing.m;
 
-    const startButtonHeight = compact ? 44 : 52;
-    const drawButtonHeight = compact ? 44 : 52;
-    const leaveButtonHeight = compact ? 44 : 52;
-    const actionButtonsGap = compact ? 10 : 12;
+    const controlsHeader = makeText('⚡ Ações', compact ? 13 : 14, '#9CA3AF', '600');
+    this.elements.push(controlsHeader);
+    y += controlsHeader.height + spacing.s;
 
-    this.createStartButton(
-      panel.x + this.options.width / 2,
-      cursorY + startButtonHeight / 2,
-      compact,
-      toFontSize(16),
-    );
-    cursorY += startButtonHeight + actionButtonsGap;
+    const buttonWidth = innerWidth;
+    const buttonHeight = compact ? 42 : 46;
 
-    this.createDrawButton(
-      panel.x + this.options.width / 2,
-      cursorY + drawButtonHeight / 2,
-      compact,
-      toFontSize(16),
-    );
-    cursorY += drawButtonHeight + actionButtonsGap;
+    this.startButton = this.createActionButton(innerX + buttonWidth / 2, y + buttonHeight / 2, buttonWidth, buttonHeight, 'Iniciar jogo', 'primary', () => this.callbacks.onStartRequested());
+    y += buttonHeight + spacing.s;
 
-    this.createLeaveButton(
-      panel.x + this.options.width / 2,
-      cursorY + leaveButtonHeight / 2,
-      compact,
-      toFontSize(16),
-    );
-    cursorY += leaveButtonHeight + (compact ? 12 : 16);
+    this.drawButton = this.createActionButton(innerX + buttonWidth / 2, y + buttonHeight / 2, buttonWidth, buttonHeight, 'Comprar carta', 'secondary', () => this.callbacks.onDrawRequested());
+    y += buttonHeight + spacing.s;
 
-    const playersLabel = this.createLabel(
-      contentX,
-      cursorY,
-      'Jogadores',
-      '#cbd5ff',
-      'bold',
-      toFontSize(15),
-    );
-    pushAndAdvance(playersLabel, 6);
+    this.leaveButton = this.createActionButton(innerX + buttonWidth / 2, y + buttonHeight / 2, buttonWidth, buttonHeight, 'Sair da sala', 'danger', () => this.callbacks.onLeaveRequested());
+    y += buttonHeight + spacing.m;
 
-    this.playerListText = this.scene.add
-      .text(contentX, cursorY, this.getVisiblePlayerList(), {
+    const instructions = this.scene.add
+      .text(innerX, y, this.options.instructions, {
         fontFamily: this.options.fontFamily,
-        fontSize: toFontSize(compact ? 12 : 15),
-        color: '#cbd5f5',
-        lineSpacing: lineGap,
-        wordWrap: { width: wrapWidth },
+        fontSize: `${Math.max(11, Math.round((compact ? 11 : 12) * fontScale))}px`,
+        color: '#9CA3AF',
+        lineSpacing: 4,
+        wordWrap: { width: innerWidth, useAdvancedWrap: true },
       })
       .setResolution(this.options.textResolution);
-    pushAndAdvance(this.playerListText, compact ? 10 : 14);
+    this.elements.push(instructions);
+    y += instructions.height + spacing.m;
 
-    const logLabel = this.createLabel(
-      contentX,
-      cursorY,
-      'Log recente',
-      '#f9a8d4',
-      'bold',
-      toFontSize(15),
-    );
-    pushAndAdvance(logLabel, 6);
+    const playersHeader = makeText('🧑‍🤝‍🧑 Jogadores', compact ? 13 : 14, '#9CA3AF', '600');
+    this.elements.push(playersHeader);
+    y += playersHeader.height + spacing.s;
 
-    this.actionLog = this.scene.add
-      .text(contentX, cursorY, 'Nenhuma ação ainda.', {
+    const playerText = this.scene.add
+      .text(innerX, y, this.getVisiblePlayerList(), {
         fontFamily: this.options.fontFamily,
-        fontSize: toFontSize(compact ? 12 : 15),
-        color: '#f472b6',
-        lineSpacing: lineGap,
-        wordWrap: { width: wrapWidth },
+        fontSize: `${Math.max(11, Math.round((compact ? 11 : 12) * fontScale))}px`,
+        color: '#E5E7EB',
+        lineSpacing: 4,
+        wordWrap: { width: innerWidth, useAdvancedWrap: true },
       })
       .setResolution(this.options.textResolution);
-    this.elements.push(this.actionLog);
+    this.elements.push(playerText);
+    y += playerText.height + spacing.m;
 
-    this.applyLog();
-    this.applyLeaveState();
-    this.applyStartState();
-    this.applyDrawState();
+    const logsHeader = makeText('📝 Log da rodada', compact ? 13 : 14, '#9CA3AF', '600');
+    this.elements.push(logsHeader);
+    y += logsHeader.height + spacing.s;
+
+    const logsBackground = this.scene.add
+      .rectangle(innerX, y, innerWidth, Math.max(compact ? 108 : 132, panelY + panelHeight - y - spacing.m), 0x0f172a, 0.72)
+      .setOrigin(0)
+      .setStrokeStyle(1, 0x2b3852, 0.7);
+    this.elements.push(logsBackground);
+
+    const logs = this.scene.add
+      .text(innerX + spacing.s, y + spacing.s, this.getVisibleLogText(), {
+        fontFamily: this.options.fontFamily,
+        fontSize: `${Math.max(11, Math.round((compact ? 11 : 12) * fontScale))}px`,
+        color: '#9CA3AF',
+        lineSpacing: 5,
+        wordWrap: { width: innerWidth - spacing.m, useAdvancedWrap: true },
+      })
+      .setResolution(this.options.textResolution);
+    this.elements.push(logs);
+
+    this.applyButtonState(this.startButton, this.currentState.startEnabled);
+    this.applyButtonState(this.drawButton, this.currentState.drawEnabled);
+    this.applyButtonState(this.leaveButton, this.currentState.leaveEnabled);
+
+    this.animateEntry();
   }
 
-  private createLabel(
-    x: number,
-    y: number,
-    text: string,
-    color: string,
-    fontStyle: string | undefined,
-    fontSize: string,
+  private createActionButton(
+    centerX: number,
+    centerY: number,
+    width: number,
+    height: number,
+    labelText: string,
+    tone: HudButtonTone,
+    onClick: () => void,
   ) {
-    return this.scene.add
-      .text(x, y, text, {
+    const palette = this.getButtonPalette(tone);
+    const shadow = this.scene.add.rectangle(centerX, centerY + 3, width, height, palette.shadow, 0.45).setOrigin(0.5);
+    const bg = this.scene.add
+      .rectangle(centerX, centerY, width, height, palette.base, 0.95)
+      .setOrigin(0.5)
+      .setStrokeStyle(1, palette.border, 0.9);
+    const label = this.scene.add
+      .text(centerX, centerY, labelText, {
         fontFamily: this.options.fontFamily,
-        fontSize,
-        fontStyle,
-        color,
-      })
-      .setResolution(this.options.textResolution);
-  }
-
-  // Lógica do botão de Sair
-  private createLeaveButton(centerX: number, y: number, compact: boolean, labelFontSize: string) {
-    const width = this.options.width - this.options.padding * 2;
-    const height = compact ? 46 : 54;
-
-    this.leaveButtonBg = this.scene.add.rectangle(centerX, y, width, height, 0xdc2626, 0.9).setOrigin(0.5);
-    this.leaveButtonBg.setStrokeStyle(1, 0x7f1d1d, 0.55);
-
-    this.leaveButtonLabel = this.scene.add.text(centerX, y, 'Sair da sala', {
-        fontFamily: this.options.fontFamily,
-        fontSize: labelFontSize,
-        fontStyle: 'bold',
+        fontSize: `${Math.max(12, Math.round((this.options.compact ? 12 : 13) * (this.options.fontScale ?? 1)))}px`,
         color: '#ffffff',
-      }).setOrigin(0.5).setResolution(this.options.textResolution);
-
-    this.leaveButtonZone = this.scene.add.zone(centerX, y, width, height).setOrigin(0.5).setInteractive({ useHandCursor: true });
-
-    this.leaveButtonZone.on('pointerover', () => {
-      if (!this.currentState.leaveEnabled) return;
-      this.leaveButtonBg?.setFillStyle(0xf87171);
-    });
-
-    this.leaveButtonZone.on('pointerout', () => {
-      this.leaveButtonBg?.setFillStyle(0xdc2626);
-      this.leaveButtonBg?.setScale(1);
-    });
-
-    this.leaveButtonZone.on('pointerdown', () => {
-      if (!this.currentState.leaveEnabled) return;
-      this.leaveButtonBg?.setScale(0.98);
-    });
-
-    this.leaveButtonZone.on('pointerup', () => {
-      if (!this.currentState.leaveEnabled) {
-        this.leaveButtonBg?.setScale(1);
-        return;
-      }
-      this.leaveButtonBg?.setScale(1);
-      this.callbacks.onLeaveRequested();
-    });
-
-    this.elements.push(this.leaveButtonBg, this.leaveButtonLabel, this.leaveButtonZone);
-  }
-
-  private createDrawButton(centerX: number, y: number, compact: boolean, labelFontSize: string) {
-    const width = this.options.width - this.options.padding * 2;
-    const height = compact ? 44 : 52;
-
-    this.drawButtonBg = this.scene.add.rectangle(centerX, y, width, height, 0x0ea5e9, 0.9).setOrigin(0.5);
-    this.drawButtonBg.setStrokeStyle(1, 0x0c4a6e, 0.55);
-
-    this.drawButtonLabel = this.scene.add
-      .text(centerX, y, 'Comprar carta', {
-        fontFamily: this.options.fontFamily,
-        fontSize: labelFontSize,
-        fontStyle: 'bold',
-        color: '#ffffff',
+        fontStyle: '700',
       })
       .setOrigin(0.5)
       .setResolution(this.options.textResolution);
 
-    this.drawButtonZone = this.scene.add
-      .zone(centerX, y, width, height)
+    const zone = this.scene.add
+      .zone(centerX, centerY, width, height)
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
 
-    this.drawButtonZone.on('pointerover', () => {
-      if (!this.currentState.drawEnabled) return;
-      this.drawButtonBg?.setFillStyle(0x38bdf8);
+    zone.on('pointerover', () => {
+      if (!zone.input?.enabled) return;
+      bg.setFillStyle(palette.hover, 1);
+      this.scene.tweens.add({ targets: [bg, label, shadow], scaleX: 1.03, scaleY: 1.03, duration: 180, ease: 'Quad.easeOut' });
     });
 
-    this.drawButtonZone.on('pointerout', () => {
-      this.drawButtonBg?.setFillStyle(0x0ea5e9);
-      this.drawButtonBg?.setScale(1);
+    zone.on('pointerout', () => {
+      bg.setFillStyle(palette.base, 0.95);
+      this.scene.tweens.add({ targets: [bg, label, shadow], scaleX: 1, scaleY: 1, duration: 180, ease: 'Quad.easeOut' });
     });
 
-    this.drawButtonZone.on('pointerdown', () => {
-      if (!this.currentState.drawEnabled) return;
-      this.drawButtonBg?.setScale(0.98);
+    zone.on('pointerdown', () => {
+      if (!zone.input?.enabled) return;
+      this.scene.tweens.add({ targets: [bg, label, shadow], scaleX: 0.97, scaleY: 0.97, duration: 120, ease: 'Quad.easeInOut' });
     });
 
-    this.drawButtonZone.on('pointerup', () => {
-      if (!this.currentState.drawEnabled) {
-        this.drawButtonBg?.setScale(1);
-        return;
-      }
-      this.drawButtonBg?.setScale(1);
-      this.callbacks.onDrawRequested();
+    zone.on('pointerup', () => {
+      if (!zone.input?.enabled) return;
+      this.scene.tweens.add({ targets: [bg, label, shadow], scaleX: 1, scaleY: 1, duration: 120, ease: 'Quad.easeOut' });
+      onClick();
     });
 
-    this.elements.push(this.drawButtonBg, this.drawButtonLabel, this.drawButtonZone);
+    this.elements.push(shadow, bg, label, zone);
+
+    return { bg, label, zone, tone };
   }
 
-  // Lógica do novo botão de Iniciar
-  private createStartButton(centerX: number, y: number, compact: boolean, labelFontSize: string) {
-    const width = this.options.width - this.options.padding * 2;
-    const height = compact ? 46 : 54;
-
-    this.startButtonBg = this.scene.add.rectangle(centerX, y, width, height, 0xdc2626, 0.9).setOrigin(0.5);
-    this.startButtonBg.setStrokeStyle(1, 0x7f1d1d, 0.55);
-
-    this.startButtonLabel = this.scene.add.text(centerX, y, 'Iniciar Jogo', {
-        fontFamily: this.options.fontFamily,
-        fontSize: labelFontSize,
-        fontStyle: 'bold',
-        color: '#ffffff',
-      }).setOrigin(0.5).setResolution(this.options.textResolution);
-
-    this.startButtonZone = this.scene.add.zone(centerX, y, width, height).setOrigin(0.5).setInteractive({ useHandCursor: true });
-
-    this.startButtonZone.on('pointerover', () => {
-      if (!this.currentState.startEnabled) return;
-      this.startButtonBg?.setFillStyle(0xf87171); // Mesma cor do hover do botão de sair
-    });
-
-    this.startButtonZone.on('pointerout', () => {
-      this.startButtonBg?.setFillStyle(0xdc2626);
-      this.startButtonBg?.setScale(1);
-    });
-
-    this.startButtonZone.on('pointerdown', () => {
-      if (!this.currentState.startEnabled) return;
-      this.startButtonBg?.setScale(0.98);
-    });
-
-    this.startButtonZone.on('pointerup', () => {
-      if (!this.currentState.startEnabled) {
-        this.startButtonBg?.setScale(1);
-        return;
-      }
-      this.startButtonBg?.setScale(1);
-      this.callbacks.onStartRequested();
-    });
-
-    this.elements.push(this.startButtonBg, this.startButtonLabel, this.startButtonZone);
-  }
-
-  private applyLog() {
-    if (!this.actionLog) return;
-    const lines = this.getVisibleLogLines();
-
-    if (!lines.length) {
-      this.actionLog.setText('• Nenhuma ação ainda.');
-    } else {
-      this.actionLog.setText(lines.map((line) => `• ${line}`).join('\n'));
+  private getButtonPalette(tone: HudButtonTone): { base: number; hover: number; border: number; shadow: number } {
+    if (tone === 'primary') {
+      return { base: 0x6c5ce7, hover: 0x7e6ff0, border: 0x4e44b7, shadow: 0x2b2368 };
     }
+    if (tone === 'secondary') {
+      return { base: 0x3a86ff, hover: 0x5a9cff, border: 0x2d69c6, shadow: 0x163869 };
+    }
+    return { base: 0xff4d4d, hover: 0xff6767, border: 0xc33434, shadow: 0x5b2323 };
+  }
+
+  private applyButtonState(button: { bg: Phaser.GameObjects.Rectangle; label: Phaser.GameObjects.Text; zone: Phaser.GameObjects.Zone; tone: HudButtonTone } | undefined, enabled: boolean) {
+    if (!button) return;
+
+    if (enabled) {
+      const palette = this.getButtonPalette(button.tone);
+      button.bg.setFillStyle(palette.base, 0.95).setAlpha(1);
+      button.label.setAlpha(1);
+      button.zone.setInteractive({ useHandCursor: true });
+      return;
+    }
+
+    button.bg.setFillStyle(0x374151, 0.7).setAlpha(0.6);
+    button.label.setAlpha(0.55);
+    button.zone.disableInteractive();
   }
 
   private getVisiblePlayerList(): string {
-    const maxLines = this.options.compact ? 3 : 5;
+    const maxLines = this.options.compact ? 4 : 6;
     const lines = this.currentState.playerList.split('\n').filter(Boolean);
-    if (lines.length <= maxLines) {
-      return this.currentState.playerList;
+    if (!lines.length) {
+      return 'Nenhum jogador ainda.';
     }
-
+    if (lines.length <= maxLines) {
+      return lines.join('\n');
+    }
     return `${lines.slice(0, maxLines).join('\n')}\n…`;
   }
 
-  private getVisibleLogLines(): string[] {
-    const maxLines = this.options.compact ? 3 : 5;
-    return this.currentState.logLines.slice(0, maxLines);
+  private getVisibleLogText(): string {
+    const maxLines = this.options.compact ? 4 : 6;
+    const lines = this.currentState.logLines.slice(0, maxLines);
+    if (!lines.length) {
+      return '• Nenhuma ação ainda.';
+    }
+    return lines.map((line) => `• ${line}`).join('\n');
   }
 
-  private applyLeaveState() {
-    if (!this.leaveButtonBg || !this.leaveButtonZone || !this.leaveButtonLabel) return;
-    if (this.currentState.leaveEnabled) {
-      this.leaveButtonBg.setFillStyle(0xdc2626, 0.95).setAlpha(1);
-      this.leaveButtonLabel.setAlpha(1);
-      this.leaveButtonZone.setInteractive({ useHandCursor: true });
-    } else {
-      this.leaveButtonBg.setFillStyle(0x1f2937, 0.6).setAlpha(0.6);
-      this.leaveButtonLabel.setAlpha(0.5);
-      this.leaveButtonZone.disableInteractive();
-    }
-  }
-
-  private applyStartState() {
-    if (!this.startButtonBg || !this.startButtonZone || !this.startButtonLabel) return;
-    if (this.currentState.startEnabled) {
-      this.startButtonBg.setFillStyle(0xdc2626, 0.95).setAlpha(1);
-      this.startButtonLabel.setAlpha(1);
-      this.startButtonZone.setInteractive({ useHandCursor: true });
-    } else {
-      this.startButtonBg.setFillStyle(0x1f2937, 0.6).setAlpha(0.6);
-      this.startButtonLabel.setAlpha(0.5);
-      this.startButtonZone.disableInteractive();
-    }
-  }
-
-  private applyDrawState() {
-    if (!this.drawButtonBg || !this.drawButtonZone || !this.drawButtonLabel) return;
-    if (this.currentState.drawEnabled) {
-      this.drawButtonBg.setFillStyle(0x0ea5e9, 0.95).setAlpha(1);
-      this.drawButtonLabel.setAlpha(1);
-      this.drawButtonZone.setInteractive({ useHandCursor: true });
-    } else {
-      this.drawButtonBg.setFillStyle(0x1f2937, 0.6).setAlpha(0.6);
-      this.drawButtonLabel.setAlpha(0.5);
-      this.drawButtonZone.disableInteractive();
-    }
+  private animateEntry() {
+    this.elements.forEach((obj, index) => {
+      const target = obj as unknown as Phaser.GameObjects.Components.Alpha & Phaser.GameObjects.Components.Transform;
+      target.setAlpha(0);
+      target.setY(target.y + 6);
+      this.scene.tweens.add({
+        targets: target,
+        alpha: 1,
+        y: target.y - 6,
+        duration: 180,
+        delay: index * 18,
+        ease: 'Sine.easeOut',
+      });
+    });
   }
 }

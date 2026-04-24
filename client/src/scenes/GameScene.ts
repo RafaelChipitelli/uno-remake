@@ -38,6 +38,7 @@ import {
   describeFirebasePersistenceError,
   recordCurrentUserMatchResult,
 } from '../services/playerAccount';
+import { askConfirmation } from '../ui/modal';
 
 export default class GameScene extends Phaser.Scene {
   private socket!: Socket;
@@ -184,10 +185,7 @@ export default class GameScene extends Phaser.Scene {
     this.clearColorSelectionModal();
 
     this.cardStage?.setTableCard(payload.firstCard, payload.currentColor);
-    this.hud?.update({
-      currentTurn: payload.currentPlayerTurn ?? INITIAL_TURN_MESSAGE,
-      status: '✅ Partida em andamento',
-    });
+    this.setStatus('✅ Partida em andamento', payload.currentPlayerTurn ?? INITIAL_TURN_MESSAGE);
 
     if (this.player?.hand && this.player.hand.length > 0) {
       this.pushLog(`✅ Você recebeu ${this.player.hand.length} cartas!`);
@@ -203,10 +201,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.pushLog(payload.message);
     this.pushLog('⏸️ Aguardando o dono da sala iniciar a próxima partida...');
-    this.hud?.update({
-      status: payload.message,
-      currentTurn: 'Partida encerrada',
-    });
+    this.setStatus(payload.message, 'Partida encerrada');
 
     void this.recordAuthenticatedMatchResult(payload);
   }
@@ -257,6 +252,7 @@ export default class GameScene extends Phaser.Scene {
     }
 
     this.pushLog(`Sala ${roomId} criada. Compartilhe o código!`);
+    this.setStatus(`🟢 Sala ${roomId} criada. Convide seus amigos.`);
     this.updateRoomDetails();
   }
 
@@ -267,6 +263,7 @@ export default class GameScene extends Phaser.Scene {
     }
 
     this.pushLog(`Entrou na sala ${roomId}.`);
+    this.setStatus(`🟢 Você entrou na sala ${roomId}.`);
     this.updateRoomDetails();
   }
 
@@ -308,10 +305,7 @@ export default class GameScene extends Phaser.Scene {
           ? '✅ É A SUA VEZ!'
           : `⏳ Vez de: ${currentPlayer?.nickname ?? INITIAL_TURN_MESSAGE}`;
       }
-      this.hud?.update({
-        status: this.statusMessage,
-        currentTurn: currentPlayer?.nickname ?? INITIAL_TURN_MESSAGE,
-      });
+      this.setStatus(this.statusMessage, currentPlayer?.nickname ?? INITIAL_TURN_MESSAGE);
     }
 
     const topCard = room.discardPile[room.discardPile.length - 1];
@@ -334,6 +328,7 @@ export default class GameScene extends Phaser.Scene {
 
   private handleRoomError(payload: RoomErrorPayload): void {
     this.pushLog(`Erro: ${payload.message}`);
+    this.setStatus(`⚠️ ${payload.message}`);
     this.isLeavingRoom = false;
     this.hud?.update({ leaveEnabled: this.canLeaveRoom() });
   }
@@ -353,17 +348,25 @@ export default class GameScene extends Phaser.Scene {
 
   private handleConnectError(err: Error): void {
     console.error('Socket error', err);
-    this.statusMessage = 'Falha na conexão';
-    this.hud?.update({ status: this.statusMessage });
+    this.setStatus('❌ Falha na conexão com o servidor.');
   }
 
   private drawBackdrop(): void {
     this.clearGroup(this.backgroundElements);
 
     const { width, height } = this.scale;
-    const fullBg = this.add.rectangle(width / 2, height / 2, width, height, 0x081226, 1).setOrigin(0.5);
-    const glowLeft = this.add.ellipse(width * 0.12, height * 0.2, width * 0.5, height * 0.55, 0x132643, 0.26);
-    const glowRight = this.add.ellipse(width * 0.88, height * 0.78, width * 0.46, height * 0.5, 0x10223d, 0.22);
+    const fullBg = this.add.rectangle(width / 2, height / 2, width, height, 0x0b0f1a, 1).setOrigin(0.5);
+    const glowLeft = this.add.ellipse(width * 0.14, height * 0.2, width * 0.56, height * 0.6, 0x3a86ff, 0.16);
+    const glowRight = this.add.ellipse(width * 0.86, height * 0.78, width * 0.5, height * 0.56, 0x6c5ce7, 0.14);
+
+    this.tweens.add({
+      targets: [glowLeft, glowRight],
+      alpha: { from: 0.12, to: 0.2 },
+      duration: 2600,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
 
     this.backgroundElements.push(fullBg, glowLeft, glowRight);
   }
@@ -472,6 +475,7 @@ export default class GameScene extends Phaser.Scene {
     });
 
     this.pushLog(`Você jogou ${card.color} ${card.value}`);
+    this.setStatus('✅ Jogada enviada. Aguardando atualização da sala...');
     this.cardStage?.setHandCards(this.player.hand);
     this.cardStage?.setTableCard(card);
   }
@@ -511,6 +515,7 @@ export default class GameScene extends Phaser.Scene {
     });
 
     this.pushLog(`✅ Você definiu a cor ${COLOR_LABELS[selectedColor]}.`);
+    this.setStatus(`🎨 Cor escolhida: ${COLOR_LABELS[selectedColor]}.`);
     this.cardStage?.setHandCards(this.player.hand);
     this.cardStage?.setTableCard(card, selectedColor);
   }
@@ -598,6 +603,16 @@ export default class GameScene extends Phaser.Scene {
     this.socket.emit('card:draw', {
       playerId: this.player.id,
     });
+
+    this.setStatus('🃏 Comprando carta...');
+  }
+
+  private setStatus(status: string, currentTurn?: string): void {
+    this.statusMessage = status;
+    this.hud?.update({
+      status: this.statusMessage,
+      ...(currentTurn ? { currentTurn } : {}),
+    });
   }
 
   private describeEvent(event: CardActionEvent): string {
@@ -637,13 +652,21 @@ export default class GameScene extends Phaser.Scene {
     return this.roomGameStatus === 'in_progress';
   }
 
-  private promptLeaveRoom(): void {
+  private async promptLeaveRoom(): Promise<void> {
     if (!this.roomId) {
       this.pushLog('Nenhuma sala ativa para sair.');
       return;
     }
 
-    if (!window.confirm('Quer realmente sair da sala?')) {
+    const shouldLeave = await askConfirmation({
+      title: 'Sair da sala?',
+      message: 'Você perderá acesso à partida atual. Deseja continuar?',
+      confirmLabel: 'Sair',
+      cancelLabel: 'Ficar',
+      confirmTone: 'danger',
+    });
+
+    if (!shouldLeave) {
       return;
     }
 
@@ -729,6 +752,9 @@ export default class GameScene extends Phaser.Scene {
     return this.roomId ? `Sala atual: ${this.roomId}` : 'Nenhuma sala ativa.';
   }
 }
+
+
+
 
 
 
