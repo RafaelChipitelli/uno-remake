@@ -7,6 +7,7 @@ export type HudSnapshot = {
   logLines: string[];
   leaveEnabled: boolean;
   startEnabled: boolean;
+  drawEnabled: boolean;
   currentTurn: string;
 };
 
@@ -27,6 +28,7 @@ type HudOptions = {
 type HudCallbacks = {
   onLeaveRequested: () => void;
   onStartRequested: () => void;
+  onDrawRequested: () => void;
 };
 
 export default class GameHud {
@@ -46,6 +48,10 @@ export default class GameHud {
   private startButtonLabel?: Phaser.GameObjects.Text;
   private startButtonZone?: Phaser.GameObjects.Zone;
 
+  private drawButtonBg?: Phaser.GameObjects.Rectangle;
+  private drawButtonLabel?: Phaser.GameObjects.Text;
+  private drawButtonZone?: Phaser.GameObjects.Zone;
+
   private currentState: HudSnapshot;
 
   constructor(scene: Phaser.Scene, options: HudOptions, callbacks: HudCallbacks) {
@@ -60,6 +66,7 @@ export default class GameHud {
       logLines: [],
       leaveEnabled: false,
       startEnabled: true,
+      drawEnabled: false,
       currentTurn: 'Aguardando jogo começar',
     };
   }
@@ -95,6 +102,9 @@ export default class GameHud {
     if (partial.startEnabled !== undefined) {
       this.applyStartState();
     }
+    if (partial.drawEnabled !== undefined) {
+      this.applyDrawState();
+    }
   }
 
   resize() {
@@ -108,6 +118,8 @@ export default class GameHud {
     this.leaveButtonZone = undefined;
     this.startButtonZone?.destroy();
     this.startButtonZone = undefined;
+    this.drawButtonZone?.destroy();
+    this.drawButtonZone = undefined;
   }
 
   private build() {
@@ -193,8 +205,9 @@ export default class GameHud {
       .setResolution(this.options.textResolution);
     pushAndAdvance(controlsText, compact ? 10 : 14);
 
-    const startButtonHeight = compact ? 46 : 54;
-    const leaveButtonHeight = compact ? 46 : 54;
+    const startButtonHeight = compact ? 44 : 52;
+    const drawButtonHeight = compact ? 44 : 52;
+    const leaveButtonHeight = compact ? 44 : 52;
     const actionButtonsGap = compact ? 10 : 12;
 
     this.createStartButton(
@@ -204,6 +217,14 @@ export default class GameHud {
       toFontSize(16),
     );
     cursorY += startButtonHeight + actionButtonsGap;
+
+    this.createDrawButton(
+      panel.x + this.options.width / 2,
+      cursorY + drawButtonHeight / 2,
+      compact,
+      toFontSize(16),
+    );
+    cursorY += drawButtonHeight + actionButtonsGap;
 
     this.createLeaveButton(
       panel.x + this.options.width / 2,
@@ -258,6 +279,7 @@ export default class GameHud {
     this.applyLog();
     this.applyLeaveState();
     this.applyStartState();
+    this.applyDrawState();
   }
 
   private createLabel(
@@ -320,6 +342,55 @@ export default class GameHud {
     });
 
     this.elements.push(this.leaveButtonBg, this.leaveButtonLabel, this.leaveButtonZone);
+  }
+
+  private createDrawButton(centerX: number, y: number, compact: boolean, labelFontSize: string) {
+    const width = this.options.width - this.options.padding * 2;
+    const height = compact ? 44 : 52;
+
+    this.drawButtonBg = this.scene.add.rectangle(centerX, y, width, height, 0x0ea5e9, 0.9).setOrigin(0.5);
+    this.drawButtonBg.setStrokeStyle(2, 0xffffff, 0.85);
+
+    this.drawButtonLabel = this.scene.add
+      .text(centerX, y, 'Comprar carta', {
+        fontFamily: this.options.fontFamily,
+        fontSize: labelFontSize,
+        fontStyle: 'bold',
+        color: '#ffffff',
+      })
+      .setOrigin(0.5)
+      .setResolution(this.options.textResolution);
+
+    this.drawButtonZone = this.scene.add
+      .zone(centerX, y, width, height)
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    this.drawButtonZone.on('pointerover', () => {
+      if (!this.currentState.drawEnabled) return;
+      this.drawButtonBg?.setFillStyle(0x38bdf8);
+    });
+
+    this.drawButtonZone.on('pointerout', () => {
+      this.drawButtonBg?.setFillStyle(0x0ea5e9);
+      this.drawButtonBg?.setScale(1);
+    });
+
+    this.drawButtonZone.on('pointerdown', () => {
+      if (!this.currentState.drawEnabled) return;
+      this.drawButtonBg?.setScale(0.98);
+    });
+
+    this.drawButtonZone.on('pointerup', () => {
+      if (!this.currentState.drawEnabled) {
+        this.drawButtonBg?.setScale(1);
+        return;
+      }
+      this.drawButtonBg?.setScale(1);
+      this.callbacks.onDrawRequested();
+    });
+
+    this.elements.push(this.drawButtonBg, this.drawButtonLabel, this.drawButtonZone);
   }
 
   // Lógica do novo botão de Iniciar
@@ -415,6 +486,19 @@ export default class GameHud {
       this.startButtonBg.setFillStyle(0x1f2937, 0.6).setAlpha(0.6);
       this.startButtonLabel.setAlpha(0.5);
       this.startButtonZone.disableInteractive();
+    }
+  }
+
+  private applyDrawState() {
+    if (!this.drawButtonBg || !this.drawButtonZone || !this.drawButtonLabel) return;
+    if (this.currentState.drawEnabled) {
+      this.drawButtonBg.setFillStyle(0x0ea5e9, 0.95).setAlpha(1);
+      this.drawButtonLabel.setAlpha(1);
+      this.drawButtonZone.setInteractive({ useHandCursor: true });
+    } else {
+      this.drawButtonBg.setFillStyle(0x1f2937, 0.6).setAlpha(0.6);
+      this.drawButtonLabel.setAlpha(0.5);
+      this.drawButtonZone.disableInteractive();
     }
   }
 }

@@ -128,6 +128,7 @@ export default class GameScene extends Phaser.Scene {
       {
         onLeaveRequested: () => this.promptLeaveRoom(),
         onStartRequested: () => this.socket?.emit('game:start'),
+        onDrawRequested: () => this.handleDrawCard(),
       },
     );
     this.hud.init(this.composeHudState());
@@ -628,6 +629,10 @@ export default class GameScene extends Phaser.Scene {
     return Boolean(this.roomId) && !this.isLeavingRoom;
   }
 
+  private canDrawCard(): boolean {
+    return Boolean(this.roomId && this.player?.isTurn) && this.isRoundInProgress() && !this.isColorSelectionOpen;
+  }
+
   private isRoundInProgress(): boolean {
     return this.roomGameStatus === 'in_progress';
   }
@@ -701,6 +706,7 @@ export default class GameScene extends Phaser.Scene {
       logLines: [...this.logLines],
       leaveEnabled: this.canLeaveRoom(),
       startEnabled: Boolean(this.roomId && this.player?.id === this.roomHostId),
+      drawEnabled: this.canDrawCard(),
       currentTurn: INITIAL_TURN_MESSAGE,
     };
   }
@@ -715,6 +721,7 @@ export default class GameScene extends Phaser.Scene {
       playerList: this.lastPlayerListMessage,
       leaveEnabled: this.canLeaveRoom(),
       startEnabled: Boolean(this.roomId && this.player?.id === this.roomHostId),
+      drawEnabled: this.canDrawCard(),
     });
   }
 
@@ -722,6 +729,7 @@ export default class GameScene extends Phaser.Scene {
     return this.roomId ? `Sala atual: ${this.roomId}` : 'Nenhuma sala ativa.';
   }
 }
+
 
 
 
