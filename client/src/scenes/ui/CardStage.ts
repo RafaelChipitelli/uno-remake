@@ -15,6 +15,19 @@ type CardStageOptions = {
   onCardSelected?: (card: Card, index: number) => void;
 };
 
+type OpponentHandSnapshot = {
+  id: string;
+  nickname: string;
+  cardCount: number;
+  isTurn: boolean;
+};
+
+type OpponentSeat = {
+  x: number;
+  y: number;
+  side: 'top' | 'left' | 'right';
+};
+
 type StageMetrics = {
   stageX: number;
   stageY: number;
@@ -45,6 +58,8 @@ export default class CardStage {
   private currentTableCard?: Card;
   private currentTableColor?: Card['color'];
   private onCardSelected?: (card: Card, index: number) => void;
+  private opponents: OpponentHandSnapshot[] = [];
+  private opponentElements: Phaser.GameObjects.GameObject[] = [];
   private handOffset = 0;
   private handVisibleCount = 0;
   private handOverflowActive = false;
@@ -113,6 +128,7 @@ export default class CardStage {
 
     this.elements.push(this.cardShadow, this.cardBase, this.cardLabel, this.playerBadge);
     this.applyNickname();
+    this.renderOpponentHands();
     this.renderHandCards();
 
     if (previousTableCard) {
@@ -152,6 +168,11 @@ export default class CardStage {
       this.handOffset = 0;
     }
     this.renderHandCards();
+  }
+
+  setOpponents(opponents: OpponentHandSnapshot[]) {
+    this.opponents = [...opponents];
+    this.renderOpponentHands();
   }
 
   setTableCard(card: Card, currentColor?: Card['color']) {
@@ -343,6 +364,133 @@ export default class CardStage {
     }
   }
 
+  private renderOpponentHands() {
+    this.opponentElements.forEach((obj) => obj.destroy());
+    this.opponentElements = [];
+
+    if (!this.opponents.length) {
+      return;
+    }
+
+    const metrics = this.getStageMetrics();
+    const seats = this.getOpponentSeats(this.opponents.length, metrics);
+
+    this.opponents.forEach((opponent, index) => {
+      const seat = seats[index];
+      if (!seat) return;
+
+      const container = this.scene.add.container(seat.x, seat.y);
+      const scale = (this.options.tableCardScale ?? 1) * (this.options.compact ? 0.86 : 0.94);
+      const cardWidth = clamp(56 * scale, 42, 62);
+      const cardHeight = cardWidth * 1.45;
+      const maxVisibleCards = 8;
+      const visibleCards = Math.min(maxVisibleCards, Math.max(0, opponent.cardCount));
+      const spread = this.options.compact ? cardWidth * 0.15 : cardWidth * 0.18;
+      const maxRotation = this.options.compact ? 12 : 16;
+
+      if (visibleCards > 0) {
+        for (let i = 0; i < visibleCards; i += 1) {
+          const t = visibleCards === 1 ? 0 : i / (visibleCards - 1) - 0.5;
+          const x = (i - (visibleCards - 1) / 2) * spread;
+          const y = Math.abs(t) * 10;
+          const angle = t * maxRotation * 2;
+
+          const shadow = this.scene.add
+            .rectangle(x + 2, y + 3, cardWidth, cardHeight, 0x000000, 0.25)
+            .setOrigin(0.5)
+            .setAngle(angle);
+
+          const back = this.scene.add
+            .rectangle(x, y, cardWidth, cardHeight, 0x111827, 1)
+            .setOrigin(0.5)
+            .setStrokeStyle(2, opponent.isTurn ? 0xfcd34d : 0xe5e7eb, opponent.isTurn ? 1 : 0.85)
+            .setAngle(angle);
+
+          const stripe = this.scene.add
+            .ellipse(x, y, cardWidth * 0.7, cardHeight * 0.34, 0xef4444, 0.95)
+            .setAngle(angle - 12);
+
+          container.add([shadow, back, stripe]);
+        }
+      }
+
+      const fanWidth = Math.max(cardWidth, visibleCards * spread + cardWidth * 0.72);
+      const highlight = this.scene.add
+        .rectangle(0, cardHeight * 0.08, fanWidth + 18, cardHeight + 20, 0xfcd34d, opponent.isTurn ? 0.14 : 0)
+        .setStrokeStyle(opponent.isTurn ? 2 : 0, 0xfcd34d, opponent.isTurn ? 0.75 : 0)
+        .setOrigin(0.5);
+      container.addAt(highlight, 0);
+
+      const nickname = this.scene.add
+        .text(0, cardHeight / 2 + 18, opponent.nickname, {
+          fontFamily: this.options.fontFamily,
+          fontSize: `${Math.round(clamp(15 * (this.options.fontScale ?? 1), 11, 16))}px`,
+          color: opponent.isTurn ? '#fde68a' : '#e5e7eb',
+          fontStyle: opponent.isTurn ? 'bold' : 'normal',
+        })
+        .setOrigin(0.5)
+        .setResolution(this.options.textResolution);
+      container.add(nickname);
+
+      if (visibleCards === 0) {
+        const noCardsHint = this.scene.add
+          .text(0, 0, 'sem cartas visíveis', {
+            fontFamily: this.options.fontFamily,
+            fontSize: `${Math.round(clamp(11 * (this.options.fontScale ?? 1), 9, 12))}px`,
+            color: '#94a3b8',
+          })
+          .setOrigin(0.5)
+          .setResolution(this.options.textResolution);
+        container.add(noCardsHint);
+      }
+
+      const countLabel = this.scene.add
+        .text(fanWidth / 2, -cardHeight / 2 - 6, `x${opponent.cardCount}`, {
+          fontFamily: this.options.fontFamily,
+          fontSize: `${Math.round(clamp(13 * (this.options.fontScale ?? 1), 10, 14))}px`,
+          color: '#ffffff',
+          fontStyle: 'bold',
+          backgroundColor: opponent.isTurn ? '#7c2d12' : '#0f172a',
+          padding: { left: 7, right: 7, top: 3, bottom: 3 },
+        })
+        .setOrigin(0.5)
+        .setResolution(this.options.textResolution);
+      container.add(countLabel);
+
+      if (seat.side !== 'top') {
+        container.setScale(0.94);
+      }
+
+      this.opponentElements.push(container);
+    });
+  }
+
+  private getOpponentSeats(count: number, metrics: StageMetrics): OpponentSeat[] {
+    const topY = clamp(this.scene.scale.height * 0.16, 56, 136);
+    const sideY = clamp(this.scene.scale.height * 0.42, 170, this.scene.scale.height * 0.5);
+    const sidePadding = clamp(metrics.stageWidth * 0.08, 26, 56);
+    const leftX = metrics.stageLeft + sidePadding;
+    const rightX = metrics.stageRight - sidePadding;
+    const topX = metrics.stageX;
+
+    if (count <= 1) {
+      return [{ x: topX, y: topY, side: 'top' }];
+    }
+
+    if (count === 2) {
+      return [
+        { x: topX, y: topY, side: 'top' },
+        { x: rightX, y: sideY, side: 'right' },
+      ];
+    }
+
+    return [
+      { x: leftX, y: sideY, side: 'left' },
+      { x: topX, y: topY, side: 'top' },
+      { x: rightX, y: sideY, side: 'right' },
+    ];
+  }
+
   private renderOverflowControls(
     metrics: StageMetrics,
     baseY: number,
@@ -482,6 +630,8 @@ export default class CardStage {
   destroy() {
     this.elements.forEach((obj) => obj.destroy());
     this.elements = [];
+    this.opponentElements.forEach((obj) => obj.destroy());
+    this.opponentElements = [];
     this.handElements.forEach((obj) => obj.destroy());
     this.handElements = [];
     this.teardownHandWheelInteraction();
