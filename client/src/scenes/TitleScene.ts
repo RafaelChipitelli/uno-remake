@@ -34,6 +34,7 @@ export default class TitleScene extends Phaser.Scene {
   private unsubscribeAuthSession?: () => void;
   private iconFloatBaseY = 0;
   private iconFloatContainer?: Phaser.GameObjects.Container;
+  private isStartingGame = false;
 
   constructor() {
     super('TitleScene');
@@ -567,38 +568,60 @@ export default class TitleScene extends Phaser.Scene {
   }
 
   private async startGameScene(autoAction: 'create' | 'join'): Promise<void> {
+    if (this.isStartingGame) {
+      return;
+    }
+
     if (isAuthenticationAvailable() && !this.authSession.user) {
       this.showInfo('Faça login com Google para jogar e salvar progresso.');
       return;
     }
 
-    let roomCode: string | undefined;
-    if (autoAction === 'join') {
-      roomCode = (
-        await askTextInput({
-          title: 'Entrar com código',
-          message: 'Digite o código da sala para entrar no jogo.',
-          placeholder: 'Ex: ABCD',
-          confirmLabel: 'Entrar',
-          cancelLabel: 'Cancelar',
-        })
-      )?.trim().toUpperCase();
-      if (!roomCode) {
-        this.showInfo('Informe um código válido.');
+    this.isStartingGame = true;
+    this.setButtonsEnabled(false);
+
+    try {
+      let roomCode: string | undefined;
+      if (autoAction === 'join') {
+        roomCode = (
+          await askTextInput({
+            title: 'Entrar com código',
+            message: 'Digite o código da sala para entrar no jogo.',
+            placeholder: 'Ex: ABCD',
+            confirmLabel: 'Entrar',
+            cancelLabel: 'Cancelar',
+          })
+        )?.trim().toUpperCase();
+        if (!roomCode) {
+          this.showInfo('Informe um código válido.');
+          return;
+        }
+      }
+
+      const nickname = await this.promptNickname();
+      if (!nickname && isAuthenticationAvailable()) {
+        this.showInfo('Não foi possível iniciar sem nickname.');
         return;
       }
-    }
 
-    const nickname = await this.promptNickname();
-    if (!nickname && isAuthenticationAvailable()) {
-      this.showInfo('Não foi possível iniciar sem nickname.');
-      return;
+      this.scene.start('GameScene', {
+        autoAction,
+        nickname,
+        roomCode,
+      });
+    } finally {
+      this.isStartingGame = false;
+      this.setButtonsEnabled(true);
     }
+  }
 
-    this.scene.start('GameScene', {
-      autoAction,
-      nickname,
-      roomCode,
+  private setButtonsEnabled(enabled: boolean): void {
+    this.buttons.forEach((button) => {
+      if (enabled) {
+        button.setInteractive({ useHandCursor: true });
+      } else {
+        button.disableInteractive();
+      }
     });
   }
 
@@ -753,6 +776,12 @@ export default class TitleScene extends Phaser.Scene {
   private async promptNickname(): Promise<string | undefined> {
     if (isAuthenticationAvailable()) {
       const profileNickname = this.authSession.profile?.nickname;
+
+      if (profileNickname?.trim()) {
+        this.lastNickname = profileNickname.trim();
+        return this.lastNickname;
+      }
+
       const fallbackNickname =
         profileNickname ?? this.authSession.user?.displayName ?? this.lastNickname ?? 'Player';
 

@@ -51,12 +51,33 @@ io.on('connection', (socket) => {
       return;
     }
 
-    if (player.roomId) {
-      removePlayerFromRoom(io, store, player.roomId, player.id);
-    }
-
     if (payload.nickname) {
       player.nickname = payload.nickname;
+    }
+
+    if (player.roomId) {
+      const currentRoom = store.rooms.get(player.roomId);
+      const isDuplicateCreateRequest =
+        Boolean(currentRoom) &&
+        currentRoom?.hostId === player.id &&
+        currentRoom?.gameStatus === 'waiting' &&
+        currentRoom?.players.length === 1;
+
+      if (isDuplicateCreateRequest && currentRoom) {
+        const alreadyInside = currentRoom.players.some((roomPlayer) => roomPlayer.id === player.id);
+        if (!alreadyInside) {
+          currentRoom.players.push(player);
+        }
+
+        socket.join(currentRoom.id);
+        socket.emit('room:created', { roomId: currentRoom.id });
+        emitRoomState(io, store.rooms, currentRoom.id);
+
+        console.log(`[room:create] ${player.nickname} reutilizou sala ${currentRoom.id} (requisição duplicada).`);
+        return;
+      }
+
+      removePlayerFromRoom(io, store, player.roomId, player.id);
     }
 
     const roomId = generateRoomCode(store.rooms);
@@ -410,6 +431,7 @@ app.get('/health', (_req, res) => {
 server.listen(SERVER_PORT, () => {
   console.log(`Server listening on http://localhost:${SERVER_PORT}`);
 });
+
 
 
 

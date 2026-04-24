@@ -51,6 +51,11 @@ export default class CardStage {
   private currentColor?: Card['color'];
   private placeholderContainer?: Phaser.GameObjects.Container;
 
+  private lastHandRenderKey?: string;
+  private lastOpponentsRenderKey?: string;
+  private lastTableRenderKey?: string;
+  private lastNicknameRenderKey?: string;
+
   constructor(scene: Phaser.Scene, options: CardStageOptions) {
     this.scene = scene;
     this.options = options;
@@ -79,8 +84,14 @@ export default class CardStage {
   }
 
   setPlayerNickname(nickname?: string) {
+    const nextNickname = nickname ?? '';
+    if (this.lastNicknameRenderKey === nextNickname) {
+      return;
+    }
+
     this.playerNickname = nickname;
-    this.build();
+    this.lastNicknameRenderKey = nextNickname;
+    this.renderTableArea();
   }
 
   pulsePlaceholder() {
@@ -96,18 +107,37 @@ export default class CardStage {
   }
 
   setHandCards(cards: Card[]) {
+    const nextHandKey = this.getHandRenderKey(cards);
+    if (this.lastHandRenderKey === nextHandKey) {
+      return;
+    }
+
     this.handCards = cards;
+    this.lastHandRenderKey = nextHandKey;
     this.renderHand();
   }
 
   setOpponents(opponents: OpponentHandSnapshot[]) {
+    const nextOpponentsKey = this.getOpponentsRenderKey(opponents);
+    if (this.lastOpponentsRenderKey === nextOpponentsKey) {
+      return;
+    }
+
     this.opponents = [...opponents];
+    this.lastOpponentsRenderKey = nextOpponentsKey;
     this.renderOpponents();
   }
 
   setTableCard(card: Card, currentColor?: Card['color']) {
+    const effectiveColor = currentColor ?? card.color;
+    const nextTableKey = `${card.id}|${card.color}|${card.value}|${effectiveColor}`;
+    if (this.lastTableRenderKey === nextTableKey) {
+      return;
+    }
+
     this.tableCard = card;
-    this.currentColor = currentColor ?? card.color;
+    this.currentColor = effectiveColor;
+    this.lastTableRenderKey = nextTableKey;
     this.renderTableArea();
   }
 
@@ -395,5 +425,15 @@ export default class CardStage {
 
   destroy() {
     this.clearStageObjects();
+  }
+
+  private getHandRenderKey(cards: Card[]): string {
+    return cards.map((card) => `${card.id}:${card.color}:${card.value}`).join('|');
+  }
+
+  private getOpponentsRenderKey(opponents: OpponentHandSnapshot[]): string {
+    return opponents
+      .map((opponent) => `${opponent.id}:${opponent.nickname}:${opponent.cardCount}:${opponent.isTurn ? '1' : '0'}`)
+      .join('|');
   }
 }
