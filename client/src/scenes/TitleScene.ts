@@ -67,7 +67,7 @@ export default class TitleScene extends Phaser.Scene {
 
     const background = this.add
       .rectangle(centerX, height / 2, panelWidth, cardHeight, 0x0b1222, 0.55)
-      .setStrokeStyle(2, 0x172036, 0.8);
+      .setStrokeStyle(1, 0x0f1a32, 0.35);
     this.staticElements.push(background);
 
     const title = this.add
@@ -148,7 +148,7 @@ export default class TitleScene extends Phaser.Scene {
 
     const buttonRect = this.add
       .rectangle(x, y, width, height, 0xf97316, 0.9)
-      .setStrokeStyle(2, 0xffffff, 0.9)
+      .setStrokeStyle(1, 0x7c2d12, 0.5)
       .setOrigin(0.5);
     const label = this.add
       .text(x, y, config.label, {

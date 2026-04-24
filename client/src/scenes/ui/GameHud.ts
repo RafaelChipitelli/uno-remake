@@ -141,7 +141,7 @@ export default class GameHud {
         0.92,
       )
       .setOrigin(0);
-    panel.setStrokeStyle(2, this.options.panelBorder, 0.9);
+    panel.setStrokeStyle(1, 0x1e293b, 0.4);
 
     const contentX = panel.x + this.options.padding;
     let cursorY = panel.y + this.options.padding;
@@ -306,7 +306,7 @@ export default class GameHud {
     const height = compact ? 46 : 54;
 
     this.leaveButtonBg = this.scene.add.rectangle(centerX, y, width, height, 0xdc2626, 0.9).setOrigin(0.5);
-    this.leaveButtonBg.setStrokeStyle(2, 0xffffff, 0.85);
+    this.leaveButtonBg.setStrokeStyle(1, 0x7f1d1d, 0.55);
 
     this.leaveButtonLabel = this.scene.add.text(centerX, y, 'Sair da sala', {
         fontFamily: this.options.fontFamily,
@@ -349,7 +349,7 @@ export default class GameHud {
     const height = compact ? 44 : 52;
 
     this.drawButtonBg = this.scene.add.rectangle(centerX, y, width, height, 0x0ea5e9, 0.9).setOrigin(0.5);
-    this.drawButtonBg.setStrokeStyle(2, 0xffffff, 0.85);
+    this.drawButtonBg.setStrokeStyle(1, 0x0c4a6e, 0.55);
 
     this.drawButtonLabel = this.scene.add
       .text(centerX, y, 'Comprar carta', {
@@ -399,7 +399,7 @@ export default class GameHud {
     const height = compact ? 46 : 54;
 
     this.startButtonBg = this.scene.add.rectangle(centerX, y, width, height, 0xdc2626, 0.9).setOrigin(0.5);
-    this.startButtonBg.setStrokeStyle(2, 0xffffff, 0.85);
+    this.startButtonBg.setStrokeStyle(1, 0x7f1d1d, 0.55);
 
     this.startButtonLabel = this.scene.add.text(centerX, y, 'Iniciar Jogo', {
         fontFamily: this.options.fontFamily,
