@@ -18,8 +18,6 @@ type ButtonConfig = {
 
 const FONT = '"Inter", system-ui, sans-serif';
 const TEXT_RESOLUTION = Math.min(window.devicePixelRatio || 1, 2);
-const SPACING_16 = 16;
-const SPACING_24 = 24;
 const DECOR_DEPTH = -10;
 
 export default class TitleScene extends Phaser.Scene {
@@ -64,43 +62,62 @@ export default class TitleScene extends Phaser.Scene {
 
     const { width, height } = this.scale;
     const centerX = width / 2;
-    const centerY = height / 2;
     const compact = width < 640 || height < 640;
-    const fontScale = Math.max(0.75, Math.min(1, Math.min(width, height) / 900));
-    const desktopTitleSize = Math.round(Math.min(64, Math.max(48, width * 0.055)));
-    const titleSize = compact ? Math.max(38, Math.round(44 * fontScale)) : desktopTitleSize;
-    const subtitleSize = Math.max(16, Math.round((compact ? 16 : 18) * fontScale));
-    const infoSize = Math.max(14, Math.round((compact ? 14 : 16) * fontScale));
-    const contentWidth = Math.min(compact ? 360 : 520, width * (compact ? 0.86 : 0.58));
+    const frameScale = Phaser.Math.Clamp(Math.min(width / 1920, height / 1080), 0.82, 1.18);
+    const layoutCenterY = compact ? height * 0.5 : height * 0.43;
+    const rem = 16 * frameScale;
+    // ETAPA 6.1 — vertical scale system (equivalent to --space-unit: 1rem)
+    const spaceUnit = Math.round(16 * frameScale);
+    const spaceSmall = Math.round(spaceUnit * 0.5);
+    const spaceMedium = Math.round(spaceUnit * 1);
+    const spaceExtra = Math.round(spaceUnit * 2);
+    // ETAPA 6.5 — visual block grouping rhythm
+    const intraBlockGap = spaceSmall;
+    const intraBlockGapMedium = spaceMedium;
+    const interBlockGap = spaceExtra;
+    // ETAPA 6.3 — relative type scale hierarchy (rem based)
+    const titleSize = Math.round(Phaser.Math.Clamp(rem * 3.4, 3.2 * 16, 3.8 * 16));
+    const subtitleSize = Math.round(rem * 1);
+    const inputFontSize = Math.round(rem * 0.95);
+    const primaryButtonFontSize = Math.round(rem * 1.2);
+    const secondaryButtonFontSize = Math.round(rem * 0.85);
+    const metaTextSize = Math.round(rem * 0.8);
+    const infoSize = Math.round(rem * 0.9);
+    const baseContentWidth = Math.min(width * 0.9, 28 * 16);
+    const contentWidth = baseContentWidth;
+    const identity = this.getIdentityDetails();
 
     this.createBackgroundDecorations(width, height);
 
     const iconRadius = compact ? 34 : 40;
-    const iconGap = compact ? SPACING_16 : SPACING_24;
-    const subtitleGap = compact ? SPACING_16 : SPACING_24;
-    const infoGap = SPACING_16;
-    const buttonGap = SPACING_16;
-    const buttonHeight = compact ? 54 : 60;
-    const profileGap = compact ? 12 : 16;
+    // ETAPA 6.4 — block height proportion rhythm
+    const inputBlockHeight = Math.round(rem * 2.5);
+    const buttonHeight = Math.round(inputBlockHeight * 1.28);
+    const secondaryButtonBaseHeight = Math.round(inputBlockHeight * 0.8);
 
     const secondaryButtons = this.getSecondaryButtonConfigs();
     const secondaryBlockHeight = compact
-      ? secondaryButtons.length * 46 + Math.max(0, secondaryButtons.length - 1) * 10
-      : 52;
+      ? secondaryButtons.length * secondaryButtonBaseHeight + Math.max(0, secondaryButtons.length - 1) * spaceSmall
+      : secondaryButtonBaseHeight;
+    const hintEstimatedHeight = identity.hint ? Math.round(infoSize * 2.8) : 0;
     const blockHeight =
       iconRadius * 2 +
-      iconGap +
+      intraBlockGapMedium + // icon -> title (top block)
       titleSize +
-      subtitleGap +
+      intraBlockGap + // title -> subtitle (top block)
       subtitleSize +
-      infoGap +
-      infoSize * 2.8 +
-      SPACING_24 +
+      interBlockGap + // top block -> middle block
+      inputBlockHeight +
+      intraBlockGap + // input -> stats (middle block)
+      metaTextSize +
+      (identity.hint ? intraBlockGap + hintEstimatedHeight : 0) +
+      interBlockGap + // middle block -> action block
       buttonHeight +
-      buttonGap +
+      intraBlockGapMedium + // primary -> secondary buttons (action block)
       secondaryBlockHeight +
-      SPACING_24;
-    let cursorY = centerY - blockHeight / 2;
+      spaceMedium + // secondary buttons -> info text
+      infoSize;
+    let cursorY = layoutCenterY - blockHeight / 2;
 
     const iconContainer = this.add.container(centerX, cursorY + iconRadius);
     const iconGlow = this.add.ellipse(0, 4, iconRadius * 2.8, iconRadius * 1.8, 0x6c5ce7, 0.2);
@@ -123,7 +140,7 @@ export default class TitleScene extends Phaser.Scene {
     const cardFrontText = this.add
       .text(0, -2, 'UNO', {
         fontFamily: FONT,
-        fontSize: Math.max(14, Math.round((compact ? 14 : 16) * fontScale)),
+        fontSize: Math.round(rem * 0.9),
         fontStyle: '800',
         color: '#ffffff',
       })
@@ -137,7 +154,7 @@ export default class TitleScene extends Phaser.Scene {
     this.iconFloatBaseY = iconContainer.y;
     this.staticElements.push(iconContainer);
     this.iconElements.push(iconContainer);
-    cursorY += iconRadius * 2 + iconGap;
+    cursorY += iconRadius * 2 + intraBlockGapMedium;
 
     const unoText = this.add
       .text(0, cursorY, 'UNO', {
@@ -159,13 +176,13 @@ export default class TitleScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setResolution(TEXT_RESOLUTION);
-    const titleGap = compact ? 10 : 14;
+    const titleGap = compact ? 10 : Math.round(14 * frameScale);
     const totalTitleWidth = unoText.width + remakeText.width + titleGap;
     unoText.setX(centerX - totalTitleWidth / 2 + unoText.width / 2);
     remakeText.setX(centerX + totalTitleWidth / 2 - remakeText.width / 2);
     this.staticElements.push(unoText, remakeText);
     this.logoElements.push(unoText, remakeText);
-    cursorY += Math.max(unoText.height, remakeText.height) + subtitleGap;
+    cursorY += Math.max(unoText.height, remakeText.height) + intraBlockGap;
 
     const subtitle = this.add
       .text(centerX, cursorY, 'Multiplayer em tempo real', {
@@ -177,11 +194,10 @@ export default class TitleScene extends Phaser.Scene {
       .setResolution(TEXT_RESOLUTION);
     this.staticElements.push(subtitle);
     this.subtitleElements.push(subtitle);
-    cursorY += subtitle.height + profileGap;
+    cursorY += subtitle.height + interBlockGap;
 
-    const identity = this.getIdentityDetails();
-    const profileBoxWidth = Math.min(contentWidth, compact ? 320 : 370);
-    const profileBoxHeight = compact ? 42 : 46;
+    const profileBoxWidth = contentWidth;
+    const profileBoxHeight = inputBlockHeight;
     const profileShadow = this.add
       .rectangle(centerX, cursorY + profileBoxHeight / 2 + 3, profileBoxWidth, profileBoxHeight, 0x101723, 0.42)
       .setOrigin(0.5);
@@ -192,7 +208,7 @@ export default class TitleScene extends Phaser.Scene {
     const profileName = this.add
       .text(centerX - profileBoxWidth / 2 + 14, cursorY + profileBoxHeight / 2, identity.nickname, {
         fontFamily: FONT,
-        fontSize: `${Math.max(13, Math.round((compact ? 14 : 15) * fontScale))}px`,
+        fontSize: `${inputFontSize}px`,
         color: '#E5E7EB',
         fontStyle: '600',
       })
@@ -200,21 +216,22 @@ export default class TitleScene extends Phaser.Scene {
       .setResolution(TEXT_RESOLUTION);
     this.staticElements.push(profileShadow, profileBox, profileName);
     this.subtitleElements.push(profileShadow, profileBox, profileName);
-    cursorY += profileBoxHeight + 10;
+    cursorY += profileBoxHeight + intraBlockGap;
 
     const statsLine = this.add
       .text(centerX, cursorY, identity.statsLabel, {
         fontFamily: FONT,
-        fontSize: `${Math.max(12, Math.round((compact ? 12 : 13) * fontScale))}px`,
+        fontSize: `${metaTextSize}px`,
         color: '#8FA0BB',
       })
       .setOrigin(0.5)
       .setResolution(TEXT_RESOLUTION);
     this.staticElements.push(statsLine);
     this.subtitleElements.push(statsLine);
-    cursorY += statsLine.height + 8;
+    cursorY += statsLine.height;
 
     if (identity.hint) {
+      cursorY += intraBlockGap;
       const authHint = this.add
         .text(centerX, cursorY, identity.hint, {
           fontFamily: FONT,
@@ -227,31 +244,50 @@ export default class TitleScene extends Phaser.Scene {
         .setResolution(TEXT_RESOLUTION);
       this.staticElements.push(authHint);
       this.subtitleElements.push(authHint);
-      cursorY += authHint.height + SPACING_24;
+      cursorY += authHint.height + interBlockGap;
     } else {
-      cursorY += SPACING_24;
+      cursorY += interBlockGap;
     }
 
     const primaryButtonY = cursorY + buttonHeight / 2;
     const needsLogin = isAuthenticationAvailable() && !this.authSession.user;
-    this.createPrimaryActionButton(centerX, primaryButtonY, {
+    this.createPrimaryActionButton(centerX, primaryButtonY, contentWidth, buttonHeight, primaryButtonFontSize, {
       label: needsLogin ? '» Entrar' : '» Jogar',
       onClick: () => (needsLogin ? this.handleGoogleSignIn() : this.handleCreateRoom()),
     });
-    cursorY += buttonHeight + buttonGap;
+    cursorY += buttonHeight + intraBlockGapMedium;
 
-    const secondaryButtonY = cursorY + 24;
+    const secondaryButtonY = cursorY + secondaryButtonBaseHeight / 2;
+    const secondaryButtonGap = spaceSmall;
+    const secondaryButtonWidth = compact
+      ? contentWidth
+      : Math.max(120, Math.round((contentWidth - secondaryButtonGap) / 2));
     if (compact) {
       secondaryButtons.forEach((config, index) => {
-        this.createSecondaryActionButton(centerX, secondaryButtonY + index * 56, config, true);
+        this.createSecondaryActionButton(
+          centerX,
+          secondaryButtonY + index * (secondaryButtonBaseHeight + spaceSmall),
+          secondaryButtonWidth,
+          secondaryButtonBaseHeight,
+          secondaryButtonFontSize,
+          config,
+        );
       });
     } else {
       secondaryButtons.forEach((config, index) => {
-        const offset = index === 0 ? -92 : 92;
-        this.createSecondaryActionButton(centerX + offset, secondaryButtonY, config, false);
+        const horizontalOffset = (secondaryButtonWidth + secondaryButtonGap) / 2;
+        const offset = index === 0 ? -horizontalOffset : horizontalOffset;
+        this.createSecondaryActionButton(
+          centerX + offset,
+          secondaryButtonY,
+          secondaryButtonWidth,
+          secondaryButtonBaseHeight,
+          secondaryButtonFontSize,
+          config,
+        );
       });
     }
-    cursorY += secondaryBlockHeight + SPACING_24;
+    cursorY += secondaryBlockHeight + spaceMedium;
 
     this.infoText = this.add
       .text(centerX, cursorY, this.getDefaultInfoMessage(), {
@@ -396,12 +432,14 @@ export default class TitleScene extends Phaser.Scene {
     });
   }
 
-  private createPrimaryActionButton(x: number, y: number, config: ButtonConfig) {
-    const compact = this.scale.width < 640 || this.scale.height < 640;
-    const fontScale = Math.max(0.75, Math.min(1, Math.min(this.scale.width, this.scale.height) / 900));
-    const width = Math.min(compact ? 240 : 260, this.scale.width * (compact ? 0.7 : 0.34));
-    const height = compact ? 58 : 62;
-    const fontSize = Math.max(22, Math.round((compact ? 20 : 22) * fontScale));
+  private createPrimaryActionButton(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    fontSize: number,
+    config: ButtonConfig,
+  ) {
     const palette = { base: 0x6c5ce7, hover: 0x7f70ef, border: 0x4f46b6, shadow: 0x2b2368 };
     const shadow = this.add.rectangle(x, y + 4, width, height, palette.shadow, 0.45).setOrigin(0.5);
 
@@ -447,10 +485,14 @@ export default class TitleScene extends Phaser.Scene {
     this.actionElements.push(shadow, buttonRect, label);
   }
 
-  private createSecondaryActionButton(x: number, y: number, config: ButtonConfig, stacked: boolean) {
-    const compact = this.scale.width < 640 || this.scale.height < 640;
-    const width = stacked ? Math.min(232, this.scale.width * 0.72) : compact ? 148 : 170;
-    const height = compact ? 42 : 46;
+  private createSecondaryActionButton(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    fontSize: number,
+    config: ButtonConfig,
+  ) {
     const palette = { base: 0x22253a, hover: 0x2a2f4a, border: 0x404a6a, shadow: 0x131722 };
 
     const shadow = this.add.rectangle(x, y + 3, width, height, palette.shadow, 0.42).setOrigin(0.5);
@@ -461,7 +503,7 @@ export default class TitleScene extends Phaser.Scene {
     const label = this.add
       .text(x, y, config.label, {
         fontFamily: FONT,
-        fontSize: compact ? '14px' : '15px',
+        fontSize: `${fontSize}px`,
         color: '#C9D4EA',
         fontStyle: '600',
       })
