@@ -104,7 +104,7 @@ export default class GameHud {
     };
 
     const panelShadow = this.scene.add
-      .rectangle(panelX + 3, panelY + 6, this.options.width, panelHeight, 0x000000, 0.3)
+      .rectangle(panelX + 3, panelY + 6, this.options.width, panelHeight, phaserTheme.colors.decor.overlay, 0.3)
       .setOrigin(0);
     const panel = this.scene.add
       .rectangle(panelX, panelY, this.options.width, panelHeight, this.options.panelColor, 0.94)

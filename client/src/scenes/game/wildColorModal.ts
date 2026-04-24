@@ -43,7 +43,7 @@ export function createWildColorModal(
   const panelY = height / 2;
 
   const overlay = scene.add
-    .rectangle(panelX, panelY, width, height, 0x000000, 0.55)
+    .rectangle(panelX, panelY, width, height, phaserTheme.colors.decor.overlay, 0.55)
     .setOrigin(0.5)
     .setDepth(2000)
     .setInteractive();
@@ -51,7 +51,7 @@ export function createWildColorModal(
   const panel = scene.add
     .rectangle(panelX, panelY, panelWidth, panelHeight, phaserTheme.colors.bg.game, 0.96)
     .setOrigin(0.5)
-    .setStrokeStyle(2, 0xffffff, 0.35)
+    .setStrokeStyle(2, phaserTheme.colors.text.inverse, 0.35)
     .setDepth(2001);
 
   const title = scene.add
@@ -77,7 +77,7 @@ export function createWildColorModal(
     const button = scene.add
       .rectangle(x, y, buttonSize, buttonSize, CARD_COLOR_HEX[color])
       .setOrigin(0.5)
-      .setStrokeStyle(3, 0xffffff)
+      .setStrokeStyle(3, phaserTheme.colors.text.inverse)
       .setDepth(2002)
       .setInteractive({ useHandCursor: true });
 

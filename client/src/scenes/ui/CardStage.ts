@@ -141,7 +141,9 @@ export default class CardStage {
 
     if (!this.tableCard) {
       const container = this.scene.add.container(metrics.stageX, centerY);
-      const shadow = this.scene.add.rectangle(4, 6, cardWidth, cardHeight, 0x000000, 0.35).setOrigin(0.5);
+      const shadow = this.scene.add
+        .rectangle(4, 6, cardWidth, cardHeight, phaserTheme.colors.decor.overlay, 0.35)
+        .setOrigin(0.5);
       const card = this.scene.add
         .rectangle(0, 0, cardWidth, cardHeight, phaserTheme.colors.card.wild, 0.96)
         .setOrigin(0.5)
@@ -166,12 +168,21 @@ export default class CardStage {
           : this.tableCard.color;
 
       const container = this.scene.add.container(metrics.stageX, centerY);
-      const shadow = this.scene.add.rectangle(5, 7, cardWidth, cardHeight, 0x000000, 0.38).setOrigin(0.5);
+      const shadow = this.scene.add
+        .rectangle(5, 7, cardWidth, cardHeight, phaserTheme.colors.decor.overlay, 0.38)
+        .setOrigin(0.5);
       const card = this.scene.add
         .rectangle(0, 0, cardWidth, cardHeight, CARD_COLOR_HEX[resolvedColor] ?? phaserTheme.colors.surface.disabled)
         .setOrigin(0.5)
-        .setStrokeStyle(3, 0xffffff, 0.9);
-      const innerHighlight = this.scene.add.ellipse(0, -cardHeight * 0.2, cardWidth * 0.74, cardHeight * 0.28, 0xffffff, 0.15);
+        .setStrokeStyle(3, phaserTheme.colors.text.inverse, 0.9);
+      const innerHighlight = this.scene.add.ellipse(
+        0,
+        -cardHeight * 0.2,
+        cardWidth * 0.74,
+        cardHeight * 0.28,
+        phaserTheme.colors.text.inverse,
+        0.15,
+      );
       const text = this.scene.add
         .text(0, 0, this.tableCard.value, {
           fontFamily: this.options.fontFamily,
@@ -232,12 +243,21 @@ export default class CardStage {
       const x = startX + index * (cardWidth + cardGap);
       const container = this.scene.add.container(x, baseY);
 
-      const shadow = this.scene.add.rectangle(2, 4, cardWidth, cardHeight, 0x000000, 0.34).setOrigin(0.5);
+      const shadow = this.scene.add
+        .rectangle(2, 4, cardWidth, cardHeight, phaserTheme.colors.decor.overlay, 0.34)
+        .setOrigin(0.5);
       const base = this.scene.add
         .rectangle(0, 0, cardWidth, cardHeight, CARD_COLOR_HEX[card.color] ?? phaserTheme.colors.surface.disabled)
         .setOrigin(0.5)
-        .setStrokeStyle(2, 0xffffff, 0.9);
-      const highlight = this.scene.add.ellipse(0, -cardHeight * 0.24, cardWidth * 0.7, cardHeight * 0.28, 0xffffff, 0.14);
+        .setStrokeStyle(2, phaserTheme.colors.text.inverse, 0.9);
+      const highlight = this.scene.add.ellipse(
+        0,
+        -cardHeight * 0.24,
+        cardWidth * 0.7,
+        cardHeight * 0.28,
+        phaserTheme.colors.text.inverse,
+        0.14,
+      );
       const value = this.scene.add
         .text(0, 0, card.value, {
           fontFamily: this.options.fontFamily,
@@ -265,12 +285,12 @@ export default class CardStage {
 
       container.on('pointerover', () => {
         this.scene.tweens.add({ targets: container, y: baseY - 16, scaleX: 1.03, scaleY: 1.03, duration: 180, ease: 'Quad.easeOut' });
-        base.setStrokeStyle(3, 0xffffff, 1);
+        base.setStrokeStyle(3, phaserTheme.colors.text.inverse, 1);
       });
 
       container.on('pointerout', () => {
         this.scene.tweens.add({ targets: container, y: baseY, scaleX: 1, scaleY: 1, duration: 180, ease: 'Quad.easeOut' });
-        base.setStrokeStyle(2, 0xffffff, 0.9);
+        base.setStrokeStyle(2, phaserTheme.colors.text.inverse, 0.9);
       });
 
       container.on('pointerdown', () => {
