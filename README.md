@@ -142,6 +142,53 @@ npm --prefix client run build
 
 ---
 
+## 🌍 Deploy em produção (Vercel + backend realtime)
+
+Como este projeto usa **Socket.IO** com conexões em tempo real persistentes, a estratégia recomendada é:
+
+- **Frontend (Vite/Phaser):** Vercel
+- **Backend (Express/Socket.IO):** provedor Node "always-on" (ex.: Render, Railway, Fly.io)
+
+> A Vercel é excelente para o client, mas o backend de jogo em tempo real deve ficar em um serviço adequado para WebSocket contínuo.
+
+### 1) Deploy do backend (Render/Railway/Fly)
+
+No diretório `server`, os scripts de produção são:
+
+- `npm run build`
+- `npm run start`
+
+Configure variáveis de ambiente no provedor do backend:
+
+- `PORT` = porta fornecida pela plataforma
+- `CLIENT_ORIGIN` = URL pública do frontend na Vercel (ex.: `https://seu-projeto.vercel.app`)
+
+Valide o backend publicado em:
+
+- `GET /health` deve retornar `{ "status": "ok" }`
+
+### 2) Deploy do frontend na Vercel
+
+1. Importe o repositório na Vercel.
+2. Configure **Root Directory** = `client`.
+3. Build command: `npm run build`.
+4. Output directory: `dist`.
+5. Adicione Environment Variables:
+   - `VITE_SERVER_URL=https://URL_DO_BACKEND_PUBLICO`
+   - `VITE_FIREBASE_*` (se usar autenticação/Firestore)
+6. Faça o deploy e teste multiplayer em duas abas/dispositivos.
+
+### 3) Checklist de cuidados em produção
+
+- **CORS:** `CLIENT_ORIGIN` deve bater exatamente com a URL da Vercel.
+- **Firebase Auth:** adicione o domínio `.vercel.app` em Authorized domains.
+- **Segredos:** nunca commitar `.env`; usar apenas variáveis no painel de cada plataforma.
+- **Latência:** escolha região do backend próxima dos jogadores.
+- **Plano gratuito:** pode haver cold starts/hibernação, afetando a primeira conexão.
+- **Observabilidade:** monitore logs de conexão Socket.IO e erros de CORS.
+
+---
+
 ## 🔐 Firebase (opcional no cliente)
 
 Se quiser habilitar login Google e persistência de perfil/estatísticas:
