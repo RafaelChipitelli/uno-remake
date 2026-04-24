@@ -1,6 +1,17 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 :root {
   color-scheme: dark;
-  font-family: 'Space Mono', 'Fira Code', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  --bg: #0b0f1a;
+  --primary: #6c5ce7;
+  --secondary: #3a86ff;
+  --success: #22c55e;
+  --danger: #ff4d4d;
+  --text: #e5e7eb;
+  --text-muted: #9ca3af;
+  --surface: #111827;
+  --surface-2: #1f2937;
 }
 
 * {
@@ -14,12 +25,14 @@ body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background: #030712;
+  background: var(--bg);
 }
 
 body {
   position: fixed;
   inset: 0;
+  color: var(--text);
+  animation: app-fade-in 350ms ease-out;
 }
 
 #app {
@@ -38,9 +51,137 @@ canvas {
   outline: none;
   box-shadow: none;
   -webkit-tap-highlight-color: transparent;
+  transition: filter 220ms ease, transform 220ms ease;
 }
 
 canvas:focus,
 canvas:focus-visible {
   outline: none;
+}
+
+.ui-modal-root {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  animation: app-fade-in 220ms ease;
+}
+
+.ui-modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(7, 10, 20, 0.58);
+  backdrop-filter: blur(8px);
+}
+
+.ui-modal-panel {
+  position: relative;
+  width: min(92vw, 460px);
+  border-radius: 14px;
+  border: 1px solid rgba(156, 163, 175, 0.26);
+  background: linear-gradient(180deg, rgba(26, 33, 50, 0.98) 0%, rgba(17, 24, 39, 0.98) 100%);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.5);
+  padding: 24px;
+  transform-origin: center;
+  animation: panel-pop 220ms ease-out;
+}
+
+.ui-modal-title {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  margin: 0 0 8px;
+  color: var(--text);
+}
+
+.ui-modal-message {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin: 0 0 16px;
+}
+
+.ui-modal-input {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(156, 163, 175, 0.4);
+  background: rgba(11, 15, 26, 0.92);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  padding: 12px 14px;
+  outline: none;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.ui-modal-input:focus {
+  border-color: rgba(108, 92, 231, 0.85);
+  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.24);
+}
+
+.ui-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.ui-modal-btn {
+  border: none;
+  border-radius: 12px;
+  font: inherit;
+  font-weight: 600;
+  padding: 10px 16px;
+  min-width: 110px;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  transition: all 0.2s ease;
+}
+
+.ui-modal-btn:hover {
+  transform: scale(1.03);
+  filter: brightness(1.08);
+}
+
+.ui-modal-btn:active {
+  transform: scale(0.97);
+}
+
+.ui-modal-btn--primary {
+  background: linear-gradient(180deg, #7c6cff 0%, var(--primary) 100%);
+}
+
+.ui-modal-btn--secondary {
+  background: linear-gradient(180deg, #5aa0ff 0%, var(--secondary) 100%);
+}
+
+.ui-modal-btn--danger {
+  background: linear-gradient(180deg, #ff7070 0%, var(--danger) 100%);
+}
+
+.ui-modal-btn--ghost {
+  background: rgba(156, 163, 175, 0.18);
+  color: var(--text);
+}
+
+@keyframes app-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes panel-pop {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }

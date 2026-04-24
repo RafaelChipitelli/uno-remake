@@ -8,14 +8,18 @@ import {
   updateCurrentUserNickname,
   type AuthSession,
 } from '../services/playerAccount';
+import { askTextInput } from '../ui/modal';
 
 type ButtonConfig = {
   label: string;
+  tone?: 'primary' | 'secondary' | 'danger' | 'neutral';
   onClick: () => void | Promise<void>;
 };
 
-const FONT = '"Space Mono", "Fira Code", monospace';
+const FONT = '"Inter", system-ui, sans-serif';
 const TEXT_RESOLUTION = Math.min(window.devicePixelRatio || 1, 2);
+const SPACING_16 = 16;
+const SPACING_24 = 24;
 
 export default class TitleScene extends Phaser.Scene {
   private staticElements: Phaser.GameObjects.GameObject[] = [];
@@ -30,7 +34,7 @@ export default class TitleScene extends Phaser.Scene {
   }
 
   create() {
-    this.cameras.main.setBackgroundColor('#030712');
+    this.cameras.main.setBackgroundColor('#0B0F1A');
 
     this.unsubscribeAuthSession = subscribeAuthSession((session) => {
       this.authSession = session;
@@ -62,12 +66,16 @@ export default class TitleScene extends Phaser.Scene {
     const cardHeight = Math.min(height * (compact ? 0.92 : 0.8), compact ? 700 : 660);
     const panelTop = (height - cardHeight) / 2;
     const panelBottom = panelTop + cardHeight;
-    const verticalPadding = Math.round(Math.max(24, Math.min(72, cardHeight * (compact ? 0.09 : 0.11))));
+    const verticalPadding = Math.round(Math.max(SPACING_24, Math.min(72, cardHeight * (compact ? 0.09 : 0.11))));
     const topY = panelTop + verticalPadding;
 
+    const leftGlow = this.add.ellipse(width * 0.16, height * 0.22, width * 0.46, height * 0.5, 0x3a86ff, 0.16);
+    const rightGlow = this.add.ellipse(width * 0.88, height * 0.78, width * 0.5, height * 0.56, 0x6c5ce7, 0.15);
+    this.staticElements.push(leftGlow, rightGlow);
+
     const background = this.add
-      .rectangle(centerX, height / 2, panelWidth, cardHeight, 0x0b1222, 0.55)
-      .setStrokeStyle(1, 0x0f1a32, 0.35);
+      .rectangle(centerX, height / 2, panelWidth, cardHeight, 0x111827, 0.78)
+      .setStrokeStyle(1, 0x2b3852, 0.6);
     this.staticElements.push(background);
 
     const title = this.add
@@ -75,28 +83,28 @@ export default class TitleScene extends Phaser.Scene {
         fontFamily: FONT,
         fontSize: titleSize,
         fontStyle: 'bold',
-        color: '#f4f4f5',
-        letterSpacing: 4,
+        color: '#E5E7EB',
+        letterSpacing: 3,
       })
       .setOrigin(0.5)
       .setResolution(TEXT_RESOLUTION);
     this.staticElements.push(title);
 
     const subtitle = this.add
-      .text(centerX, title.y + Math.max(30, Math.round(52 * fontScale)), 'Multiplayer em tempo real', {
+      .text(centerX, title.y + Math.max(SPACING_24, Math.round(48 * fontScale)), 'Multiplayer em tempo real', {
         fontFamily: FONT,
         fontSize: subtitleSize,
-        color: '#cbd5f5',
+        color: '#9CA3AF',
       })
       .setOrigin(0.5)
       .setResolution(TEXT_RESOLUTION);
     this.staticElements.push(subtitle);
 
     const authHint = this.add
-      .text(centerX, subtitle.y + Math.max(24, Math.round(32 * fontScale)), this.getAuthSummaryMessage(), {
+      .text(centerX, subtitle.y + Math.max(SPACING_16, Math.round(32 * fontScale)), this.getAuthSummaryMessage(), {
         fontFamily: FONT,
         fontSize: Math.max(12, Math.round((compact ? 13 : 16) * fontScale)),
-        color: '#c4b5fd',
+        color: '#9CA3AF',
         align: 'center',
         wordWrap: { width: panelWidth * 0.84, useAdvancedWrap: true },
       })
@@ -106,14 +114,14 @@ export default class TitleScene extends Phaser.Scene {
 
     const buttons = this.getButtonConfigs();
 
-    const buttonHeight = compact ? 54 : 64;
-    const buttonGap = compact ? 20 : 28;
-    const subtitleToButtonsGap = Math.max(20, Math.round(28 * fontScale));
+    const buttonHeight = compact ? 52 : 60;
+    const buttonGap = compact ? SPACING_16 : SPACING_24;
+    const subtitleToButtonsGap = Math.max(SPACING_16, Math.round(28 * fontScale));
     const buttonsBlockHeight = buttons.length * buttonHeight + (buttons.length - 1) * buttonGap;
 
     const buttonsAnchorY = authHint.y + authHint.height + subtitleToButtonsGap;
 
-    const minInfoY = buttonsAnchorY + buttonsBlockHeight + Math.max(24, Math.round(40 * fontScale));
+    const minInfoY = buttonsAnchorY + buttonsBlockHeight + Math.max(SPACING_24, Math.round(40 * fontScale));
     const idealInfoY = panelBottom - verticalPadding;
     const infoY = Math.max(minInfoY, idealInfoY);
 
@@ -127,11 +135,13 @@ export default class TitleScene extends Phaser.Scene {
       .text(centerX, infoY, this.getDefaultInfoMessage(), {
         fontFamily: FONT,
         fontSize: infoSize,
-        color: '#f9a8d4',
+        color: '#9CA3AF',
       })
       .setOrigin(0.5)
       .setResolution(TEXT_RESOLUTION);
     this.staticElements.push(this.infoText);
+
+    this.animateScreenEntry();
   }
 
   private handleResize(gameSize: Phaser.Structs.Size) {
@@ -146,9 +156,20 @@ export default class TitleScene extends Phaser.Scene {
     const height = compact ? 54 : 64;
     const fontSize = Math.max(14, Math.round((compact ? 16 : 20) * fontScale));
 
+    const tone = config.tone ?? 'neutral';
+    const toneMap: Record<NonNullable<ButtonConfig['tone']>, { base: number; hover: number; border: number; shadow: number }> = {
+      primary: { base: 0x6c5ce7, hover: 0x7f70ef, border: 0x4f46b6, shadow: 0x2b2368 },
+      secondary: { base: 0x3a86ff, hover: 0x5b9dff, border: 0x2d66bf, shadow: 0x163869 },
+      danger: { base: 0xff4d4d, hover: 0xff6666, border: 0xbf3434, shadow: 0x6c1f1f },
+      neutral: { base: 0x4b5563, hover: 0x596575, border: 0x2d3642, shadow: 0x1f2430 },
+    };
+    const palette = toneMap[tone];
+
+    const shadow = this.add.rectangle(x, y + 4, width, height, palette.shadow, 0.45).setOrigin(0.5);
+
     const buttonRect = this.add
-      .rectangle(x, y, width, height, 0xf97316, 0.9)
-      .setStrokeStyle(1, 0x7c2d12, 0.5)
+      .rectangle(x, y, width, height, palette.base, 0.9)
+      .setStrokeStyle(1, palette.border, 0.8)
       .setOrigin(0.5);
     const label = this.add
       .text(x, y, config.label, {
@@ -164,18 +185,23 @@ export default class TitleScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
 
-    zone.on('pointerover', () => buttonRect.setFillStyle(0xfb923c));
-    zone.on('pointerout', () => {
-      buttonRect.setFillStyle(0xf97316);
-      buttonRect.setScale(1);
+    zone.on('pointerover', () => {
+      buttonRect.setFillStyle(palette.hover);
+      this.tweens.add({ targets: [buttonRect, label, shadow], scaleX: 1.03, scaleY: 1.03, duration: 180, ease: 'Quad.easeOut' });
     });
-    zone.on('pointerdown', () => buttonRect.setScale(0.98));
+    zone.on('pointerout', () => {
+      buttonRect.setFillStyle(palette.base);
+      this.tweens.add({ targets: [buttonRect, label, shadow], scaleX: 1, scaleY: 1, duration: 180, ease: 'Quad.easeOut' });
+    });
+    zone.on('pointerdown', () => {
+      this.tweens.add({ targets: [buttonRect, label, shadow], scaleX: 0.97, scaleY: 0.97, duration: 120, ease: 'Quad.easeInOut' });
+    });
     zone.on('pointerup', () => {
-      buttonRect.setScale(1);
+      this.tweens.add({ targets: [buttonRect, label, shadow], scaleX: 1, scaleY: 1, duration: 120, ease: 'Quad.easeOut' });
       void config.onClick();
     });
 
-    this.staticElements.push(buttonRect, label);
+    this.staticElements.push(shadow, buttonRect, label);
     this.buttons.push(zone);
   }
 
@@ -195,7 +221,15 @@ export default class TitleScene extends Phaser.Scene {
 
     let roomCode: string | undefined;
     if (autoAction === 'join') {
-      roomCode = window.prompt('Digite o código da sala (ex: ABCD)')?.trim().toUpperCase();
+      roomCode = (
+        await askTextInput({
+          title: 'Entrar com código',
+          message: 'Digite o código da sala para entrar no jogo.',
+          placeholder: 'Ex: ABCD',
+          confirmLabel: 'Entrar',
+          cancelLabel: 'Cancelar',
+        })
+      )?.trim().toUpperCase();
       if (!roomCode) {
         this.showInfo('Informe um código válido.');
         return;
@@ -218,23 +252,23 @@ export default class TitleScene extends Phaser.Scene {
   private getButtonConfigs(): ButtonConfig[] {
     if (isAuthenticationAvailable()) {
       if (this.authSession.isLoading) {
-        return [{ label: 'Carregando sessão...', onClick: () => this.showInfo('Aguarde a sessão carregar.') }];
+        return [{ label: 'Carregando sessão...', tone: 'neutral', onClick: () => this.showInfo('Aguarde a sessão carregar.') }];
       }
 
       if (!this.authSession.user) {
-        return [{ label: 'Entrar com Google', onClick: () => this.handleGoogleSignIn() }];
+        return [{ label: 'Entrar com Google', tone: 'primary', onClick: () => this.handleGoogleSignIn() }];
       }
 
       return [
-        { label: 'Criar Sala', onClick: () => this.handleCreateRoom() },
-        { label: 'Entrar com Código', onClick: () => this.handleJoinRoom() },
-        { label: 'Sair da Conta Google', onClick: () => this.handleGoogleSignOut() },
+        { label: 'Criar Sala', tone: 'primary', onClick: () => this.handleCreateRoom() },
+        { label: 'Entrar com Código', tone: 'secondary', onClick: () => this.handleJoinRoom() },
+        { label: 'Sair da Conta Google', tone: 'danger', onClick: () => this.handleGoogleSignOut() },
       ];
     }
 
     return [
-      { label: 'Criar Sala', onClick: () => this.handleCreateRoom() },
-      { label: 'Entrar com Código', onClick: () => this.handleJoinRoom() },
+      { label: 'Criar Sala', tone: 'primary', onClick: () => this.handleCreateRoom() },
+      { label: 'Entrar com Código', tone: 'secondary', onClick: () => this.handleJoinRoom() },
     ];
   }
 
@@ -331,7 +365,15 @@ export default class TitleScene extends Phaser.Scene {
       const fallbackNickname =
         profileNickname ?? this.authSession.user?.displayName ?? this.lastNickname ?? 'Player';
 
-      const input = window.prompt('Qual nickname deseja usar?', fallbackNickname)?.trim() ?? '';
+      const input =
+        (await askTextInput({
+          title: 'Escolha seu nickname',
+          message: 'Esse nome aparecerá para os outros jogadores na sala.',
+          placeholder: 'Digite seu nickname',
+          initialValue: fallbackNickname,
+          confirmLabel: 'Continuar',
+          cancelLabel: 'Cancelar',
+        })) ?? '';
       const finalNickname = input || fallbackNickname;
 
       if (!finalNickname) {
@@ -352,7 +394,15 @@ export default class TitleScene extends Phaser.Scene {
       return finalNickname;
     }
 
-    const input = window.prompt('Qual nickname deseja usar?', this.lastNickname || 'Player')?.trim() ?? '';
+    const input =
+      (await askTextInput({
+        title: 'Escolha seu nickname',
+        message: 'Digite o nome que será mostrado na partida.',
+        placeholder: 'Digite seu nickname',
+        initialValue: this.lastNickname || 'Player',
+        confirmLabel: 'Continuar',
+        cancelLabel: 'Cancelar',
+      })) ?? '';
     if (input) {
       this.lastNickname = input;
     }
@@ -365,6 +415,22 @@ export default class TitleScene extends Phaser.Scene {
     this.buttons.forEach((btn) => btn.destroy());
     this.staticElements = [];
     this.buttons = [];
+  }
+
+  private animateScreenEntry(): void {
+    this.staticElements.forEach((element, index) => {
+      const target = element as unknown as Phaser.GameObjects.Components.Transform & Phaser.GameObjects.Components.Alpha;
+      target.setAlpha(0);
+      target.setY(target.y + 10);
+      this.tweens.add({
+        targets: target,
+        alpha: 1,
+        y: target.y - 10,
+        duration: 220,
+        delay: index * 45,
+        ease: 'Sine.easeOut',
+      });
+    });
   }
 
 }
