@@ -3,15 +3,27 @@
 :root {
   color-scheme: dark;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  --bg: #0b0f1a;
-  --primary: #6c5ce7;
-  --secondary: #3a86ff;
-  --success: #22c55e;
-  --danger: #ff4d4d;
-  --text: #e5e7eb;
-  --text-muted: #9ca3af;
-  --surface: #111827;
-  --surface-2: #1f2937;
+  --color-bg-canvas: #0b0f1a;
+  --color-bg-game: #0f172a;
+  --color-action-primary: #6c5ce7;
+  --color-action-secondary: #3a86ff;
+  --color-status-success: #22c55e;
+  --color-status-danger: #ff4d4d;
+  --color-text-primary: #e5e7eb;
+  --color-text-muted: #9ca3af;
+  --color-surface-card: #111827;
+  --color-surface-card-alt: #1f2937;
+
+  /* aliases legados (retrocompatibilidade) */
+  --bg: var(--color-bg-canvas);
+  --primary: var(--color-action-primary);
+  --secondary: var(--color-action-secondary);
+  --success: var(--color-status-success);
+  --danger: var(--color-status-danger);
+  --text: var(--color-text-primary);
+  --text-muted: var(--color-text-muted);
+  --surface: var(--color-surface-card);
+  --surface-2: var(--color-surface-card-alt);
 }
 
 * {

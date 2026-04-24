@@ -1,6 +1,9 @@
 import Phaser from 'phaser';
 import { createGameConfig } from './config/phaser';
+import { applyThemeCssVariables } from './theme/tokens';
 import './style.css';
+
+applyThemeCssVariables();
 
 const game = new Phaser.Game(createGameConfig());
 
@@ -11,6 +14,7 @@ const resize = () => {
 
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', resize);
+
 
 
 

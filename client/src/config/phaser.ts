@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
 import GameScene from '../scenes/GameScene';
 import TitleScene from '../scenes/TitleScene';
+import { theme } from '../theme/tokens';
 
 export function createGameConfig(): Phaser.Types.Core.GameConfig {
   return {
     type: Phaser.AUTO,
-    backgroundColor: '#0f172a',
+    backgroundColor: theme.colors.bg.game,
     parent: 'app',
     physics: {
       default: 'arcade',
