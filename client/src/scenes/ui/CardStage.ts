@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { CARD_COLOR_HEX } from '../../game/colors';
+import { getCardDisplayParts, getCardDisplayScale, getCardDisplayValue } from '../../game/cardDisplay';
 import { phaserTheme, theme } from '../../theme/tokens';
 import type { Card } from '../../types';
 
@@ -244,6 +245,7 @@ export default class CardStage {
         fontSize: `${Math.round(clamp(52 * (this.options.fontScale ?? 1), 30, 56))}px`,
         color: theme.colors.text.inverse,
         fontStyle: '800',
+        align: 'center',
       })
       .setOrigin(0.5)
       .setResolution(this.options.textResolution);
@@ -370,7 +372,13 @@ export default class CardStage {
     this.placeholderContainer.setVisible(false);
     this.tableContainer.setVisible(true);
     this.tableCardRect.setFillStyle(CARD_COLOR_HEX[resolvedColor] ?? phaserTheme.colors.surface.disabled);
-    this.tableCardText.setText(this.tableCard.value);
+    const tableLabel = getCardDisplayValue(this.tableCard.value);
+    const tableSymbol = getCardDisplayParts(this.tableCard.value).symbol;
+    const tableLabelScale = getCardDisplayScale(this.tableCard.value);
+    this.tableCardText
+      .setText(tableSymbol ? `${tableLabel}\n${tableSymbol}` : tableLabel)
+      .setFontSize(Math.round(clamp(52 * (this.options.fontScale ?? 1) * tableLabelScale, 18, 56)))
+      .setLineSpacing(tableSymbol ? -8 : 0);
 
     if (withIntroAnimation) {
       this.tableContainer.setScale(0.9).setAlpha(0);
@@ -505,7 +513,13 @@ export default class CardStage {
       }
 
       view.base.setFillStyle(CARD_COLOR_HEX[card.color] ?? phaserTheme.colors.surface.disabled);
-      view.value.setText(card.value);
+      const displayLabel = getCardDisplayValue(card.value);
+      const displaySymbol = getCardDisplayParts(card.value).symbol;
+      const labelScale = getCardDisplayScale(card.value);
+      view.value
+        .setText(displaySymbol ? `${displayLabel}\n${displaySymbol}` : displayLabel)
+        .setFontSize(Math.round(clamp(cardWidth * 0.32 * labelScale, 10, 24)))
+        .setLineSpacing(displaySymbol ? -6 : 0);
 
       const targetX = startX + index * (cardWidth + cardGap);
       view.homeX = targetX;
@@ -657,14 +671,17 @@ export default class CardStage {
       phaserTheme.colors.text.inverse,
       0.14,
     );
+    const cardDisplay = getCardDisplayParts(card.value);
     const value = this.scene.add
-      .text(0, 0, card.value, {
+      .text(0, 0, cardDisplay.symbol ? `${cardDisplay.label}\n${cardDisplay.symbol}` : cardDisplay.label, {
         fontFamily: this.options.fontFamily,
-        fontSize: `${Math.round(clamp(cardWidth * 0.32, 13, 24))}px`,
+        fontSize: `${Math.round(clamp(cardWidth * 0.32 * getCardDisplayScale(card.value), 10, 24))}px`,
         color: theme.colors.text.inverse,
         fontStyle: '800',
+        align: 'center',
       })
       .setOrigin(0.5)
+      .setLineSpacing(cardDisplay.symbol ? -6 : 0)
       .setResolution(this.options.textResolution);
 
     container.add([shadow, base, highlight, value]);

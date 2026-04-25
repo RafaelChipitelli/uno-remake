@@ -113,6 +113,93 @@ canvas:focus-visible {
   margin: 0 0 16px;
 }
 
+.ui-modal-content {
+  margin-bottom: 14px;
+}
+
+.ui-draw-decision-preview {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(156, 163, 175, 0.22);
+  background: rgba(11, 15, 26, 0.62);
+}
+
+.ui-draw-decision-card {
+  width: 72px;
+  height: 104px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.88);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  flex-shrink: 0;
+}
+
+.ui-draw-decision-card--red {
+  background: #ef4444;
+}
+
+.ui-draw-decision-card--green {
+  background: #22c55e;
+}
+
+.ui-draw-decision-card--blue {
+  background: #3b82f6;
+}
+
+.ui-draw-decision-card--yellow {
+  background: #facc15;
+}
+
+.ui-draw-decision-card--wild {
+  background: #111827;
+}
+
+.ui-draw-decision-card-value {
+  color: #f9fafb;
+  font-weight: 800;
+  font-size: 24px;
+  line-height: 0.9;
+  white-space: pre-line;
+  text-align: center;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+.ui-draw-decision-card--yellow .ui-draw-decision-card-value {
+  color: #1f2937;
+  text-shadow: none;
+}
+
+.ui-draw-decision-details {
+  min-width: 0;
+}
+
+.ui-draw-decision-title {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ui-draw-decision-description {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.ui-draw-decision-hint {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .ui-modal-input {
   width: 100%;
   border-radius: 12px;
