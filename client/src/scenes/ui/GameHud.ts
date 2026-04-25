@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { phaserTheme, theme } from '../../theme/tokens';
 
 export type HudSnapshot = {
   status: string;
@@ -39,6 +40,16 @@ export default class GameHud {
   private callbacks: HudCallbacks;
   private elements: Phaser.GameObjects.GameObject[] = [];
   private currentState: HudSnapshot;
+  private isBuilt = false;
+
+  private titleText?: Phaser.GameObjects.Text;
+  private statusText?: Phaser.GameObjects.Text;
+  private roomLabelText?: Phaser.GameObjects.Text;
+  private turnLabelText?: Phaser.GameObjects.Text;
+  private playersHeaderText?: Phaser.GameObjects.Text;
+  private playerText?: Phaser.GameObjects.Text;
+  private logsHeaderText?: Phaser.GameObjects.Text;
+  private logsText?: Phaser.GameObjects.Text;
 
   private startButton?: { bg: Phaser.GameObjects.Rectangle; label: Phaser.GameObjects.Text; zone: Phaser.GameObjects.Zone; tone: HudButtonTone };
   private drawButton?: { bg: Phaser.GameObjects.Rectangle; label: Phaser.GameObjects.Text; zone: Phaser.GameObjects.Zone; tone: HudButtonTone };
@@ -63,6 +74,7 @@ export default class GameHud {
   init(initialState: HudSnapshot) {
     this.currentState = { ...initialState };
     this.build();
+    this.refreshDynamicContent();
   }
 
   setLayoutMetrics(partial: Pick<HudOptions, 'width' | 'margin' | 'padding' | 'compact' | 'fontScale'>) {
@@ -72,7 +84,10 @@ export default class GameHud {
 
   update(partial: Partial<HudSnapshot>) {
     this.currentState = { ...this.currentState, ...partial };
-    this.build();
+    if (!this.isBuilt) {
+      this.build();
+    }
+    this.refreshDynamicContent();
   }
 
   resize() {
@@ -82,6 +97,15 @@ export default class GameHud {
   destroy() {
     this.elements.forEach((obj) => obj.destroy());
     this.elements = [];
+    this.isBuilt = false;
+    this.titleText = undefined;
+    this.statusText = undefined;
+    this.roomLabelText = undefined;
+    this.turnLabelText = undefined;
+    this.playersHeaderText = undefined;
+    this.playerText = undefined;
+    this.logsHeaderText = undefined;
+    this.logsText = undefined;
     this.startButton = undefined;
     this.drawButton = undefined;
     this.leaveButton = undefined;
@@ -103,14 +127,14 @@ export default class GameHud {
     };
 
     const panelShadow = this.scene.add
-      .rectangle(panelX + 3, panelY + 6, this.options.width, panelHeight, 0x000000, 0.3)
+      .rectangle(panelX + 3, panelY + 6, this.options.width, panelHeight, phaserTheme.colors.decor.overlay, 0.3)
       .setOrigin(0);
     const panel = this.scene.add
       .rectangle(panelX, panelY, this.options.width, panelHeight, this.options.panelColor, 0.94)
       .setOrigin(0)
       .setStrokeStyle(1, this.options.panelBorder, 0.9);
     const panelTopGlow = this.scene.add
-      .rectangle(panelX, panelY, this.options.width, 52, 0x6c5ce7, 0.08)
+      .rectangle(panelX, panelY, this.options.width, 52, phaserTheme.colors.action.primary.base, 0.08)
       .setOrigin(0);
 
     this.elements.push(panelShadow, panel, panelTopGlow);
@@ -127,36 +151,36 @@ export default class GameHud {
         })
         .setResolution(this.options.textResolution);
 
-    const title = makeText('👤 Player Panel', compact ? 17 : 19, '#E5E7EB', '700');
-    this.elements.push(title);
-    y += title.height + spacing.m;
+    this.titleText = makeText('👤 Player Panel', compact ? 17 : 19, theme.colors.text.primary, '700');
+    this.elements.push(this.titleText);
+    y += this.titleText.height + spacing.m;
 
-    const status = makeText(this.currentState.status || 'Conectando...', compact ? 13 : 14, '#E5E7EB', '600');
-    this.elements.push(status);
-    y += status.height + spacing.s;
+    this.statusText = makeText(this.currentState.status || 'Conectando...', compact ? 13 : 14, theme.colors.text.primary, '600');
+    this.elements.push(this.statusText);
+    y += this.statusText.height + spacing.s;
 
-    const roomLabel = this.scene.add
+    this.roomLabelText = this.scene.add
       .text(innerX, y, `🏷 ${this.currentState.roomLabel}`, {
         fontFamily: this.options.fontFamily,
         fontSize: `${Math.max(11, Math.round((compact ? 12 : 13) * fontScale))}px`,
-        color: '#9CA3AF',
+        color: theme.colors.text.muted,
       })
       .setResolution(this.options.textResolution);
-    this.elements.push(roomLabel);
-    y += roomLabel.height + spacing.s;
+    this.elements.push(this.roomLabelText);
+    y += this.roomLabelText.height + spacing.s;
 
-    const turnLabel = this.scene.add
+    this.turnLabelText = this.scene.add
       .text(innerX, y, `⏱ Vez: ${this.currentState.currentTurn}`, {
         fontFamily: this.options.fontFamily,
         fontSize: `${Math.max(11, Math.round((compact ? 12 : 13) * fontScale))}px`,
-        color: '#22C55E',
+        color: theme.colors.status.success,
         fontStyle: '600',
       })
       .setResolution(this.options.textResolution);
-    this.elements.push(turnLabel);
-    y += turnLabel.height + spacing.m;
+    this.elements.push(this.turnLabelText);
+    y += this.turnLabelText.height + spacing.m;
 
-    const controlsHeader = makeText('⚡ Ações', compact ? 13 : 14, '#9CA3AF', '600');
+    const controlsHeader = makeText('⚡ Ações', compact ? 13 : 14, theme.colors.text.muted, '600');
     this.elements.push(controlsHeader);
     y += controlsHeader.height + spacing.s;
 
@@ -176,7 +200,7 @@ export default class GameHud {
       .text(innerX, y, this.options.instructions, {
         fontFamily: this.options.fontFamily,
         fontSize: `${Math.max(11, Math.round((compact ? 11 : 12) * fontScale))}px`,
-        color: '#9CA3AF',
+        color: theme.colors.text.muted,
         lineSpacing: 4,
         wordWrap: { width: innerWidth, useAdvancedWrap: true },
       })
@@ -184,48 +208,68 @@ export default class GameHud {
     this.elements.push(instructions);
     y += instructions.height + spacing.m;
 
-    const playersHeader = makeText('🧑‍🤝‍🧑 Jogadores', compact ? 13 : 14, '#9CA3AF', '600');
-    this.elements.push(playersHeader);
-    y += playersHeader.height + spacing.s;
+    this.playersHeaderText = makeText('🧑‍🤝‍🧑 Jogadores', compact ? 13 : 14, theme.colors.text.muted, '600');
+    this.elements.push(this.playersHeaderText);
+    y += this.playersHeaderText.height + spacing.s;
 
-    const playerText = this.scene.add
+    this.playerText = this.scene.add
       .text(innerX, y, this.getVisiblePlayerList(), {
         fontFamily: this.options.fontFamily,
         fontSize: `${Math.max(11, Math.round((compact ? 11 : 12) * fontScale))}px`,
-        color: '#E5E7EB',
+        color: theme.colors.text.primary,
         lineSpacing: 4,
         wordWrap: { width: innerWidth, useAdvancedWrap: true },
       })
       .setResolution(this.options.textResolution);
-    this.elements.push(playerText);
-    y += playerText.height + spacing.m;
+    this.elements.push(this.playerText);
+    y += this.playerText.height + spacing.m;
 
-    const logsHeader = makeText('📝 Log da rodada', compact ? 13 : 14, '#9CA3AF', '600');
-    this.elements.push(logsHeader);
-    y += logsHeader.height + spacing.s;
+    this.logsHeaderText = makeText('📝 Log da rodada', compact ? 13 : 14, theme.colors.text.muted, '600');
+    this.elements.push(this.logsHeaderText);
+    y += this.logsHeaderText.height + spacing.s;
 
     const logsBackground = this.scene.add
-      .rectangle(innerX, y, innerWidth, Math.max(compact ? 108 : 132, panelY + panelHeight - y - spacing.m), 0x0f172a, 0.72)
+      .rectangle(
+        innerX,
+        y,
+        innerWidth,
+        Math.max(compact ? 108 : 132, panelY + panelHeight - y - spacing.m),
+        phaserTheme.colors.bg.game,
+        0.72,
+      )
       .setOrigin(0)
-      .setStrokeStyle(1, 0x2b3852, 0.7);
+      .setStrokeStyle(1, phaserTheme.colors.surface.panelBorder, 0.7);
     this.elements.push(logsBackground);
 
-    const logs = this.scene.add
+    this.logsText = this.scene.add
       .text(innerX + spacing.s, y + spacing.s, this.getVisibleLogText(), {
         fontFamily: this.options.fontFamily,
         fontSize: `${Math.max(11, Math.round((compact ? 11 : 12) * fontScale))}px`,
-        color: '#9CA3AF',
+        color: theme.colors.text.muted,
         lineSpacing: 5,
         wordWrap: { width: innerWidth - spacing.m, useAdvancedWrap: true },
       })
       .setResolution(this.options.textResolution);
-    this.elements.push(logs);
+    this.elements.push(this.logsText);
 
     this.applyButtonState(this.startButton, this.currentState.startEnabled);
     this.applyButtonState(this.drawButton, this.currentState.drawEnabled);
     this.applyButtonState(this.leaveButton, this.currentState.leaveEnabled);
 
     this.animateEntry();
+    this.isBuilt = true;
+  }
+
+  private refreshDynamicContent() {
+    this.statusText?.setText(this.currentState.status || 'Conectando...');
+    this.roomLabelText?.setText(`🏷 ${this.currentState.roomLabel}`);
+    this.turnLabelText?.setText(`⏱ Vez: ${this.currentState.currentTurn}`);
+    this.playerText?.setText(this.getVisiblePlayerList());
+    this.logsText?.setText(this.getVisibleLogText());
+
+    this.applyButtonState(this.startButton, this.currentState.startEnabled);
+    this.applyButtonState(this.drawButton, this.currentState.drawEnabled);
+    this.applyButtonState(this.leaveButton, this.currentState.leaveEnabled);
   }
 
   private createActionButton(
@@ -247,7 +291,7 @@ export default class GameHud {
       .text(centerX, centerY, labelText, {
         fontFamily: this.options.fontFamily,
         fontSize: `${Math.max(12, Math.round((this.options.compact ? 12 : 13) * (this.options.fontScale ?? 1)))}px`,
-        color: '#ffffff',
+        color: theme.colors.text.inverse,
         fontStyle: '700',
       })
       .setOrigin(0.5)
@@ -287,12 +331,12 @@ export default class GameHud {
 
   private getButtonPalette(tone: HudButtonTone): { base: number; hover: number; border: number; shadow: number } {
     if (tone === 'primary') {
-      return { base: 0x6c5ce7, hover: 0x7e6ff0, border: 0x4e44b7, shadow: 0x2b2368 };
+      return phaserTheme.colors.action.primary;
     }
     if (tone === 'secondary') {
-      return { base: 0x3a86ff, hover: 0x5a9cff, border: 0x2d69c6, shadow: 0x163869 };
+      return phaserTheme.colors.action.secondary;
     }
-    return { base: 0xff4d4d, hover: 0xff6767, border: 0xc33434, shadow: 0x5b2323 };
+    return phaserTheme.colors.action.danger;
   }
 
   private applyButtonState(button: { bg: Phaser.GameObjects.Rectangle; label: Phaser.GameObjects.Text; zone: Phaser.GameObjects.Zone; tone: HudButtonTone } | undefined, enabled: boolean) {
@@ -306,7 +350,7 @@ export default class GameHud {
       return;
     }
 
-    button.bg.setFillStyle(0x374151, 0.7).setAlpha(0.6);
+    button.bg.setFillStyle(phaserTheme.colors.surface.disabled, 0.7).setAlpha(0.6);
     button.label.setAlpha(0.55);
     button.zone.disableInteractive();
   }

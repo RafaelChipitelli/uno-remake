@@ -6,9 +6,11 @@ import { getFirstPlayableCardIndex, isValidCardPlay } from '../game/rules';
 import type {
   Card,
   CardActionEvent,
+  CreateRoomPayload,
   GameEndedPayload,
   GameStatus,
   Player,
+  QuickPlayPayload,
   Room,
   RoomErrorPayload,
 } from '../types';
@@ -38,6 +40,7 @@ import {
   describeFirebasePersistenceError,
   recordCurrentUserMatchResult,
 } from '../services/playerAccount';
+import { phaserTheme } from '../theme/tokens';
 import { askConfirmation } from '../ui/modal';
 
 export default class GameScene extends Phaser.Scene {
@@ -56,7 +59,7 @@ export default class GameScene extends Phaser.Scene {
   private statusMessage = INITIAL_STATUS_MESSAGE;
   private lastPlayerListMessage = EMPTY_PLAYER_LIST_MESSAGE;
 
-  private pendingAction?: 'create' | 'join';
+  private pendingAction?: 'quick_play' | 'create_private' | 'join';
   private pendingNickname?: string;
   private pendingRoomCode?: string;
 
@@ -355,9 +358,25 @@ export default class GameScene extends Phaser.Scene {
     this.clearGroup(this.backgroundElements);
 
     const { width, height } = this.scale;
-    const fullBg = this.add.rectangle(width / 2, height / 2, width, height, 0x0b0f1a, 1).setOrigin(0.5);
-    const glowLeft = this.add.ellipse(width * 0.14, height * 0.2, width * 0.56, height * 0.6, 0x3a86ff, 0.16);
-    const glowRight = this.add.ellipse(width * 0.86, height * 0.78, width * 0.5, height * 0.56, 0x6c5ce7, 0.14);
+    const fullBg = this.add
+      .rectangle(width / 2, height / 2, width, height, phaserTheme.colors.bg.canvas, 1)
+      .setOrigin(0.5);
+    const glowLeft = this.add.ellipse(
+      width * 0.14,
+      height * 0.2,
+      width * 0.56,
+      height * 0.6,
+      phaserTheme.colors.action.secondary.base,
+      0.16,
+    );
+    const glowRight = this.add.ellipse(
+      width * 0.86,
+      height * 0.78,
+      width * 0.5,
+      height * 0.56,
+      phaserTheme.colors.action.primary.base,
+      0.14,
+    );
 
     this.tweens.add({
       targets: [glowLeft, glowRight],
@@ -410,8 +429,12 @@ export default class GameScene extends Phaser.Scene {
 
     const nickname = this.pendingNickname?.trim() || this.player.nickname;
 
-    if (this.pendingAction === 'create') {
-      this.socket.emit('room:create', { nickname });
+    if (this.pendingAction === 'quick_play') {
+      const payload: QuickPlayPayload = { nickname };
+      this.socket.emit('room:quick-play', payload);
+    } else if (this.pendingAction === 'create_private') {
+      const payload: CreateRoomPayload = { nickname, visibility: 'private' };
+      this.socket.emit('room:create', payload);
     } else {
       const roomCode = this.pendingRoomCode;
       if (!roomCode) {
@@ -752,6 +775,8 @@ export default class GameScene extends Phaser.Scene {
     return this.roomId ? `Sala atual: ${this.roomId}` : 'Nenhuma sala ativa.';
   }
 }
+
+
 
 
 

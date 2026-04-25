@@ -1,6 +1,7 @@
 // Estruturas compartilhadas entre servidor e cliente
 export type CardColor = 'red' | 'green' | 'blue' | 'yellow' | 'wild';
 export type GameStatus = 'waiting' | 'in_progress' | 'finished';
+export type RoomVisibility = 'public' | 'private';
 
 export interface Card {
   id: string;
@@ -19,6 +20,7 @@ export interface Player {
 
 export interface Room {
   id: string;
+  visibility: RoomVisibility;
   players: Player[];
   discardPile: Card[];
   drawPileCount: number;
@@ -52,6 +54,11 @@ export interface CardActionEvent {
 }
 
 export interface CreateRoomPayload {
+  nickname?: string;
+  visibility?: RoomVisibility;
+}
+
+export interface QuickPlayPayload {
   nickname?: string;
 }
 

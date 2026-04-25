@@ -1,13 +1,14 @@
 import type { CardColor } from '../types';
+import { phaserTheme } from '../theme/tokens';
 
 export type SelectableColor = Exclude<CardColor, 'wild'>;
 
 export const CARD_COLOR_HEX: Record<CardColor, number> = {
-  red: 0xdc2626,
-  green: 0x16a34a,
-  blue: 0x2563eb,
-  yellow: 0xeab308,
-  wild: 0x1f2937,
+  red: phaserTheme.colors.card.red,
+  green: phaserTheme.colors.card.green,
+  blue: phaserTheme.colors.card.blue,
+  yellow: phaserTheme.colors.card.yellow,
+  wild: phaserTheme.colors.card.wild,
 };
 
 export const COLOR_LABELS: Record<CardColor, string> = {

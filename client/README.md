@@ -40,7 +40,8 @@ npm install
 ## Personalização
 
 - Para apontar para outro backend, defina `VITE_SERVER_URL` (ex.: `.env.local`) ou altere `src/config/network.ts`.
-- As fontes/cores principais estão centralizadas em módulos de `src/scenes/game` e `src/game` para facilitar manutenção.
+- As cores de tema estão centralizadas em `src/theme/tokens.ts`.
+- Padrão recomendado: **não adicionar novos hex/0x direto em cenas/componentes**; crie/ajuste token em `tokens.ts` e consuma via `theme` (strings) ou `phaserTheme` (numbers).
 
 ## Login com Google + Firestore (Firebase)
 
