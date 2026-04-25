@@ -31,7 +31,7 @@ export const SCENE_KEYS = {
 } as const;
 
 export type SceneLaunchData = {
-  autoAction?: 'create' | 'join';
+  autoAction?: 'quick_play' | 'create_private' | 'join';
   nickname?: string;
   roomCode?: string;
 };

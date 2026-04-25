@@ -6,9 +6,11 @@ import { getFirstPlayableCardIndex, isValidCardPlay } from '../game/rules';
 import type {
   Card,
   CardActionEvent,
+  CreateRoomPayload,
   GameEndedPayload,
   GameStatus,
   Player,
+  QuickPlayPayload,
   Room,
   RoomErrorPayload,
 } from '../types';
@@ -57,7 +59,7 @@ export default class GameScene extends Phaser.Scene {
   private statusMessage = INITIAL_STATUS_MESSAGE;
   private lastPlayerListMessage = EMPTY_PLAYER_LIST_MESSAGE;
 
-  private pendingAction?: 'create' | 'join';
+  private pendingAction?: 'quick_play' | 'create_private' | 'join';
   private pendingNickname?: string;
   private pendingRoomCode?: string;
 
@@ -427,8 +429,12 @@ export default class GameScene extends Phaser.Scene {
 
     const nickname = this.pendingNickname?.trim() || this.player.nickname;
 
-    if (this.pendingAction === 'create') {
-      this.socket.emit('room:create', { nickname });
+    if (this.pendingAction === 'quick_play') {
+      const payload: QuickPlayPayload = { nickname };
+      this.socket.emit('room:quick-play', payload);
+    } else if (this.pendingAction === 'create_private') {
+      const payload: CreateRoomPayload = { nickname, visibility: 'private' };
+      this.socket.emit('room:create', payload);
     } else {
       const roomCode = this.pendingRoomCode;
       if (!roomCode) {
@@ -769,6 +775,7 @@ export default class GameScene extends Phaser.Scene {
     return this.roomId ? `Sala atual: ${this.roomId}` : 'Nenhuma sala ativa.';
   }
 }
+
 
 
 

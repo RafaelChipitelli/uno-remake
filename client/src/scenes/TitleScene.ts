@@ -264,7 +264,7 @@ export default class TitleScene extends Phaser.Scene {
     const needsLogin = isAuthenticationAvailable() && !this.authSession.user;
     this.createPrimaryActionButton(centerX, primaryButtonY, contentWidth, buttonHeight, primaryButtonFontSize, {
       label: needsLogin ? '» Entrar' : '» Jogar',
-      onClick: () => (needsLogin ? this.handleGoogleSignIn() : this.handleCreateRoom()),
+      onClick: () => (needsLogin ? this.handleGoogleSignIn() : this.handleQuickPlay()),
     });
     cursorY += buttonHeight + intraBlockGapMedium;
 
@@ -559,15 +559,19 @@ export default class TitleScene extends Phaser.Scene {
     this.actionElements.push(shadow, buttonRect, label);
   }
 
+  private handleQuickPlay() {
+    void this.startGameScene('quick_play');
+  }
+
   private handleCreateRoom() {
-    void this.startGameScene('create');
+    void this.startGameScene('create_private');
   }
 
   private handleJoinRoom() {
     void this.startGameScene('join');
   }
 
-  private async startGameScene(autoAction: 'create' | 'join'): Promise<void> {
+  private async startGameScene(autoAction: 'quick_play' | 'create_private' | 'join'): Promise<void> {
     if (this.isStartingGame) {
       return;
     }
@@ -627,7 +631,7 @@ export default class TitleScene extends Phaser.Scene {
 
   private getSecondaryButtonConfigs(): ButtonConfig[] {
     return [
-      { label: 'Criar Sala', tone: 'secondary', onClick: () => this.handleCreateRoom() },
+      { label: 'Criar Sala Privada', tone: 'secondary', onClick: () => this.handleCreateRoom() },
       { label: 'Entrar com Código', tone: 'secondary', onClick: () => this.handleJoinRoom() },
     ];
   }

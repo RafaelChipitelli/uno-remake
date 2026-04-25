@@ -17,7 +17,9 @@ import type {
   JoinRoomPayload,
   PlayCardPayload,
   Player,
+  QuickPlayPayload,
   Room,
+  RoomVisibility,
 } from './types';
 
 const app = express();
@@ -51,6 +53,8 @@ io.on('connection', (socket) => {
       return;
     }
 
+    const roomVisibility: RoomVisibility = payload.visibility ?? 'public';
+
     if (payload.nickname) {
       player.nickname = payload.nickname;
     }
@@ -60,6 +64,7 @@ io.on('connection', (socket) => {
       const isDuplicateCreateRequest =
         Boolean(currentRoom) &&
         currentRoom?.hostId === player.id &&
+        currentRoom?.visibility === roomVisibility &&
         currentRoom?.gameStatus === 'waiting' &&
         currentRoom?.players.length === 1;
 
@@ -83,6 +88,7 @@ io.on('connection', (socket) => {
     const roomId = generateRoomCode(store.rooms);
     const room: Room = {
       id: roomId,
+      visibility: roomVisibility,
       players: [],
       discardPile: [],
       drawPileCount: 0,
@@ -105,7 +111,72 @@ io.on('connection', (socket) => {
     socket.emit('room:created', { roomId });
     emitRoomState(io, store.rooms, roomId);
 
-    console.log(`[room:create] ${player.nickname} criou sala ${roomId}`);
+    console.log(`[room:create] ${player.nickname} criou sala ${roomId} (${roomVisibility})`);
+  });
+
+  socket.on('room:quick-play', (payload: QuickPlayPayload = {}) => {
+    const player = store.players.get(socket.id);
+    if (!player) {
+      return;
+    }
+
+    if (payload.nickname) {
+      player.nickname = payload.nickname;
+    }
+
+    if (player.roomId) {
+      removePlayerFromRoom(io, store, player.roomId, player.id);
+    }
+
+    const waitingPublicRooms = [...store.rooms.values()]
+      .filter((room) => room.visibility === 'public' && room.gameStatus === 'waiting')
+      .sort((a, b) => b.players.length - a.players.length || a.id.localeCompare(b.id));
+
+    const targetRoom = waitingPublicRooms[0];
+    if (targetRoom) {
+      player.roomId = targetRoom.id;
+      player.isTurn = false;
+
+      const alreadyInside = targetRoom.players.some((roomPlayer) => roomPlayer.id === player.id);
+      if (!alreadyInside) {
+        targetRoom.players.push(player);
+      }
+
+      socket.join(targetRoom.id);
+      socket.emit('room:joined', { roomId: targetRoom.id });
+      emitRoomState(io, store.rooms, targetRoom.id);
+
+      console.log(`[room:quick-play] ${player.nickname} entrou na sala pública ${targetRoom.id}`);
+      return;
+    }
+
+    const roomId = generateRoomCode(store.rooms);
+    const room: Room = {
+      id: roomId,
+      visibility: 'public',
+      players: [],
+      discardPile: [],
+      drawPileCount: 0,
+      currentColor: 'red',
+      hostId: player.id,
+      turnDirection: 1,
+      gameStatus: 'waiting',
+      winnerId: undefined,
+      winnerNickname: undefined,
+    };
+
+    player.roomId = roomId;
+    player.isTurn = true;
+
+    room.players.push(player);
+    store.rooms.set(roomId, room);
+    store.serverDecks.set(roomId, shuffleDeck(createUnoDeck()));
+
+    socket.join(roomId);
+    socket.emit('room:created', { roomId });
+    emitRoomState(io, store.rooms, roomId);
+
+    console.log(`[room:quick-play] ${player.nickname} criou sala pública ${roomId}`);
   });
 
   socket.on('room:join', (payload: JoinRoomPayload) => {
@@ -431,6 +502,7 @@ app.get('/health', (_req, res) => {
 server.listen(SERVER_PORT, () => {
   console.log(`Server listening on http://localhost:${SERVER_PORT}`);
 });
+
 
 
 
