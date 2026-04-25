@@ -29,12 +29,17 @@ export default class TitleScene extends Phaser.Scene {
   private subtitleElements: Phaser.GameObjects.GameObject[] = [];
   private actionElements: Phaser.GameObjects.GameObject[] = [];
   private infoText?: Phaser.GameObjects.Text;
+  private authStatusText?: Phaser.GameObjects.Text;
   private lastNickname = '';
   private authSession: AuthSession = getCurrentAuthSession();
   private unsubscribeAuthSession?: () => void;
   private iconFloatBaseY = 0;
   private iconFloatContainer?: Phaser.GameObjects.Container;
   private isStartingGame = false;
+  private resizeDebounceCall?: Phaser.Time.TimerEvent;
+  private lastResizeWidth = 0;
+  private lastResizeHeight = 0;
+  private hasPlayedInitialEntry = false;
 
   constructor() {
     super('TitleScene');
@@ -42,21 +47,40 @@ export default class TitleScene extends Phaser.Scene {
 
   create() {
     this.cameras.main.setBackgroundColor(theme.colors.bg.canvas);
+    this.lastResizeWidth = this.scale.width;
+    this.lastResizeHeight = this.scale.height;
 
     this.unsubscribeAuthSession = subscribeAuthSession((session) => {
+      const previousLayoutKey = this.getAuthLayoutKey(this.authSession);
       this.authSession = session;
-      this.buildLayout();
-    });
+      const nextLayoutKey = this.getAuthLayoutKey(session);
 
-    this.buildLayout();
+      if (previousLayoutKey !== nextLayoutKey || this.staticElements.length === 0) {
+        this.buildLayout();
+      }
+    });
 
     this.scale.on('resize', this.handleResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off('resize', this.handleResize, this);
+      this.resizeDebounceCall?.remove();
+      this.resizeDebounceCall = undefined;
       this.unsubscribeAuthSession?.();
       this.unsubscribeAuthSession = undefined;
       this.clearLayout();
     });
+  }
+
+  private getAuthLayoutKey(session: AuthSession): string {
+    const stats = session.profile?.stats;
+    return [
+      session.isLoading ? '1' : '0',
+      session.user?.uid ?? '',
+      session.profile?.nickname ?? '',
+      stats?.gamesPlayed ?? '',
+      stats?.gamesWon ?? '',
+      stats?.gamesLost ?? '',
+    ].join('|');
   }
 
   private buildLayout() {
@@ -314,8 +338,12 @@ export default class TitleScene extends Phaser.Scene {
     if (isAuthenticationAvailable() && this.authSession.user) {
       this.createTopRightSignOut();
     }
+    this.createTopRightAuthStatus();
 
-    this.animateScreenEntry();
+    if (!this.hasPlayedInitialEntry) {
+      this.animateScreenEntry();
+      this.hasPlayedInitialEntry = true;
+    }
     this.startIconFloating();
   }
 
@@ -349,6 +377,26 @@ export default class TitleScene extends Phaser.Scene {
     this.staticElements.push(label);
     this.buttons.push(zone);
     this.actionElements.push(label);
+  }
+
+  private createTopRightAuthStatus() {
+    if (!this.authSession.isLoading) {
+      return;
+    }
+
+    const { width } = this.scale;
+    this.authStatusText = this.add
+      .text(width - 32, 46, 'Verificando sessão de login...', {
+        fontFamily: FONT,
+        fontSize: '13px',
+        color: theme.colors.text.muted,
+      })
+      .setOrigin(1, 0)
+      .setAlpha(0.9)
+      .setResolution(TEXT_RESOLUTION);
+
+    this.staticElements.push(this.authStatusText);
+    this.actionElements.push(this.authStatusText);
   }
 
   private createBackgroundDecorations(width: number, height: number) {
@@ -420,8 +468,19 @@ export default class TitleScene extends Phaser.Scene {
   }
 
   private handleResize(gameSize: Phaser.Structs.Size) {
+    if (gameSize.width === this.lastResizeWidth && gameSize.height === this.lastResizeHeight) {
+      return;
+    }
+
+    this.lastResizeWidth = gameSize.width;
+    this.lastResizeHeight = gameSize.height;
     this.cameras.resize(gameSize.width, gameSize.height);
-    this.buildLayout();
+
+    this.resizeDebounceCall?.remove();
+    this.resizeDebounceCall = this.time.delayedCall(80, () => {
+      this.buildLayout();
+      this.resizeDebounceCall = undefined;
+    });
   }
 
   private startIconFloating() {
@@ -649,7 +708,6 @@ export default class TitleScene extends Phaser.Scene {
       return {
         nickname: 'Carregando perfil...',
         statsLabel: 'Partidas: -- • Vitórias: --',
-        hint: 'Verificando sessão de login...',
       };
     }
 
