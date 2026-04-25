@@ -659,7 +659,7 @@ export default class GameScene extends Phaser.Scene {
     }
 
     this.logLines.unshift(sanitized);
-    this.logLines = this.logLines.slice(0, 5);
+    this.logLines = this.logLines.slice(0, 20);
     this.hud?.update({ logLines: [...this.logLines] });
   }
 
@@ -775,6 +775,7 @@ export default class GameScene extends Phaser.Scene {
     return this.roomId ? `Sala atual: ${this.roomId}` : 'Nenhuma sala ativa.';
   }
 }
+
 
 
 

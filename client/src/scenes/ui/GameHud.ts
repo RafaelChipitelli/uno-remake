@@ -212,28 +212,35 @@ export default class GameHud {
     this.elements.push(this.playersHeaderText);
     y += this.playersHeaderText.height + spacing.s;
 
+    const playerFontSize = Math.max(11, Math.round((compact ? 11 : 12) * fontScale));
+    const playerLineSpacing = 4;
+    const playerLineHeight = playerFontSize + playerLineSpacing;
+    const playerBlockHeight = this.getMaxPlayerLines() * playerLineHeight + spacing.s;
+
     this.playerText = this.scene.add
       .text(innerX, y, this.getVisiblePlayerList(), {
         fontFamily: this.options.fontFamily,
-        fontSize: `${Math.max(11, Math.round((compact ? 11 : 12) * fontScale))}px`,
+        fontSize: `${playerFontSize}px`,
         color: theme.colors.text.primary,
-        lineSpacing: 4,
+        lineSpacing: playerLineSpacing,
         wordWrap: { width: innerWidth, useAdvancedWrap: true },
       })
-      .setResolution(this.options.textResolution);
+      .setResolution(this.options.textResolution)
+      .setFixedSize(innerWidth, playerBlockHeight);
     this.elements.push(this.playerText);
-    y += this.playerText.height + spacing.m;
+    y += playerBlockHeight + spacing.m;
 
-    this.logsHeaderText = makeText('📝 Log da rodada', compact ? 13 : 14, theme.colors.text.muted, '600');
+    this.logsHeaderText = makeText('📝 Log da partida', compact ? 13 : 14, theme.colors.text.muted, '600');
     this.elements.push(this.logsHeaderText);
     y += this.logsHeaderText.height + spacing.s;
 
+    const logsMinHeight = compact ? 140 : 180;
     const logsBackground = this.scene.add
       .rectangle(
         innerX,
         y,
         innerWidth,
-        Math.max(compact ? 108 : 132, panelY + panelHeight - y - spacing.m),
+        Math.max(logsMinHeight, panelY + panelHeight - y - spacing.m),
         phaserTheme.colors.bg.game,
         0.72,
       )
@@ -356,7 +363,7 @@ export default class GameHud {
   }
 
   private getVisiblePlayerList(): string {
-    const maxLines = this.options.compact ? 4 : 6;
+    const maxLines = this.getMaxPlayerLines();
     const lines = this.currentState.playerList.split('\n').filter(Boolean);
     if (!lines.length) {
       return 'Nenhum jogador ainda.';
@@ -368,12 +375,20 @@ export default class GameHud {
   }
 
   private getVisibleLogText(): string {
-    const maxLines = this.options.compact ? 4 : 6;
+    const maxLines = this.getMaxLogLines();
     const lines = this.currentState.logLines.slice(0, maxLines);
     if (!lines.length) {
       return '• Nenhuma ação ainda.';
     }
     return lines.map((line) => `• ${line}`).join('\n');
+  }
+
+  private getMaxPlayerLines(): number {
+    return this.options.compact ? 4 : 6;
+  }
+
+  private getMaxLogLines(): number {
+    return this.options.compact ? 7 : 10;
   }
 
   private animateEntry() {
