@@ -89,6 +89,8 @@ export default class CardStage {
   private turnIndicatorPulseTween?: Phaser.Tweens.Tween;
   private handNavLeft?: Phaser.GameObjects.Text;
   private handNavRight?: Phaser.GameObjects.Text;
+  private handHiddenLeftCount?: Phaser.GameObjects.Text;
+  private handHiddenRightCount?: Phaser.GameObjects.Text;
 
   private opponentViews: OpponentView[] = [];
   private wheelListenerRegistered = false;
@@ -299,7 +301,31 @@ export default class CardStage {
     this.handNavLeft.on('pointerup', () => this.shiftHandWindow(-1));
     this.handNavRight.on('pointerup', () => this.shiftHandWindow(1));
 
-    this.allObjects.push(this.handNavLeft, this.handNavRight);
+    this.handHiddenLeftCount = this.scene.add
+      .text(0, 0, '0', {
+        fontFamily: this.options.fontFamily,
+        fontSize: `${Math.round(clamp(11 * (this.options.fontScale ?? 1), 9, 13))}px`,
+        color: theme.colors.text.muted,
+        fontStyle: '500',
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.75)
+      .setResolution(this.options.textResolution)
+      .setVisible(false);
+
+    this.handHiddenRightCount = this.scene.add
+      .text(0, 0, '0', {
+        fontFamily: this.options.fontFamily,
+        fontSize: `${Math.round(clamp(11 * (this.options.fontScale ?? 1), 9, 13))}px`,
+        color: theme.colors.text.muted,
+        fontStyle: '500',
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.75)
+      .setResolution(this.options.textResolution)
+      .setVisible(false);
+
+    this.allObjects.push(this.handNavLeft, this.handNavRight, this.handHiddenLeftCount, this.handHiddenRightCount);
 
     this.createOpponentSlots();
   }
@@ -561,7 +587,7 @@ export default class CardStage {
     totalWidth: number,
     maxStart: number,
   ): void {
-    if (!this.handNavLeft || !this.handNavRight) {
+    if (!this.handNavLeft || !this.handNavRight || !this.handHiddenLeftCount || !this.handHiddenRightCount) {
       return;
     }
 
@@ -569,6 +595,8 @@ export default class CardStage {
     if (!hasOverflow) {
       this.handNavLeft.setVisible(false).disableInteractive();
       this.handNavRight.setVisible(false).disableInteractive();
+      this.handHiddenLeftCount.setVisible(false);
+      this.handHiddenRightCount.setVisible(false);
       return;
     }
 
@@ -582,6 +610,8 @@ export default class CardStage {
 
     const canGoLeft = this.handWindowStart > 0;
     const canGoRight = this.handWindowStart < maxStart;
+    const hiddenLeftCount = this.handWindowStart;
+    const hiddenRightCount = maxStart - this.handWindowStart;
 
     if (canGoLeft) {
       this.handNavLeft.setAlpha(1).setInteractive({ useHandCursor: true });
@@ -599,6 +629,16 @@ export default class CardStage {
     this.handNavRight.setScale(1);
     this.handNavLeft.setY(y - cardHeight * 0.05);
     this.handNavRight.setY(y - cardHeight * 0.05);
+
+    const countOffsetY = cardHeight * 0.27;
+    this.handHiddenLeftCount
+      .setPosition(this.handNavLeft.x, this.handNavLeft.y + countOffsetY)
+      .setText(String(hiddenLeftCount))
+      .setVisible(true);
+    this.handHiddenRightCount
+      .setPosition(this.handNavRight.x, this.handNavRight.y + countOffsetY)
+      .setText(String(hiddenRightCount))
+      .setVisible(true);
   }
 
   private getHandLayout(metrics: StageMetrics): {
@@ -822,6 +862,8 @@ export default class CardStage {
     this.turnIndicatorText = undefined;
     this.handNavLeft = undefined;
     this.handNavRight = undefined;
+    this.handHiddenLeftCount = undefined;
+    this.handHiddenRightCount = undefined;
   }
 
   private unregisterWheelNavigationListener(): void {
