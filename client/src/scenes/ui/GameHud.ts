@@ -45,7 +45,6 @@ export default class GameHud {
   private titleText?: Phaser.GameObjects.Text;
   private statusText?: Phaser.GameObjects.Text;
   private roomLabelText?: Phaser.GameObjects.Text;
-  private turnLabelText?: Phaser.GameObjects.Text;
   private playersHeaderText?: Phaser.GameObjects.Text;
   private playerText?: Phaser.GameObjects.Text;
   private logsHeaderText?: Phaser.GameObjects.Text;
@@ -101,7 +100,6 @@ export default class GameHud {
     this.titleText = undefined;
     this.statusText = undefined;
     this.roomLabelText = undefined;
-    this.turnLabelText = undefined;
     this.playersHeaderText = undefined;
     this.playerText = undefined;
     this.logsHeaderText = undefined;
@@ -169,16 +167,7 @@ export default class GameHud {
     this.elements.push(this.roomLabelText);
     y += this.roomLabelText.height + spacing.s;
 
-    this.turnLabelText = this.scene.add
-      .text(innerX, y, `⏱ Vez: ${this.currentState.currentTurn}`, {
-        fontFamily: this.options.fontFamily,
-        fontSize: `${Math.max(11, Math.round((compact ? 12 : 13) * fontScale))}px`,
-        color: theme.colors.status.success,
-        fontStyle: '600',
-      })
-      .setResolution(this.options.textResolution);
-    this.elements.push(this.turnLabelText);
-    y += this.turnLabelText.height + spacing.m;
+    y += spacing.m;
 
     const controlsHeader = makeText('⚡ Ações', compact ? 13 : 14, theme.colors.text.muted, '600');
     this.elements.push(controlsHeader);
@@ -270,7 +259,6 @@ export default class GameHud {
   private refreshDynamicContent() {
     this.statusText?.setText(this.currentState.status || 'Conectando...');
     this.roomLabelText?.setText(`🏷 ${this.currentState.roomLabel}`);
-    this.turnLabelText?.setText(`⏱ Vez: ${this.currentState.currentTurn}`);
     this.playerText?.setText(this.getVisiblePlayerList());
     this.logsText?.setText(this.getVisibleLogText());
 

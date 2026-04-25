@@ -288,6 +288,8 @@ export default class GameScene extends Phaser.Scene {
 
     this.cardStage?.setOpponents(opponents);
 
+    const currentPlayer = room.players.find((player) => player.isTurn);
+
     if (me) {
       this.player = me;
       this.cardStage?.setHandCards(me.hand);
@@ -296,7 +298,6 @@ export default class GameScene extends Phaser.Scene {
         this.clearColorSelectionModal();
       }
 
-      const currentPlayer = room.players.find((player) => player.isTurn);
       if (room.gameStatus === 'finished') {
         this.statusMessage = room.winnerNickname
           ? `🏆 O ${room.winnerNickname} ganhou o jogo!`
@@ -304,19 +305,22 @@ export default class GameScene extends Phaser.Scene {
       } else if (room.gameStatus === 'waiting') {
         this.statusMessage = 'Aguardando o dono da sala iniciar a partida';
       } else {
-        this.statusMessage = me.isTurn
-          ? '✅ É A SUA VEZ!'
-          : `⏳ Vez de: ${currentPlayer?.nickname ?? INITIAL_TURN_MESSAGE}`;
+        this.statusMessage = '✅ Partida em andamento';
       }
       this.setStatus(this.statusMessage, currentPlayer?.nickname ?? INITIAL_TURN_MESSAGE);
     }
+
+    this.cardStage?.setTurnIndicator({
+      phase: room.gameStatus,
+      isMyTurn: Boolean(me?.isTurn),
+      currentTurnNickname: currentPlayer?.nickname,
+    });
 
     const topCard = room.discardPile[room.discardPile.length - 1];
     if (topCard) {
       this.cardStage?.setTableCard(topCard, room.currentColor);
     }
 
-    this.cardStage?.setPlayerNickname(this.player?.nickname);
     const playerList =
       room.players
         .map((player) => {
@@ -344,7 +348,11 @@ export default class GameScene extends Phaser.Scene {
 
     this.clearColorSelectionModal();
     this.updateRoomDetails(EMPTY_PLAYER_LIST_MESSAGE);
-    this.cardStage?.setPlayerNickname(undefined);
+    this.cardStage?.setTurnIndicator({
+      phase: 'waiting',
+      isMyTurn: false,
+      currentTurnNickname: undefined,
+    });
     this.cardStage?.setOpponents([]);
     this.goBackToLobby('Você saiu da sala.');
   }
@@ -398,7 +406,6 @@ export default class GameScene extends Phaser.Scene {
 
     this.statusMessage = `Conectado como ${nickname}`;
     this.hud.update({ status: this.statusMessage });
-    this.cardStage.setPlayerNickname(nickname);
     this.cardStage.pulsePlaceholder();
   }
 
@@ -775,6 +782,11 @@ export default class GameScene extends Phaser.Scene {
     return this.roomId ? `Sala atual: ${this.roomId}` : 'Nenhuma sala ativa.';
   }
 }
+
+
+
+
+
 
 
 
