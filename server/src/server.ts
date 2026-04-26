@@ -11,7 +11,9 @@ import { passTurnToNextPlayer } from './core/turns';
 import { emitRoomState, removePlayerFromRoom } from './state/roomState';
 import { createGameStore } from './state/store';
 import type {
+  Card,
   CreateRoomPayload,
+  DrawDecisionPayload,
   DrawCardPayload,
   GameEndedPayload,
   JoinRoomPayload,
@@ -46,6 +48,91 @@ io.on('connection', (socket) => {
 
   const connectedPlayer = store.players.get(socket.id);
   socket.emit('lobby:welcome', connectedPlayer);
+
+  const resolvePlayedCard = (
+    actor: Player,
+    room: Room,
+    playedCard: Card,
+    selectedColor?: Card['color'],
+  ): { gameEnded: boolean } => {
+    room.discardPile.push(playedCard);
+    room.currentColor = playedCard.color === 'wild' && selectedColor ? selectedColor : playedCard.color;
+
+    const cardIndex = actor.hand.findIndex((card) => card.id === playedCard.id);
+    if (cardIndex !== -1) {
+      actor.hand.splice(cardIndex, 1);
+    }
+
+    if (actor.hand.length === 0) {
+      room.gameStatus = 'finished';
+      room.winnerId = actor.id;
+      room.winnerNickname = actor.nickname;
+      delete room.pendingDrawDecision;
+
+      room.players.forEach((roomPlayer) => {
+        roomPlayer.isTurn = false;
+      });
+
+      const event = createActionEvent(actor, 'play', playedCard, room.currentColor);
+      io.to(actor.roomId as string).emit('card:played', event);
+
+      const endedPayload: GameEndedPayload = {
+        winnerId: actor.id,
+        winnerNickname: actor.nickname,
+        message: `🏆 O ${actor.nickname} ganhou o jogo!`,
+      };
+
+      io.to(actor.roomId as string).emit('game:ended', endedPayload);
+      emitRoomState(io, store.rooms, actor.roomId as string);
+
+      console.log(`[game:end] ${actor.nickname} venceu na sala ${actor.roomId}`);
+      return { gameEnded: true };
+    }
+
+    const currentPlayerIndex = room.players.findIndex((roomPlayer) => roomPlayer.id === actor.id);
+    let stepsToAdvance = 1;
+
+    switch (playedCard.value) {
+      case 'skip':
+        stepsToAdvance = 2;
+        break;
+      case 'reverse':
+        if (room.players.length <= 2) {
+          stepsToAdvance = 2;
+        } else {
+          room.turnDirection = room.turnDirection === 1 ? -1 : 1;
+        }
+        break;
+      case '+2': {
+        const targetPlayer = getNextPlayer(room, currentPlayerIndex);
+        if (targetPlayer && actor.roomId) {
+          drawCardsForPlayer(store.serverDecks, actor.roomId, room, targetPlayer, 2);
+        }
+        stepsToAdvance = 2;
+        break;
+      }
+      case '+4': {
+        const targetPlayer = getNextPlayer(room, currentPlayerIndex);
+        if (targetPlayer && actor.roomId) {
+          drawCardsForPlayer(store.serverDecks, actor.roomId, room, targetPlayer, 4);
+        }
+        stepsToAdvance = 2;
+        break;
+      }
+      default:
+        break;
+    }
+
+    delete room.pendingDrawDecision;
+    passTurnToNextPlayer(room, stepsToAdvance);
+
+    const event = createActionEvent(actor, 'play', playedCard, room.currentColor);
+    io.to(actor.roomId as string).emit('card:played', event);
+    emitRoomState(io, store.rooms, actor.roomId as string);
+
+    console.log(`[card:play] ${actor.nickname} jogou ${playedCard.color} ${playedCard.value} na sala ${actor.roomId}`);
+    return { gameEnded: false };
+  };
 
   socket.on('room:create', (payload: CreateRoomPayload = {}) => {
     const player = store.players.get(socket.id);
@@ -261,6 +348,13 @@ io.on('connection', (socket) => {
       return;
     }
 
+    if (room.pendingDrawDecision?.playerId === actor.id) {
+      socket.emit('room:error', {
+        message: 'Você comprou uma carta jogável. Escolha entre jogar a carta comprada ou passar a vez.',
+      });
+      return;
+    }
+
     const topCard = room.discardPile[room.discardPile.length - 1];
     if (topCard && !isValidCardPlay(payload.card, topCard, room.currentColor)) {
       socket.emit('room:error', { message: '❌ Jogada inválida! Essa carta não combina com a mesa.' });
@@ -274,85 +368,7 @@ io.on('connection', (socket) => {
       }
     }
 
-    room.discardPile.push(payload.card);
-    room.currentColor =
-      payload.card.color === 'wild' && payload.selectedColor
-        ? payload.selectedColor
-        : payload.card.color;
-
-    const cardIndex = actor.hand.findIndex((card) => card.id === payload.card.id);
-    if (cardIndex !== -1) {
-      actor.hand.splice(cardIndex, 1);
-    }
-
-    if (actor.hand.length === 0) {
-      room.gameStatus = 'finished';
-      room.winnerId = actor.id;
-      room.winnerNickname = actor.nickname;
-
-      room.players.forEach((roomPlayer) => {
-        roomPlayer.isTurn = false;
-      });
-
-      const event = createActionEvent(actor, 'play', payload.card, room.currentColor);
-      io.to(actor.roomId).emit('card:played', event);
-
-      const endedPayload: GameEndedPayload = {
-        winnerId: actor.id,
-        winnerNickname: actor.nickname,
-        message: `🏆 O ${actor.nickname} ganhou o jogo!`,
-      };
-
-      io.to(actor.roomId).emit('game:ended', endedPayload);
-      emitRoomState(io, store.rooms, actor.roomId);
-
-      console.log(`[game:end] ${actor.nickname} venceu na sala ${actor.roomId}`);
-      return;
-    }
-
-    const currentPlayerIndex = room.players.findIndex((roomPlayer) => roomPlayer.id === actor.id);
-    let stepsToAdvance = 1;
-
-    switch (payload.card.value) {
-      case 'skip':
-        stepsToAdvance = 2;
-        break;
-      case 'reverse':
-        if (room.players.length <= 2) {
-          stepsToAdvance = 2;
-        } else {
-          room.turnDirection = room.turnDirection === 1 ? -1 : 1;
-        }
-        break;
-      case '+2': {
-        const targetPlayer = getNextPlayer(room, currentPlayerIndex);
-        if (targetPlayer) {
-          drawCardsForPlayer(store.serverDecks, actor.roomId, room, targetPlayer, 2);
-        }
-        stepsToAdvance = 2;
-        break;
-      }
-      case '+4': {
-        const targetPlayer = getNextPlayer(room, currentPlayerIndex);
-        if (targetPlayer) {
-          drawCardsForPlayer(store.serverDecks, actor.roomId, room, targetPlayer, 4);
-        }
-        stepsToAdvance = 2;
-        break;
-      }
-      default:
-        break;
-    }
-
-    passTurnToNextPlayer(room, stepsToAdvance);
-
-    const event = createActionEvent(actor, 'play', payload.card, room.currentColor);
-    io.to(actor.roomId).emit('card:played', event);
-    emitRoomState(io, store.rooms, actor.roomId);
-
-    console.log(
-      `[card:play] ${actor.nickname} jogou ${payload.card.color} ${payload.card.value} na sala ${actor.roomId}`,
-    );
+    resolvePlayedCard(actor, room, payload.card, payload.selectedColor);
   });
 
   socket.on('card:draw', (_payload: DrawCardPayload) => {
@@ -382,6 +398,13 @@ io.on('connection', (socket) => {
       return;
     }
 
+    if (room.pendingDrawDecision?.playerId === actor.id) {
+      socket.emit('room:error', {
+        message: 'Decida primeiro se quer jogar a carta comprada ou manter na mão.',
+      });
+      return;
+    }
+
     const deck = store.serverDecks.get(actor.roomId);
     if (!room || !deck || deck.length === 0) {
       socket.emit('room:error', { message: 'O baralho está vazio ou não foi encontrado!' });
@@ -397,9 +420,23 @@ io.on('connection', (socket) => {
     actor.hand.push(drawnCard);
     room.drawPileCount = deck.length;
 
-    passTurnToNextPlayer(room);
+    const topCard = room.discardPile[room.discardPile.length - 1];
+    const drawnCardPlayable = Boolean(topCard && isValidCardPlay(drawnCard, topCard, room.currentColor));
 
-    const privateEvent = createActionEvent(actor, 'draw', drawnCard);
+    if (drawnCardPlayable) {
+      room.pendingDrawDecision = {
+        playerId: actor.id,
+        cardId: drawnCard.id,
+      };
+    } else {
+      delete room.pendingDrawDecision;
+      passTurnToNextPlayer(room);
+    }
+
+    const privateEvent = createActionEvent(actor, 'draw', drawnCard, undefined, {
+      drawnCardPlayable,
+      drawDecisionPending: drawnCardPlayable,
+    });
     const publicEvent = createActionEvent(actor, 'draw');
 
     io.to(actor.id).emit('card:drawn', privateEvent);
@@ -409,6 +446,57 @@ io.on('connection', (socket) => {
     console.log(
       `[card:draw] ${actor.nickname} comprou ${drawnCard.color} ${drawnCard.value} na sala ${actor.roomId}`,
     );
+  });
+
+  socket.on('card:draw-decision', (payload: DrawDecisionPayload) => {
+    const actor = store.players.get(socket.id);
+    if (!actor?.roomId) {
+      return;
+    }
+
+    const room = store.rooms.get(actor.roomId);
+    if (!room) {
+      return;
+    }
+
+    if (room.gameStatus !== 'in_progress') {
+      socket.emit('room:error', { message: 'A rodada não está em andamento.' });
+      return;
+    }
+
+    const pending = room.pendingDrawDecision;
+    if (!pending || pending.playerId !== actor.id) {
+      socket.emit('room:error', { message: 'Nenhuma decisão de compra pendente para você.' });
+      return;
+    }
+
+    const pendingCard = actor.hand.find((card) => card.id === pending.cardId);
+    if (!pendingCard) {
+      delete room.pendingDrawDecision;
+      socket.emit('room:error', { message: 'A carta comprada pendente não foi encontrada na sua mão.' });
+      emitRoomState(io, store.rooms, actor.roomId);
+      return;
+    }
+
+    if (payload.choice === 'keep') {
+      delete room.pendingDrawDecision;
+      passTurnToNextPlayer(room);
+      emitRoomState(io, store.rooms, actor.roomId);
+      io.to(actor.roomId).emit(
+        'card:drawn',
+        createActionEvent(actor, 'draw', undefined, undefined, { drawnCardPlayable: true, drawDecisionPending: false }),
+      );
+      return;
+    }
+
+    if (pendingCard.color === 'wild') {
+      if (!payload.selectedColor || payload.selectedColor === 'wild') {
+        socket.emit('room:error', { message: 'Escolha uma cor válida para jogar o curinga comprado.' });
+        return;
+      }
+    }
+
+    resolvePlayedCard(actor, room, pendingCard, payload.selectedColor);
   });
 
   socket.on('game:start', () => {
@@ -440,6 +528,7 @@ io.on('connection', (socket) => {
     store.serverDecks.set(actor.roomId, deck);
 
     room.gameStatus = 'in_progress';
+    delete room.pendingDrawDecision;
     room.winnerId = undefined;
     room.winnerNickname = undefined;
     room.discardPile = [];
@@ -502,6 +591,8 @@ app.get('/health', (_req, res) => {
 server.listen(SERVER_PORT, () => {
   console.log(`Server listening on http://localhost:${SERVER_PORT}`);
 });
+
+
 
 
 

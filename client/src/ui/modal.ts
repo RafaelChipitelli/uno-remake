@@ -10,6 +10,7 @@ type BaseModalOptions<T> = {
   title: string;
   message?: string;
   buttons: ModalButtonConfig<T>[];
+  renderContent?: (container: HTMLElement) => void;
   withTextInput?: {
     placeholder?: string;
     initialValue?: string;
@@ -48,6 +49,13 @@ function renderModal<T>(options: BaseModalOptions<T>): Promise<ModalResult<T>> {
       message.className = 'ui-modal-message';
       message.textContent = options.message;
       panel.appendChild(message);
+    }
+
+    if (options.renderContent) {
+      const content = document.createElement('div');
+      content.className = 'ui-modal-content';
+      options.renderContent(content);
+      panel.appendChild(content);
     }
 
     let textInput: HTMLInputElement | undefined;
@@ -144,6 +152,26 @@ export async function askConfirmation(options: {
       { label: options.confirmLabel ?? 'Confirmar', value: true, tone: options.confirmTone ?? 'primary' },
       { label: options.cancelLabel ?? 'Cancelar', value: false, tone: 'ghost' },
     ],
+  });
+
+  return result.value;
+}
+
+export async function askChoice<T extends string>(options: {
+  title: string;
+  message?: string;
+  renderContent?: (container: HTMLElement) => void;
+  choices: Array<{
+    label: string;
+    value: T;
+    tone?: ModalButtonTone;
+  }>;
+}): Promise<T> {
+  const result = await renderModal<T>({
+    title: options.title,
+    message: options.message,
+    renderContent: options.renderContent,
+    buttons: options.choices,
   });
 
   return result.value;

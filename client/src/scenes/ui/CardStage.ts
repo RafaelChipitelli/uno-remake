@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { CARD_COLOR_HEX } from '../../game/colors';
+import { getCardDisplayParts, getCardDisplayScale, getCardDisplayValue } from '../../game/cardDisplay';
 import { phaserTheme, theme } from '../../theme/tokens';
 import type { Card } from '../../types';
 
@@ -47,6 +48,14 @@ type OpponentView = {
   count: Phaser.GameObjects.Text;
 };
 
+type TurnIndicatorPhase = 'waiting' | 'in_progress' | 'finished';
+
+type TurnIndicatorState = {
+  phase: TurnIndicatorPhase;
+  isMyTurn?: boolean;
+  currentTurnNickname?: string;
+};
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
@@ -61,7 +70,6 @@ export default class CardStage {
 
   private handCards: Card[] = [];
   private opponents: OpponentHandSnapshot[] = [];
-  private playerNickname?: string;
   private tableCard?: Card;
   private currentColor?: Card['color'];
 
@@ -75,12 +83,20 @@ export default class CardStage {
   private tableContainer?: Phaser.GameObjects.Container;
   private tableCardRect?: Phaser.GameObjects.Rectangle;
   private tableCardText?: Phaser.GameObjects.Text;
-  private nicknameText?: Phaser.GameObjects.Text;
+  private turnIndicatorContainer?: Phaser.GameObjects.Container;
+  private turnIndicatorBg?: Phaser.GameObjects.Rectangle;
+  private turnIndicatorText?: Phaser.GameObjects.Text;
+  private turnIndicatorPulseTween?: Phaser.Tweens.Tween;
   private handNavLeft?: Phaser.GameObjects.Text;
   private handNavRight?: Phaser.GameObjects.Text;
+  private handHiddenLeftCount?: Phaser.GameObjects.Text;
+  private handHiddenRightCount?: Phaser.GameObjects.Text;
 
   private opponentViews: OpponentView[] = [];
   private wheelListenerRegistered = false;
+  private turnIndicatorPhase: TurnIndicatorPhase = 'waiting';
+  private isMyTurn = false;
+  private currentTurnNickname?: string;
 
   constructor(scene: Phaser.Scene, options: CardStageOptions) {
     this.scene = scene;
@@ -111,9 +127,11 @@ export default class CardStage {
     this.build();
   }
 
-  setPlayerNickname(nickname?: string) {
-    this.playerNickname = nickname;
-    this.syncTableArea();
+  setTurnIndicator(state: TurnIndicatorState) {
+    this.turnIndicatorPhase = state.phase;
+    this.isMyTurn = Boolean(state.isMyTurn);
+    this.currentTurnNickname = state.currentTurnNickname;
+    this.syncTurnIndicator();
   }
 
   pulsePlaceholder() {
@@ -229,21 +247,34 @@ export default class CardStage {
         fontSize: `${Math.round(clamp(52 * (this.options.fontScale ?? 1), 30, 56))}px`,
         color: theme.colors.text.inverse,
         fontStyle: '800',
+        align: 'center',
       })
       .setOrigin(0.5)
       .setResolution(this.options.textResolution);
     this.tableContainer.add([tableShadow, this.tableCardRect, tableHighlight, this.tableCardText]);
     this.allObjects.push(this.tableContainer);
 
-    this.nicknameText = this.scene.add
-      .text(metrics.stageX, centerY + cardHeight / 2 + 24, 'Aguardando conexão...', {
+    const indicatorWidth = clamp(metrics.stageWidth * 0.42, 210, 360);
+    const indicatorHeight = this.options.compact ? 38 : 44;
+    const indicatorY = centerY + cardHeight / 2 + (this.options.compact ? 54 : 62);
+
+    this.turnIndicatorContainer = this.scene.add.container(metrics.stageX, indicatorY);
+    this.turnIndicatorBg = this.scene.add
+      .rectangle(0, 0, indicatorWidth, indicatorHeight, phaserTheme.colors.surface.card, 0.9)
+      .setOrigin(0.5)
+      .setStrokeStyle(1, phaserTheme.colors.surface.panelBorder, 0.9);
+    this.turnIndicatorText = this.scene.add
+      .text(0, 0, '⏳ Aguardando turno...', {
         fontFamily: this.options.fontFamily,
-        fontSize: `${Math.round(clamp(16 * (this.options.fontScale ?? 1), 12, 18))}px`,
+        fontSize: `${Math.round(clamp((this.options.compact ? 15 : 17) * (this.options.fontScale ?? 1), 12, 20))}px`,
         color: theme.colors.text.muted,
+        fontStyle: '600',
       })
       .setOrigin(0.5)
       .setResolution(this.options.textResolution);
-    this.allObjects.push(this.nicknameText);
+    this.turnIndicatorContainer.add([this.turnIndicatorBg, this.turnIndicatorText]);
+    this.allObjects.push(this.turnIndicatorContainer);
+    this.syncTurnIndicator();
 
     this.handNavLeft = this.scene.add
       .text(0, 0, '<', {
@@ -270,7 +301,31 @@ export default class CardStage {
     this.handNavLeft.on('pointerup', () => this.shiftHandWindow(-1));
     this.handNavRight.on('pointerup', () => this.shiftHandWindow(1));
 
-    this.allObjects.push(this.handNavLeft, this.handNavRight);
+    this.handHiddenLeftCount = this.scene.add
+      .text(0, 0, '0', {
+        fontFamily: this.options.fontFamily,
+        fontSize: `${Math.round(clamp(11 * (this.options.fontScale ?? 1), 9, 13))}px`,
+        color: theme.colors.text.muted,
+        fontStyle: '500',
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.75)
+      .setResolution(this.options.textResolution)
+      .setVisible(false);
+
+    this.handHiddenRightCount = this.scene.add
+      .text(0, 0, '0', {
+        fontFamily: this.options.fontFamily,
+        fontSize: `${Math.round(clamp(11 * (this.options.fontScale ?? 1), 9, 13))}px`,
+        color: theme.colors.text.muted,
+        fontStyle: '500',
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.75)
+      .setResolution(this.options.textResolution)
+      .setVisible(false);
+
+    this.allObjects.push(this.handNavLeft, this.handNavRight, this.handHiddenLeftCount, this.handHiddenRightCount);
 
     this.createOpponentSlots();
   }
@@ -310,7 +365,7 @@ export default class CardStage {
   }
 
   private syncTableArea(withIntroAnimation = false): void {
-    if (!this.tableContainer || !this.placeholderContainer || !this.tableCardRect || !this.tableCardText || !this.nicknameText) {
+    if (!this.tableContainer || !this.placeholderContainer || !this.tableCardRect || !this.tableCardText) {
       return;
     }
 
@@ -322,9 +377,12 @@ export default class CardStage {
     this.tableGlow?.setPosition(metrics.stageX, centerY + 16).setSize(cardWidth * 2.5, cardHeight * 1.2);
     this.placeholderContainer.setPosition(metrics.stageX, centerY);
     this.tableContainer.setPosition(metrics.stageX, centerY);
-    this.nicknameText
-      .setPosition(metrics.stageX, centerY + cardHeight / 2 + 24)
-      .setText(this.playerNickname ? `Você: ${this.playerNickname}` : 'Aguardando conexão...');
+
+    const indicatorWidth = clamp(metrics.stageWidth * 0.42, 210, 360);
+    const indicatorHeight = this.options.compact ? 38 : 44;
+    this.turnIndicatorContainer?.setPosition(metrics.stageX, centerY + cardHeight / 2 + (this.options.compact ? 54 : 62));
+    this.turnIndicatorBg?.setSize(indicatorWidth, indicatorHeight);
+    this.syncTurnIndicator();
 
     if (!this.tableCard) {
       this.placeholderContainer.setVisible(true);
@@ -340,7 +398,13 @@ export default class CardStage {
     this.placeholderContainer.setVisible(false);
     this.tableContainer.setVisible(true);
     this.tableCardRect.setFillStyle(CARD_COLOR_HEX[resolvedColor] ?? phaserTheme.colors.surface.disabled);
-    this.tableCardText.setText(this.tableCard.value);
+    const tableLabel = getCardDisplayValue(this.tableCard.value);
+    const tableSymbol = getCardDisplayParts(this.tableCard.value).symbol;
+    const tableLabelScale = getCardDisplayScale(this.tableCard.value);
+    this.tableCardText
+      .setText(tableSymbol ? `${tableLabel}\n${tableSymbol}` : tableLabel)
+      .setFontSize(Math.round(clamp(52 * (this.options.fontScale ?? 1) * tableLabelScale, 18, 56)))
+      .setLineSpacing(tableSymbol ? -8 : 0);
 
     if (withIntroAnimation) {
       this.tableContainer.setScale(0.9).setAlpha(0);
@@ -353,6 +417,95 @@ export default class CardStage {
         ease: 'Quad.easeOut',
       });
     }
+  }
+
+  private syncTurnIndicator(): void {
+    if (!this.turnIndicatorContainer || !this.turnIndicatorBg || !this.turnIndicatorText) {
+      return;
+    }
+
+    if (this.turnIndicatorPhase === 'in_progress' && this.isMyTurn) {
+      this.turnIndicatorText
+        .setText('🔥 SUA VEZ DE JOGAR')
+        .setColor(theme.colors.status.success)
+        .setFontStyle('700');
+      this.turnIndicatorBg
+        .setFillStyle(phaserTheme.colors.status.success, 0.2)
+        .setStrokeStyle(2, phaserTheme.colors.status.success, 1);
+
+      if (!this.turnIndicatorPulseTween) {
+        this.turnIndicatorPulseTween = this.scene.tweens.add({
+          targets: this.turnIndicatorContainer,
+          alpha: { from: 0.86, to: 1 },
+          scaleX: { from: 1, to: 1.03 },
+          scaleY: { from: 1, to: 1.03 },
+          duration: 520,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut',
+        });
+      }
+      return;
+    }
+
+    if (this.turnIndicatorPhase === 'waiting') {
+      const waitingText = '⏳ Aguardando o host iniciar o jogo';
+
+      this.turnIndicatorText
+        .setText(waitingText)
+        .setColor(theme.colors.text.muted)
+        .setFontStyle('600');
+      this.turnIndicatorBg
+        .setFillStyle(phaserTheme.colors.surface.card, 0.9)
+        .setStrokeStyle(1, phaserTheme.colors.surface.panelBorder, 0.9);
+
+      if (this.turnIndicatorPulseTween) {
+        this.turnIndicatorPulseTween.stop();
+        this.turnIndicatorPulseTween.remove();
+        this.turnIndicatorPulseTween = undefined;
+      }
+
+      this.turnIndicatorContainer.setAlpha(1).setScale(1);
+      return;
+    }
+
+    if (this.turnIndicatorPhase === 'finished') {
+      this.turnIndicatorText
+        .setText('🏁 Rodada encerrada')
+        .setColor(theme.colors.text.muted)
+        .setFontStyle('600');
+      this.turnIndicatorBg
+        .setFillStyle(phaserTheme.colors.surface.card, 0.9)
+        .setStrokeStyle(1, phaserTheme.colors.surface.panelBorder, 0.9);
+
+      if (this.turnIndicatorPulseTween) {
+        this.turnIndicatorPulseTween.stop();
+        this.turnIndicatorPulseTween.remove();
+        this.turnIndicatorPulseTween = undefined;
+      }
+
+      this.turnIndicatorContainer.setAlpha(1).setScale(1);
+      return;
+    }
+
+    const waitingText = this.currentTurnNickname
+      ? `⏳ Vez de: ${this.currentTurnNickname}`
+      : '⏳ Aguardando turno...';
+    this.turnIndicatorText
+      .setText(waitingText)
+      .setColor(theme.colors.text.muted)
+      .setFontStyle('600');
+    this.turnIndicatorBg
+      .setFillStyle(phaserTheme.colors.surface.card, 0.9)
+      .setStrokeStyle(1, phaserTheme.colors.surface.panelBorder, 0.9);
+
+    if (this.turnIndicatorPulseTween) {
+      this.turnIndicatorPulseTween.stop();
+      this.turnIndicatorPulseTween.remove();
+      this.turnIndicatorPulseTween = undefined;
+    }
+
+    this.turnIndicatorContainer.setAlpha(1).setScale(1);
   }
 
   private syncHand(withIntroAnimation = false): void {
@@ -386,7 +539,13 @@ export default class CardStage {
       }
 
       view.base.setFillStyle(CARD_COLOR_HEX[card.color] ?? phaserTheme.colors.surface.disabled);
-      view.value.setText(card.value);
+      const displayLabel = getCardDisplayValue(card.value);
+      const displaySymbol = getCardDisplayParts(card.value).symbol;
+      const labelScale = getCardDisplayScale(card.value);
+      view.value
+        .setText(displaySymbol ? `${displayLabel}\n${displaySymbol}` : displayLabel)
+        .setFontSize(Math.round(clamp(cardWidth * 0.32 * labelScale, 10, 24)))
+        .setLineSpacing(displaySymbol ? -6 : 0);
 
       const targetX = startX + index * (cardWidth + cardGap);
       view.homeX = targetX;
@@ -428,7 +587,7 @@ export default class CardStage {
     totalWidth: number,
     maxStart: number,
   ): void {
-    if (!this.handNavLeft || !this.handNavRight) {
+    if (!this.handNavLeft || !this.handNavRight || !this.handHiddenLeftCount || !this.handHiddenRightCount) {
       return;
     }
 
@@ -436,6 +595,8 @@ export default class CardStage {
     if (!hasOverflow) {
       this.handNavLeft.setVisible(false).disableInteractive();
       this.handNavRight.setVisible(false).disableInteractive();
+      this.handHiddenLeftCount.setVisible(false);
+      this.handHiddenRightCount.setVisible(false);
       return;
     }
 
@@ -449,6 +610,8 @@ export default class CardStage {
 
     const canGoLeft = this.handWindowStart > 0;
     const canGoRight = this.handWindowStart < maxStart;
+    const hiddenLeftCount = this.handWindowStart;
+    const hiddenRightCount = maxStart - this.handWindowStart;
 
     if (canGoLeft) {
       this.handNavLeft.setAlpha(1).setInteractive({ useHandCursor: true });
@@ -466,6 +629,16 @@ export default class CardStage {
     this.handNavRight.setScale(1);
     this.handNavLeft.setY(y - cardHeight * 0.05);
     this.handNavRight.setY(y - cardHeight * 0.05);
+
+    const countOffsetY = cardHeight * 0.27;
+    this.handHiddenLeftCount
+      .setPosition(this.handNavLeft.x, this.handNavLeft.y + countOffsetY)
+      .setText(String(hiddenLeftCount))
+      .setVisible(true);
+    this.handHiddenRightCount
+      .setPosition(this.handNavRight.x, this.handNavRight.y + countOffsetY)
+      .setText(String(hiddenRightCount))
+      .setVisible(true);
   }
 
   private getHandLayout(metrics: StageMetrics): {
@@ -538,14 +711,17 @@ export default class CardStage {
       phaserTheme.colors.text.inverse,
       0.14,
     );
+    const cardDisplay = getCardDisplayParts(card.value);
     const value = this.scene.add
-      .text(0, 0, card.value, {
+      .text(0, 0, cardDisplay.symbol ? `${cardDisplay.label}\n${cardDisplay.symbol}` : cardDisplay.label, {
         fontFamily: this.options.fontFamily,
-        fontSize: `${Math.round(clamp(cardWidth * 0.32, 13, 24))}px`,
+        fontSize: `${Math.round(clamp(cardWidth * 0.32 * getCardDisplayScale(card.value), 10, 24))}px`,
         color: theme.colors.text.inverse,
         fontStyle: '800',
+        align: 'center',
       })
       .setOrigin(0.5)
+      .setLineSpacing(cardDisplay.symbol ? -6 : 0)
       .setResolution(this.options.textResolution);
 
     container.add([shadow, base, highlight, value]);
@@ -665,6 +841,12 @@ export default class CardStage {
   }
 
   private clearStageObjects() {
+    if (this.turnIndicatorPulseTween) {
+      this.turnIndicatorPulseTween.stop();
+      this.turnIndicatorPulseTween.remove();
+      this.turnIndicatorPulseTween = undefined;
+    }
+
     this.allObjects.forEach((obj) => obj.destroy());
     this.allObjects = [];
     this.handViews.clear();
@@ -675,9 +857,13 @@ export default class CardStage {
     this.tableContainer = undefined;
     this.tableCardRect = undefined;
     this.tableCardText = undefined;
-    this.nicknameText = undefined;
+    this.turnIndicatorContainer = undefined;
+    this.turnIndicatorBg = undefined;
+    this.turnIndicatorText = undefined;
     this.handNavLeft = undefined;
     this.handNavRight = undefined;
+    this.handHiddenLeftCount = undefined;
+    this.handHiddenRightCount = undefined;
   }
 
   private unregisterWheelNavigationListener(): void {

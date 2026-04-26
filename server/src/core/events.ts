@@ -5,6 +5,10 @@ export function createActionEvent(
   action: CardActionEvent['action'],
   card?: Card,
   currentColor?: Card['color'],
+  options?: {
+    drawnCardPlayable?: boolean;
+    drawDecisionPending?: boolean;
+  },
 ): CardActionEvent {
   return {
     action,
@@ -13,5 +17,11 @@ export function createActionEvent(
     timestamp: Date.now(),
     ...(card ? { card } : {}),
     ...(currentColor ? { currentColor } : {}),
+    ...(typeof options?.drawnCardPlayable === 'boolean'
+      ? { drawnCardPlayable: options.drawnCardPlayable }
+      : {}),
+    ...(typeof options?.drawDecisionPending === 'boolean'
+      ? { drawDecisionPending: options.drawDecisionPending }
+      : {}),
   };
 }

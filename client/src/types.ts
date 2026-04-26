@@ -27,6 +27,10 @@ export interface Room {
   hostId: string;
   turnDirection: 1 | -1;
   gameStatus: GameStatus;
+  pendingDrawDecision?: {
+    playerId: string;
+    cardId: string;
+  };
   winnerId?: string | undefined;
   winnerNickname?: string | undefined;
 }
@@ -43,12 +47,22 @@ export interface DrawCardPayload {
   playerId: string;
 }
 
+export type DrawDecisionChoice = 'play' | 'keep';
+
+export interface DrawDecisionPayload {
+  playerId: string;
+  choice: DrawDecisionChoice;
+  selectedColor?: CardColor;
+}
+
 export interface CardActionEvent {
   action: CardActionType;
   playerId: string;
   nickname: string;
   card?: Card;
   currentColor?: CardColor;
+  drawnCardPlayable?: boolean;
+  drawDecisionPending?: boolean;
   timestamp: number;
 }
 
