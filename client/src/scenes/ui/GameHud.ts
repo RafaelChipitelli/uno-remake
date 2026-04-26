@@ -9,6 +9,7 @@ export type HudSnapshot = {
   leaveEnabled: boolean;
   startEnabled: boolean;
   drawEnabled: boolean;
+  roundInProgress: boolean;
   currentTurn: string;
 };
 
@@ -77,6 +78,7 @@ export default class GameHud {
       leaveEnabled: false,
       startEnabled: true,
       drawEnabled: false,
+      roundInProgress: false,
       currentTurn: 'Aguardando jogo começar',
     };
   }
@@ -96,10 +98,19 @@ export default class GameHud {
   }
 
   update(partial: Partial<HudSnapshot>) {
+    const previousState = this.currentState;
     this.currentState = { ...this.currentState, ...partial };
-    if (!this.isBuilt) {
+    const actionStateChanged =
+      previousState.startEnabled !== this.currentState.startEnabled ||
+      previousState.drawEnabled !== this.currentState.drawEnabled ||
+      previousState.roundInProgress !== this.currentState.roundInProgress;
+
+    if (!this.isBuilt || actionStateChanged) {
       this.build();
+      this.refreshDynamicContent();
+      return;
     }
+
     this.refreshDynamicContent();
   }
 
@@ -297,10 +308,25 @@ export default class GameHud {
       this.refreshDynamicContent();
     });
 
-    this.drawButton = this.createActionButton(primaryX, baseY, primaryWidth, buttonHeight, 'Comprar', 'primary', () => this.callbacks.onDrawRequested());
+    const primaryIsStart = !this.currentState.roundInProgress;
+    this.drawButton = this.createActionButton(
+      primaryX,
+      baseY,
+      primaryWidth,
+      buttonHeight,
+      primaryIsStart ? 'Iniciar' : 'Comprar',
+      'primary',
+      () => {
+        if (primaryIsStart) {
+          this.callbacks.onStartRequested();
+          return;
+        }
+        this.callbacks.onDrawRequested();
+      },
+    );
     this.leaveButton = this.createActionButton(leaveX, baseY, leaveWidth, buttonHeight, 'Sair', 'danger', () => this.callbacks.onLeaveRequested());
 
-    this.applyButtonState(this.drawButton, this.currentState.drawEnabled);
+    this.applyButtonState(this.drawButton, primaryIsStart ? this.currentState.startEnabled : this.currentState.drawEnabled);
     this.applyButtonState(this.leaveButton, this.currentState.leaveEnabled);
 
     if (!this.overlayOpen) {
@@ -436,7 +462,8 @@ export default class GameHud {
 
   private applyInteractiveStates() {
     if (this.getHudMode() === 'overlay') {
-      this.applyButtonState(this.drawButton, this.currentState.drawEnabled);
+      const primaryIsStart = !this.currentState.roundInProgress;
+      this.applyButtonState(this.drawButton, primaryIsStart ? this.currentState.startEnabled : this.currentState.drawEnabled);
       this.applyButtonState(this.leaveButton, this.currentState.leaveEnabled);
       this.applyButtonState(this.overlayStartButton, this.currentState.startEnabled);
       return;

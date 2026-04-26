@@ -209,6 +209,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.cardStage?.setTableCard(payload.firstCard, payload.currentColor);
     this.setStatus('✅ Partida em andamento', payload.currentPlayerTurn ?? INITIAL_TURN_MESSAGE);
+    this.syncHudActions();
 
     if (this.player?.hand && this.player.hand.length > 0) {
       this.pushLog(`✅ Você recebeu ${this.player.hand.length} cartas!`);
@@ -227,6 +228,7 @@ export default class GameScene extends Phaser.Scene {
     this.pushLog(payload.message);
     this.pushLog('⏸️ Aguardando o dono da sala iniciar a próxima partida...');
     this.setStatus(payload.message, 'Partida encerrada');
+    this.syncHudActions();
 
     void this.recordAuthenticatedMatchResult(payload);
   }
@@ -374,6 +376,7 @@ export default class GameScene extends Phaser.Scene {
         this.statusMessage = '✅ Partida em andamento';
       }
       this.setStatus(this.statusMessage, currentPlayer?.nickname ?? INITIAL_TURN_MESSAGE);
+      this.syncHudActions();
     }
 
     this.cardStage?.setTurnIndicator({
@@ -414,6 +417,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.clearColorSelectionModal();
     this.updateRoomDetails(EMPTY_PLAYER_LIST_MESSAGE);
+    this.syncHudActions();
     this.cardStage?.setTurnIndicator({
       phase: 'waiting',
       isMyTurn: false,
@@ -778,6 +782,15 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
+  private syncHudActions(): void {
+    this.hud?.update({
+      leaveEnabled: this.canLeaveRoom(),
+      startEnabled: this.canStartGame(),
+      drawEnabled: this.canDrawCard(),
+      roundInProgress: this.isRoundInProgress(),
+    });
+  }
+
   private describeEvent(event: CardActionEvent): string {
     return describeCardActionEvent(event, this.player?.id, COLOR_LABELS);
   }
@@ -1005,6 +1018,7 @@ export default class GameScene extends Phaser.Scene {
       leaveEnabled: this.canLeaveRoom(),
       startEnabled: this.canStartGame(),
       drawEnabled: this.canDrawCard(),
+      roundInProgress: this.isRoundInProgress(),
       currentTurn: INITIAL_TURN_MESSAGE,
     };
   }
@@ -1017,10 +1031,8 @@ export default class GameScene extends Phaser.Scene {
     this.hud?.update({
       roomLabel: this.getRoomLabel(),
       playerList: this.lastPlayerListMessage,
-      leaveEnabled: this.canLeaveRoom(),
-      startEnabled: this.canStartGame(),
-      drawEnabled: this.canDrawCard(),
     });
+    this.syncHudActions();
   }
 
   private canStartGame(): boolean {
@@ -1035,6 +1047,8 @@ export default class GameScene extends Phaser.Scene {
     return this.roomId ? `Sala atual: ${this.roomId}` : 'Nenhuma sala ativa.';
   }
 }
+
+
 
 
 
