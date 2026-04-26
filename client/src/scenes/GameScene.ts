@@ -136,6 +136,7 @@ export default class GameScene extends Phaser.Scene {
         width: this.responsiveLayout.hudWidth,
         margin: this.responsiveLayout.hudMargin,
         padding: this.responsiveLayout.hudPadding,
+        hudMode: this.responsiveLayout.hudMode,
         compact: this.responsiveLayout.compact,
         fontScale: this.responsiveLayout.fontScale,
         panelColor: PANEL_COLOR,
@@ -156,6 +157,7 @@ export default class GameScene extends Phaser.Scene {
     this.cardStage = new CardStage(this, {
       hudWidth: this.responsiveLayout.hudWidth,
       hudMargin: this.responsiveLayout.hudMargin,
+      hudMode: this.responsiveLayout.hudMode,
       fontFamily: FONT_FAMILY,
       textResolution: TEXT_RESOLUTION,
       stagePadding: this.responsiveLayout.stagePadding,
@@ -973,12 +975,14 @@ export default class GameScene extends Phaser.Scene {
       width: this.responsiveLayout.hudWidth,
       margin: this.responsiveLayout.hudMargin,
       padding: this.responsiveLayout.hudPadding,
+      hudMode: this.responsiveLayout.hudMode,
       compact: this.responsiveLayout.compact,
       fontScale: this.responsiveLayout.fontScale,
     });
     this.cardStage?.setLayoutMetrics({
       hudWidth: this.responsiveLayout.hudWidth,
       hudMargin: this.responsiveLayout.hudMargin,
+      hudMode: this.responsiveLayout.hudMode,
       stagePadding: this.responsiveLayout.stagePadding,
       handBottomOffset: this.responsiveLayout.handBottomOffset,
       tableCardScale: this.responsiveLayout.tableCardScale,
@@ -1023,6 +1027,7 @@ export default class GameScene extends Phaser.Scene {
     return this.roomId ? `Sala atual: ${this.roomId}` : 'Nenhuma sala ativa.';
   }
 }
+
 
 
 

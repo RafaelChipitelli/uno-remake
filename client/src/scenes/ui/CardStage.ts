@@ -7,6 +7,7 @@ import type { Card } from '../../types';
 type CardStageOptions = {
   hudWidth: number;
   hudMargin: number;
+  hudMode?: 'sidebar' | 'overlay';
   fontFamily: string;
   textResolution: number;
   stagePadding?: number;
@@ -107,7 +108,14 @@ export default class CardStage {
   setLayoutMetrics(
     partial: Pick<
       CardStageOptions,
-      'hudWidth' | 'hudMargin' | 'stagePadding' | 'handBottomOffset' | 'tableCardScale' | 'fontScale' | 'compact'
+      | 'hudWidth'
+      | 'hudMargin'
+      | 'hudMode'
+      | 'stagePadding'
+      | 'handBottomOffset'
+      | 'tableCardScale'
+      | 'fontScale'
+      | 'compact'
     >,
   ) {
     this.options = { ...this.options, ...partial };
@@ -815,7 +823,10 @@ export default class CardStage {
 
   private getOpponentSeats(): Array<{ x: number; y: number }> {
     const metrics = this.getMetrics();
-    const topY = clamp(this.scene.scale.height * 0.15, 60, 130);
+    const topY =
+      this.options.hudMode === 'overlay'
+        ? clamp(this.scene.scale.height * 0.18, 86, 140)
+        : clamp(this.scene.scale.height * 0.15, 60, 130);
     const sideY = clamp(this.scene.scale.height * 0.42, 170, this.scene.scale.height * 0.52);
     const leftX = metrics.stageLeft + clamp(metrics.stageWidth * 0.12, 28, 64);
     const rightX = metrics.stageRight - clamp(metrics.stageWidth * 0.12, 28, 64);
@@ -829,7 +840,10 @@ export default class CardStage {
 
   private getMetrics(): StageMetrics {
     const width = this.scene.scale.width;
-    const stageLeft = this.options.hudMargin + this.options.hudWidth + this.options.hudMargin;
+    const stageLeft =
+      this.options.hudMode === 'overlay'
+        ? this.options.hudMargin
+        : this.options.hudMargin + this.options.hudWidth + this.options.hudMargin;
     const stageRight = width - this.options.hudMargin;
     const stageWidth = Math.max(200, stageRight - stageLeft);
     return {
