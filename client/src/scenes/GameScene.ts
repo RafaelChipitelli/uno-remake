@@ -1003,7 +1003,7 @@ export default class GameScene extends Phaser.Scene {
       playerList: this.lastPlayerListMessage,
       logLines: [...this.logLines],
       leaveEnabled: this.canLeaveRoom(),
-      startEnabled: Boolean(this.roomId && this.player?.id === this.roomHostId),
+      startEnabled: this.canStartGame(),
       drawEnabled: this.canDrawCard(),
       currentTurn: INITIAL_TURN_MESSAGE,
     };
@@ -1018,15 +1018,24 @@ export default class GameScene extends Phaser.Scene {
       roomLabel: this.getRoomLabel(),
       playerList: this.lastPlayerListMessage,
       leaveEnabled: this.canLeaveRoom(),
-      startEnabled: Boolean(this.roomId && this.player?.id === this.roomHostId),
+      startEnabled: this.canStartGame(),
       drawEnabled: this.canDrawCard(),
     });
+  }
+
+  private canStartGame(): boolean {
+    return (
+      Boolean(this.roomId) &&
+      this.player?.id === this.roomHostId &&
+      this.roomGameStatus !== 'in_progress'
+    );
   }
 
   private getRoomLabel(): string {
     return this.roomId ? `Sala atual: ${this.roomId}` : 'Nenhuma sala ativa.';
   }
 }
+
 
 
 

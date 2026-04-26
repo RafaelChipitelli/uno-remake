@@ -63,6 +63,7 @@ export default class GameHud {
   private startButton?: ActionButton;
   private drawButton?: ActionButton;
   private leaveButton?: ActionButton;
+  private overlayStartButton?: ActionButton;
 
   constructor(scene: Phaser.Scene, options: HudOptions, callbacks: HudCallbacks) {
     this.scene = scene;
@@ -121,6 +122,7 @@ export default class GameHud {
     this.startButton = undefined;
     this.drawButton = undefined;
     this.leaveButton = undefined;
+    this.overlayStartButton = undefined;
   }
 
   private getHudMode(): HudMode {
@@ -295,14 +297,10 @@ export default class GameHud {
       this.refreshDynamicContent();
     });
 
-    const primaryLabel = this.currentState.startEnabled ? 'Iniciar' : 'Comprar';
-    const primaryAction = this.currentState.startEnabled
-      ? () => this.callbacks.onStartRequested()
-      : () => this.callbacks.onDrawRequested();
-    this.drawButton = this.createActionButton(primaryX, baseY, primaryWidth, buttonHeight, primaryLabel, 'primary', primaryAction);
+    this.drawButton = this.createActionButton(primaryX, baseY, primaryWidth, buttonHeight, 'Comprar', 'primary', () => this.callbacks.onDrawRequested());
     this.leaveButton = this.createActionButton(leaveX, baseY, leaveWidth, buttonHeight, 'Sair', 'danger', () => this.callbacks.onLeaveRequested());
 
-    this.applyButtonState(this.drawButton, this.currentState.startEnabled || this.currentState.drawEnabled);
+    this.applyButtonState(this.drawButton, this.currentState.drawEnabled);
     this.applyButtonState(this.leaveButton, this.currentState.leaveEnabled);
 
     if (!this.overlayOpen) {
@@ -350,6 +348,18 @@ export default class GameHud {
       })
       .setResolution(this.options.textResolution);
     y += this.roomLabelText.height + 12;
+
+    this.overlayStartButton = this.createActionButton(
+      panelX,
+      y + 22,
+      innerW,
+      44,
+      'Iniciar jogo',
+      'secondary',
+      () => this.callbacks.onStartRequested(),
+    );
+    this.applyButtonState(this.overlayStartButton, this.currentState.startEnabled);
+    y += 54;
 
     this.playersHeaderText = this.scene.add
       .text(innerX, y, '🧑‍🤝‍🧑 Jogadores', {
@@ -411,6 +421,9 @@ export default class GameHud {
     this.leaveButton.bg.setDepth(20);
     this.leaveButton.label.setDepth(21);
     this.leaveButton.zone.setDepth(22);
+    this.overlayStartButton?.bg.setDepth(12);
+    this.overlayStartButton?.label.setDepth(13);
+    this.overlayStartButton?.zone.setDepth(14);
   }
 
   private refreshDynamicContent() {
@@ -423,8 +436,9 @@ export default class GameHud {
 
   private applyInteractiveStates() {
     if (this.getHudMode() === 'overlay') {
-      this.applyButtonState(this.drawButton, this.currentState.startEnabled || this.currentState.drawEnabled);
+      this.applyButtonState(this.drawButton, this.currentState.drawEnabled);
       this.applyButtonState(this.leaveButton, this.currentState.leaveEnabled);
+      this.applyButtonState(this.overlayStartButton, this.currentState.startEnabled);
       return;
     }
 
