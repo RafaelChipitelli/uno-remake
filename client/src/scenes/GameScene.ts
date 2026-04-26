@@ -3,7 +3,12 @@ import { io, type Socket } from 'socket.io-client';
 import { SOCKET_SERVER_URL } from '../config/network';
 import { getCardDisplayParts } from '../game/cardDisplay';
 import { COLOR_LABELS, type SelectableColor } from '../game/colors';
-import { getFirstPlayableCardIndex, isValidCardPlay } from '../game/rules';
+import {
+  canStackOverPendingDraw,
+  getFirstPlayableCardIndex,
+  isStackDrawCard,
+  isValidCardPlay,
+} from '../game/rules';
 import type {
   Card,
   CardActionEvent,
@@ -69,6 +74,10 @@ export default class GameScene extends Phaser.Scene {
   private hasReturnedToLobby = false;
   private isColorSelectionOpen = false;
   private pendingDrawDecisionCardId?: string;
+  private pendingStackDrawForMe?: {
+    amount: number;
+    topCardValue: '+2' | '+4';
+  };
   private isDrawDecisionPromptOpen = false;
   private isDrawDecisionSubmitting = false;
   private wildColorModal?: WildColorModalHandle;
@@ -95,6 +104,7 @@ export default class GameScene extends Phaser.Scene {
     this.hasRecordedCurrentRoundResult = false;
     this.isRecordingCurrentRoundResult = false;
     this.clearPendingDrawDecisionState();
+    this.clearPendingStackDrawState();
     this.clearColorSelectionModal();
 
     this.socket = io(SOCKET_SERVER_URL, {
@@ -186,6 +196,7 @@ export default class GameScene extends Phaser.Scene {
     this.hasRecordedCurrentRoundResult = false;
     this.isRecordingCurrentRoundResult = false;
     this.clearPendingDrawDecisionState();
+    this.clearPendingStackDrawState();
     this.pushLog(payload.message);
     this.pushLog(`🃏 Carta na mesa: ${payload.firstCard.color} ${payload.firstCard.value}`);
     if (payload.currentPlayerTurn) {
@@ -208,6 +219,7 @@ export default class GameScene extends Phaser.Scene {
   private handleGameEnded(payload: GameEndedPayload): void {
     this.roomGameStatus = 'finished';
     this.clearPendingDrawDecisionState();
+    this.clearPendingStackDrawState();
     this.clearColorSelectionModal();
 
     this.pushLog(payload.message);
@@ -262,6 +274,10 @@ export default class GameScene extends Phaser.Scene {
 
     if (!this.player || event.playerId !== this.player.id) {
       return;
+    }
+
+    if (event.drawReason === 'stack_penalty') {
+      this.clearPendingStackDrawState();
     }
 
     if (event.drawDecisionPending && event.drawnCardPlayable && event.card) {
@@ -328,6 +344,18 @@ export default class GameScene extends Phaser.Scene {
         this.isDrawDecisionSubmitting = false;
       }
 
+      this.pendingStackDrawForMe =
+        room.pendingStackDraw?.targetPlayerId === me.id
+          ? {
+              amount: room.pendingStackDraw.amount,
+              topCardValue: room.pendingStackDraw.topCardValue,
+            }
+          : undefined;
+
+      if (this.pendingStackDrawForMe && me.isTurn && room.gameStatus === 'in_progress') {
+        this.statusMessage = `⚠️ Penalidade +${this.pendingStackDrawForMe.amount}: jogue +2/+4 ou compre`;
+      }
+
       if (!me.isTurn && this.isColorSelectionOpen) {
         this.clearColorSelectionModal();
       }
@@ -338,6 +366,8 @@ export default class GameScene extends Phaser.Scene {
           : '🏆 Partida encerrada';
       } else if (room.gameStatus === 'waiting') {
         this.statusMessage = 'Aguardando o dono da sala iniciar a partida';
+      } else if (this.pendingStackDrawForMe && me.isTurn) {
+        this.statusMessage = `⚠️ Penalidade +${this.pendingStackDrawForMe.amount}: jogue +2/+4 ou compre`;
       } else {
         this.statusMessage = '✅ Partida em andamento';
       }
@@ -508,6 +538,19 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
+    const pendingStackForMe = this.pendingStackDrawForMe;
+    if (pendingStackForMe) {
+      if (!isStackDrawCard(card)) {
+        this.pushLog(`⚠️ Penalidade acumulada +${pendingStackForMe.amount}: jogue +2/+4 ou compre.`);
+        return;
+      }
+
+      if (!canStackOverPendingDraw(card, pendingStackForMe.topCardValue)) {
+        this.pushLog('❌ Não pode jogar +2 em cima de +4 na pilha de compra.');
+        return;
+      }
+    }
+
     if (!this.isRoundInProgress()) {
       this.pushLog('⏸️ Rodada encerrada. Aguarde o próximo jogo.');
       return;
@@ -661,10 +704,15 @@ export default class GameScene extends Phaser.Scene {
       this.player.hand,
       this.cardStage?.getTableCard(),
       this.cardStage?.getCurrentColor(),
+      this.pendingStackDrawForMe?.topCardValue,
     );
 
     if (playableIndex === -1) {
-      this.pushLog('❌ Nenhuma carta jogável. Comprando uma carta automaticamente...');
+      if (this.pendingStackDrawForMe) {
+        this.pushLog(`❌ Sem +2/+4 válido. Comprando penalidade +${this.pendingStackDrawForMe.amount}...`);
+      } else {
+        this.pushLog('❌ Nenhuma carta jogável. Comprando uma carta automaticamente...');
+      }
       this.handleDrawCard();
       return;
     }
@@ -690,6 +738,16 @@ export default class GameScene extends Phaser.Scene {
 
     if (this.hasPendingDrawDecision()) {
       this.pushLog('🧠 Decida primeiro o que fazer com a carta comprada.');
+      return;
+    }
+
+    const pendingStackForMe = this.pendingStackDrawForMe;
+    if (pendingStackForMe) {
+      this.socket.emit('card:draw-penalty', {
+        playerId: this.player.id,
+      });
+
+      this.setStatus(`🃏 Comprando penalidade acumulada (+${pendingStackForMe.amount})...`);
       return;
     }
 
@@ -764,6 +822,10 @@ export default class GameScene extends Phaser.Scene {
     this.pendingDrawDecisionCardId = undefined;
     this.isDrawDecisionPromptOpen = false;
     this.isDrawDecisionSubmitting = false;
+  }
+
+  private clearPendingStackDrawState(): void {
+    this.pendingStackDrawForMe = undefined;
   }
 
   private async promptDrawDecision(drawnCard: Card): Promise<void> {
@@ -961,6 +1023,9 @@ export default class GameScene extends Phaser.Scene {
     return this.roomId ? `Sala atual: ${this.roomId}` : 'Nenhuma sala ativa.';
   }
 }
+
+
+
 
 
 

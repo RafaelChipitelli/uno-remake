@@ -32,6 +32,11 @@ export interface Room {
     playerId: string;
     cardId: string;
   };
+  pendingStackDraw?: {
+    amount: number;
+    topCardValue: '+2' | '+4';
+    targetPlayerId: string;
+  };
   winnerId?: string | undefined;
   winnerNickname?: string | undefined;
 }
@@ -64,6 +69,8 @@ export interface CardActionEvent {
   currentColor?: CardColor;
   drawnCardPlayable?: boolean;
   drawDecisionPending?: boolean;
+  drawCount?: number;
+  drawReason?: 'normal' | 'stack_penalty';
   timestamp: number;
 }
 

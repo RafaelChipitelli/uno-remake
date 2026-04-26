@@ -8,6 +8,8 @@ export function createActionEvent(
   options?: {
     drawnCardPlayable?: boolean;
     drawDecisionPending?: boolean;
+    drawCount?: number;
+    drawReason?: 'normal' | 'stack_penalty';
   },
 ): CardActionEvent {
   return {
@@ -23,5 +25,7 @@ export function createActionEvent(
     ...(typeof options?.drawDecisionPending === 'boolean'
       ? { drawDecisionPending: options.drawDecisionPending }
       : {}),
+    ...(typeof options?.drawCount === 'number' ? { drawCount: options.drawCount } : {}),
+    ...(options?.drawReason ? { drawReason: options.drawReason } : {}),
   };
 }

@@ -36,6 +36,18 @@ const io = new Server(server, {
 const store = createGameStore();
 const STARTING_HAND_SIZE = 10;
 
+function isStackDrawCardValue(value: string): value is '+2' | '+4' {
+  return value === '+2' || value === '+4';
+}
+
+function canStackOverPendingDraw(cardValue: string, pendingTopCardValue: '+2' | '+4'): boolean {
+  if (cardValue === '+4') {
+    return true;
+  }
+
+  return cardValue === '+2' && pendingTopCardValue === '+2';
+}
+
 io.on('connection', (socket) => {
   console.log(`Player connected: ${socket.id}`);
 
@@ -68,6 +80,7 @@ io.on('connection', (socket) => {
       room.winnerId = actor.id;
       room.winnerNickname = actor.nickname;
       delete room.pendingDrawDecision;
+      delete room.pendingStackDraw;
 
       room.players.forEach((roomPlayer) => {
         roomPlayer.isTurn = false;
@@ -106,20 +119,29 @@ io.on('connection', (socket) => {
       case '+2': {
         const targetPlayer = getNextPlayer(room, currentPlayerIndex);
         if (targetPlayer && actor.roomId) {
-          drawCardsForPlayer(store.serverDecks, actor.roomId, room, targetPlayer, 2);
+          room.pendingStackDraw = {
+            amount: (room.pendingStackDraw?.amount ?? 0) + 2,
+            topCardValue: '+2',
+            targetPlayerId: targetPlayer.id,
+          };
         }
-        stepsToAdvance = 2;
+        stepsToAdvance = 1;
         break;
       }
       case '+4': {
         const targetPlayer = getNextPlayer(room, currentPlayerIndex);
         if (targetPlayer && actor.roomId) {
-          drawCardsForPlayer(store.serverDecks, actor.roomId, room, targetPlayer, 4);
+          room.pendingStackDraw = {
+            amount: (room.pendingStackDraw?.amount ?? 0) + 4,
+            topCardValue: '+4',
+            targetPlayerId: targetPlayer.id,
+          };
         }
-        stepsToAdvance = 2;
+        stepsToAdvance = 1;
         break;
       }
       default:
+        delete room.pendingStackDraw;
         break;
     }
 
@@ -355,8 +377,32 @@ io.on('connection', (socket) => {
       return;
     }
 
+    const pendingStackDraw = room.pendingStackDraw;
+    if (pendingStackDraw) {
+      if (pendingStackDraw.targetPlayerId !== actor.id) {
+        socket.emit('room:error', {
+          message: 'Aguarde a resolução da penalidade de compra acumulada.',
+        });
+        return;
+      }
+
+      if (!isStackDrawCardValue(payload.card.value)) {
+        socket.emit('room:error', {
+          message: `Você precisa jogar +2/+4 ou comprar ${pendingStackDraw.amount} cartas de penalidade.`,
+        });
+        return;
+      }
+
+      if (!canStackOverPendingDraw(payload.card.value, pendingStackDraw.topCardValue)) {
+        socket.emit('room:error', {
+          message: 'Não é permitido jogar +2 em cima de +4 na pilha de compra.',
+        });
+        return;
+      }
+    }
+
     const topCard = room.discardPile[room.discardPile.length - 1];
-    if (topCard && !isValidCardPlay(payload.card, topCard, room.currentColor)) {
+    if (!pendingStackDraw && topCard && !isValidCardPlay(payload.card, topCard, room.currentColor)) {
       socket.emit('room:error', { message: '❌ Jogada inválida! Essa carta não combina com a mesa.' });
       return;
     }
@@ -405,6 +451,13 @@ io.on('connection', (socket) => {
       return;
     }
 
+    if (room.pendingStackDraw) {
+      socket.emit('room:error', {
+        message: `Há uma penalidade acumulada de +${room.pendingStackDraw.amount}. Jogue +2/+4 ou compre a penalidade.`,
+      });
+      return;
+    }
+
     const deck = store.serverDecks.get(actor.roomId);
     if (!room || !deck || deck.length === 0) {
       socket.emit('room:error', { message: 'O baralho está vazio ou não foi encontrado!' });
@@ -436,8 +489,13 @@ io.on('connection', (socket) => {
     const privateEvent = createActionEvent(actor, 'draw', drawnCard, undefined, {
       drawnCardPlayable,
       drawDecisionPending: drawnCardPlayable,
+      drawCount: 1,
+      drawReason: 'normal',
     });
-    const publicEvent = createActionEvent(actor, 'draw');
+    const publicEvent = createActionEvent(actor, 'draw', undefined, undefined, {
+      drawCount: 1,
+      drawReason: 'normal',
+    });
 
     io.to(actor.id).emit('card:drawn', privateEvent);
     socket.to(actor.roomId).emit('card:drawn', publicEvent);
@@ -445,6 +503,63 @@ io.on('connection', (socket) => {
 
     console.log(
       `[card:draw] ${actor.nickname} comprou ${drawnCard.color} ${drawnCard.value} na sala ${actor.roomId}`,
+    );
+  });
+
+  socket.on('card:draw-penalty', (_payload: DrawCardPayload) => {
+    const actor = store.players.get(socket.id);
+    if (!actor?.roomId) {
+      return;
+    }
+
+    const room = store.rooms.get(actor.roomId);
+    if (!room) {
+      socket.emit('room:error', { message: 'Sala não encontrada.' });
+      return;
+    }
+
+    if (room.gameStatus !== 'in_progress') {
+      socket.emit('room:error', { message: 'A rodada não está em andamento. Aguarde o próximo jogo.' });
+      return;
+    }
+
+    if (!actor.isTurn) {
+      socket.emit('room:error', { message: 'Não é a sua vez de resolver a penalidade!' });
+      return;
+    }
+
+    if (room.pendingDrawDecision?.playerId === actor.id) {
+      socket.emit('room:error', {
+        message: 'Decida primeiro se quer jogar a carta comprada ou manter na mão.',
+      });
+      return;
+    }
+
+    const pendingStackDraw = room.pendingStackDraw;
+    if (!pendingStackDraw) {
+      socket.emit('room:error', { message: 'Não há penalidade acumulada para comprar agora.' });
+      return;
+    }
+
+    if (pendingStackDraw.targetPlayerId !== actor.id) {
+      socket.emit('room:error', { message: 'A penalidade acumulada é de outro jogador.' });
+      return;
+    }
+
+    const drawnCards = drawCardsForPlayer(store.serverDecks, actor.roomId, room, actor, pendingStackDraw.amount);
+    delete room.pendingStackDraw;
+    passTurnToNextPlayer(room);
+
+    const event = createActionEvent(actor, 'draw', undefined, undefined, {
+      drawCount: drawnCards.length,
+      drawReason: 'stack_penalty',
+    });
+
+    io.to(actor.roomId).emit('card:drawn', event);
+    emitRoomState(io, store.rooms, actor.roomId);
+
+    console.log(
+      `[card:draw-penalty] ${actor.nickname} comprou ${drawnCards.length} cartas de penalidade na sala ${actor.roomId}`,
     );
   });
 
@@ -529,6 +644,7 @@ io.on('connection', (socket) => {
 
     room.gameStatus = 'in_progress';
     delete room.pendingDrawDecision;
+    delete room.pendingStackDraw;
     room.winnerId = undefined;
     room.winnerNickname = undefined;
     room.discardPile = [];
@@ -591,6 +707,7 @@ app.get('/health', (_req, res) => {
 server.listen(SERVER_PORT, () => {
   console.log(`Server listening on http://localhost:${SERVER_PORT}`);
 });
+
 
 
 

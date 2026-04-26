@@ -45,9 +45,19 @@ export function describeCardActionEvent(
   myPlayerId: string | undefined,
   colorLabels: Record<Card['color'], string>,
 ): string {
+  if (event.action === 'draw' && event.drawReason === 'stack_penalty') {
+    const actor = event.playerId === myPlayerId ? 'Você' : event.nickname;
+    const drawCount = event.drawCount ?? 0;
+    return `${actor} comprou ${drawCount} carta${drawCount === 1 ? '' : 's'} de penalidade acumulada`;
+  }
+
   const actor = event.playerId === myPlayerId ? 'Você' : event.nickname;
   const actionVerb = event.action === 'play' ? 'jogou' : 'comprou';
-  const cardLabel = event.card ? `${colorLabels[event.card.color]} ${event.card.value}` : 'uma carta';
+  const cardLabel = event.card
+    ? `${colorLabels[event.card.color]} ${event.card.value}`
+    : event.action === 'draw' && typeof event.drawCount === 'number'
+      ? `${event.drawCount} carta${event.drawCount === 1 ? '' : 's'}`
+      : 'uma carta';
 
   if (
     event.action === 'play' &&
