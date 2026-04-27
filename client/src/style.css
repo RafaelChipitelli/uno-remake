@@ -225,6 +225,55 @@ canvas:focus-visible {
   margin-top: 20px;
 }
 
+@media (max-width: 640px) {
+  .ui-modal-panel {
+    width: min(96vw, 420px);
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .ui-modal-title {
+    font-size: 20px;
+  }
+
+  .ui-modal-message {
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+
+  .ui-modal-actions {
+    gap: 8px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+  }
+
+  .ui-modal-btn {
+    min-width: 92px;
+    flex: 1 1 auto;
+    padding: 11px 12px;
+    border-radius: 10px;
+  }
+
+  .ui-draw-decision-preview {
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .ui-draw-decision-card {
+    width: 60px;
+    height: 88px;
+    border-radius: 10px;
+  }
+
+  .ui-draw-decision-card-value {
+    font-size: 20px;
+  }
+
+  .ui-draw-decision-description {
+    font-size: 16px;
+  }
+}
+
 .ui-modal-btn {
   border: none;
   border-radius: 12px;

@@ -136,6 +136,7 @@ export default class GameScene extends Phaser.Scene {
         width: this.responsiveLayout.hudWidth,
         margin: this.responsiveLayout.hudMargin,
         padding: this.responsiveLayout.hudPadding,
+        hudMode: this.responsiveLayout.hudMode,
         compact: this.responsiveLayout.compact,
         fontScale: this.responsiveLayout.fontScale,
         panelColor: PANEL_COLOR,
@@ -156,6 +157,7 @@ export default class GameScene extends Phaser.Scene {
     this.cardStage = new CardStage(this, {
       hudWidth: this.responsiveLayout.hudWidth,
       hudMargin: this.responsiveLayout.hudMargin,
+      hudMode: this.responsiveLayout.hudMode,
       fontFamily: FONT_FAMILY,
       textResolution: TEXT_RESOLUTION,
       stagePadding: this.responsiveLayout.stagePadding,
@@ -207,6 +209,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.cardStage?.setTableCard(payload.firstCard, payload.currentColor);
     this.setStatus('✅ Partida em andamento', payload.currentPlayerTurn ?? INITIAL_TURN_MESSAGE);
+    this.syncHudActions();
 
     if (this.player?.hand && this.player.hand.length > 0) {
       this.pushLog(`✅ Você recebeu ${this.player.hand.length} cartas!`);
@@ -225,6 +228,7 @@ export default class GameScene extends Phaser.Scene {
     this.pushLog(payload.message);
     this.pushLog('⏸️ Aguardando o dono da sala iniciar a próxima partida...');
     this.setStatus(payload.message, 'Partida encerrada');
+    this.syncHudActions();
 
     void this.recordAuthenticatedMatchResult(payload);
   }
@@ -372,6 +376,7 @@ export default class GameScene extends Phaser.Scene {
         this.statusMessage = '✅ Partida em andamento';
       }
       this.setStatus(this.statusMessage, currentPlayer?.nickname ?? INITIAL_TURN_MESSAGE);
+      this.syncHudActions();
     }
 
     this.cardStage?.setTurnIndicator({
@@ -412,6 +417,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.clearColorSelectionModal();
     this.updateRoomDetails(EMPTY_PLAYER_LIST_MESSAGE);
+    this.syncHudActions();
     this.cardStage?.setTurnIndicator({
       phase: 'waiting',
       isMyTurn: false,
@@ -776,6 +782,15 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
+  private syncHudActions(): void {
+    this.hud?.update({
+      leaveEnabled: this.canLeaveRoom(),
+      startEnabled: this.canStartGame(),
+      drawEnabled: this.canDrawCard(),
+      roundInProgress: this.isRoundInProgress(),
+    });
+  }
+
   private describeEvent(event: CardActionEvent): string {
     return describeCardActionEvent(event, this.player?.id, COLOR_LABELS);
   }
@@ -973,12 +988,14 @@ export default class GameScene extends Phaser.Scene {
       width: this.responsiveLayout.hudWidth,
       margin: this.responsiveLayout.hudMargin,
       padding: this.responsiveLayout.hudPadding,
+      hudMode: this.responsiveLayout.hudMode,
       compact: this.responsiveLayout.compact,
       fontScale: this.responsiveLayout.fontScale,
     });
     this.cardStage?.setLayoutMetrics({
       hudWidth: this.responsiveLayout.hudWidth,
       hudMargin: this.responsiveLayout.hudMargin,
+      hudMode: this.responsiveLayout.hudMode,
       stagePadding: this.responsiveLayout.stagePadding,
       handBottomOffset: this.responsiveLayout.handBottomOffset,
       tableCardScale: this.responsiveLayout.tableCardScale,
@@ -999,8 +1016,9 @@ export default class GameScene extends Phaser.Scene {
       playerList: this.lastPlayerListMessage,
       logLines: [...this.logLines],
       leaveEnabled: this.canLeaveRoom(),
-      startEnabled: Boolean(this.roomId && this.player?.id === this.roomHostId),
+      startEnabled: this.canStartGame(),
       drawEnabled: this.canDrawCard(),
+      roundInProgress: this.isRoundInProgress(),
       currentTurn: INITIAL_TURN_MESSAGE,
     };
   }
@@ -1013,16 +1031,26 @@ export default class GameScene extends Phaser.Scene {
     this.hud?.update({
       roomLabel: this.getRoomLabel(),
       playerList: this.lastPlayerListMessage,
-      leaveEnabled: this.canLeaveRoom(),
-      startEnabled: Boolean(this.roomId && this.player?.id === this.roomHostId),
-      drawEnabled: this.canDrawCard(),
     });
+    this.syncHudActions();
+  }
+
+  private canStartGame(): boolean {
+    return (
+      Boolean(this.roomId) &&
+      this.player?.id === this.roomHostId &&
+      this.roomGameStatus !== 'in_progress'
+    );
   }
 
   private getRoomLabel(): string {
     return this.roomId ? `Sala atual: ${this.roomId}` : 'Nenhuma sala ativa.';
   }
 }
+
+
+
+
 
 
 

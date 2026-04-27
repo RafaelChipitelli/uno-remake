@@ -9,8 +9,11 @@ export type HudSnapshot = {
   leaveEnabled: boolean;
   startEnabled: boolean;
   drawEnabled: boolean;
+  roundInProgress: boolean;
   currentTurn: string;
 };
+
+type HudMode = 'sidebar' | 'overlay';
 
 type HudOptions = {
   width: number;
@@ -24,6 +27,7 @@ type HudOptions = {
   fontFamily: string;
   textResolution: number;
   instructions: string;
+  hudMode?: HudMode;
 };
 
 type HudCallbacks = {
@@ -34,6 +38,13 @@ type HudCallbacks = {
 
 type HudButtonTone = 'primary' | 'secondary' | 'danger';
 
+type ActionButton = {
+  bg: Phaser.GameObjects.Rectangle;
+  label: Phaser.GameObjects.Text;
+  zone: Phaser.GameObjects.Zone;
+  tone: HudButtonTone;
+};
+
 export default class GameHud {
   private scene: Phaser.Scene;
   private options: HudOptions;
@@ -41,8 +52,8 @@ export default class GameHud {
   private elements: Phaser.GameObjects.GameObject[] = [];
   private currentState: HudSnapshot;
   private isBuilt = false;
+  private overlayOpen = false;
 
-  private titleText?: Phaser.GameObjects.Text;
   private statusText?: Phaser.GameObjects.Text;
   private roomLabelText?: Phaser.GameObjects.Text;
   private playersHeaderText?: Phaser.GameObjects.Text;
@@ -50,9 +61,10 @@ export default class GameHud {
   private logsHeaderText?: Phaser.GameObjects.Text;
   private logsText?: Phaser.GameObjects.Text;
 
-  private startButton?: { bg: Phaser.GameObjects.Rectangle; label: Phaser.GameObjects.Text; zone: Phaser.GameObjects.Zone; tone: HudButtonTone };
-  private drawButton?: { bg: Phaser.GameObjects.Rectangle; label: Phaser.GameObjects.Text; zone: Phaser.GameObjects.Zone; tone: HudButtonTone };
-  private leaveButton?: { bg: Phaser.GameObjects.Rectangle; label: Phaser.GameObjects.Text; zone: Phaser.GameObjects.Zone; tone: HudButtonTone };
+  private startButton?: ActionButton;
+  private drawButton?: ActionButton;
+  private leaveButton?: ActionButton;
+  private overlayStartButton?: ActionButton;
 
   constructor(scene: Phaser.Scene, options: HudOptions, callbacks: HudCallbacks) {
     this.scene = scene;
@@ -66,6 +78,7 @@ export default class GameHud {
       leaveEnabled: false,
       startEnabled: true,
       drawEnabled: false,
+      roundInProgress: false,
       currentTurn: 'Aguardando jogo começar',
     };
   }
@@ -76,16 +89,28 @@ export default class GameHud {
     this.refreshDynamicContent();
   }
 
-  setLayoutMetrics(partial: Pick<HudOptions, 'width' | 'margin' | 'padding' | 'compact' | 'fontScale'>) {
+  setLayoutMetrics(partial: Pick<HudOptions, 'width' | 'margin' | 'padding' | 'compact' | 'fontScale' | 'hudMode'>) {
     this.options = { ...this.options, ...partial };
+    if (this.getHudMode() === 'sidebar') {
+      this.overlayOpen = false;
+    }
     this.build();
   }
 
   update(partial: Partial<HudSnapshot>) {
+    const previousState = this.currentState;
     this.currentState = { ...this.currentState, ...partial };
-    if (!this.isBuilt) {
+    const actionStateChanged =
+      previousState.startEnabled !== this.currentState.startEnabled ||
+      previousState.drawEnabled !== this.currentState.drawEnabled ||
+      previousState.roundInProgress !== this.currentState.roundInProgress;
+
+    if (!this.isBuilt || actionStateChanged) {
       this.build();
+      this.refreshDynamicContent();
+      return;
     }
+
     this.refreshDynamicContent();
   }
 
@@ -97,21 +122,37 @@ export default class GameHud {
     this.elements.forEach((obj) => obj.destroy());
     this.elements = [];
     this.isBuilt = false;
-    this.titleText = undefined;
+
     this.statusText = undefined;
     this.roomLabelText = undefined;
     this.playersHeaderText = undefined;
     this.playerText = undefined;
     this.logsHeaderText = undefined;
     this.logsText = undefined;
+
     this.startButton = undefined;
     this.drawButton = undefined;
     this.leaveButton = undefined;
+    this.overlayStartButton = undefined;
+  }
+
+  private getHudMode(): HudMode {
+    return this.options.hudMode ?? 'sidebar';
   }
 
   private build() {
     this.destroy();
+    if (this.getHudMode() === 'overlay') {
+      this.buildOverlayHud();
+    } else {
+      this.buildSidebarHud();
+    }
+    this.applyInteractiveStates();
+    this.animateEntry();
+    this.isBuilt = true;
+  }
 
+  private buildSidebarHud() {
     const compact = Boolean(this.options.compact);
     const panelHeight = this.scene.scale.height - this.options.margin * 2;
     const panelX = this.options.margin;
@@ -119,10 +160,7 @@ export default class GameHud {
     const innerX = panelX + this.options.padding;
     const innerWidth = this.options.width - this.options.padding * 2;
     const fontScale = this.options.fontScale ?? 1;
-    const spacing = {
-      s: 8,
-      m: 16,
-    };
+    const spacing = { s: 8, m: 16 };
 
     const panelShadow = this.scene.add
       .rectangle(panelX + 3, panelY + 6, this.options.width, panelHeight, phaserTheme.colors.decor.overlay, 0.3)
@@ -149,9 +187,9 @@ export default class GameHud {
         })
         .setResolution(this.options.textResolution);
 
-    this.titleText = makeText('👤 Player Panel', compact ? 17 : 19, theme.colors.text.primary, '700');
-    this.elements.push(this.titleText);
-    y += this.titleText.height + spacing.m;
+    const titleText = makeText('👤 Painel', compact ? 17 : 19, theme.colors.text.primary, '700');
+    this.elements.push(titleText);
+    y += titleText.height + spacing.m;
 
     this.statusText = makeText(this.currentState.status || 'Conectando...', compact ? 13 : 14, theme.colors.text.primary, '600');
     this.elements.push(this.statusText);
@@ -165,9 +203,7 @@ export default class GameHud {
       })
       .setResolution(this.options.textResolution);
     this.elements.push(this.roomLabelText);
-    y += this.roomLabelText.height + spacing.s;
-
-    y += spacing.m;
+    y += this.roomLabelText.height + spacing.m;
 
     const controlsHeader = makeText('⚡ Ações', compact ? 13 : 14, theme.colors.text.muted, '600');
     this.elements.push(controlsHeader);
@@ -175,13 +211,10 @@ export default class GameHud {
 
     const buttonWidth = innerWidth;
     const buttonHeight = compact ? 42 : 46;
-
     this.startButton = this.createActionButton(innerX + buttonWidth / 2, y + buttonHeight / 2, buttonWidth, buttonHeight, 'Iniciar jogo', 'primary', () => this.callbacks.onStartRequested());
     y += buttonHeight + spacing.s;
-
     this.drawButton = this.createActionButton(innerX + buttonWidth / 2, y + buttonHeight / 2, buttonWidth, buttonHeight, 'Comprar carta', 'secondary', () => this.callbacks.onDrawRequested());
     y += buttonHeight + spacing.s;
-
     this.leaveButton = this.createActionButton(innerX + buttonWidth / 2, y + buttonHeight / 2, buttonWidth, buttonHeight, 'Sair da sala', 'danger', () => this.callbacks.onLeaveRequested());
     y += buttonHeight + spacing.m;
 
@@ -201,38 +234,25 @@ export default class GameHud {
     this.elements.push(this.playersHeaderText);
     y += this.playersHeaderText.height + spacing.s;
 
-    const playerFontSize = Math.max(11, Math.round((compact ? 11 : 12) * fontScale));
-    const playerLineSpacing = 4;
-    const playerLineHeight = playerFontSize + playerLineSpacing;
-    const playerBlockHeight = this.getMaxPlayerLines() * playerLineHeight + spacing.s;
-
     this.playerText = this.scene.add
       .text(innerX, y, this.getVisiblePlayerList(), {
         fontFamily: this.options.fontFamily,
-        fontSize: `${playerFontSize}px`,
+        fontSize: `${Math.max(11, Math.round((compact ? 11 : 12) * fontScale))}px`,
         color: theme.colors.text.primary,
-        lineSpacing: playerLineSpacing,
+        lineSpacing: 4,
         wordWrap: { width: innerWidth, useAdvancedWrap: true },
       })
       .setResolution(this.options.textResolution)
-      .setFixedSize(innerWidth, playerBlockHeight);
+      .setFixedSize(innerWidth, this.getMaxPlayerLines() * 16 + 8);
     this.elements.push(this.playerText);
-    y += playerBlockHeight + spacing.m;
+    y += this.playerText.height + spacing.m;
 
     this.logsHeaderText = makeText('📝 Log da partida', compact ? 13 : 14, theme.colors.text.muted, '600');
     this.elements.push(this.logsHeaderText);
     y += this.logsHeaderText.height + spacing.s;
 
-    const logsMinHeight = compact ? 140 : 180;
     const logsBackground = this.scene.add
-      .rectangle(
-        innerX,
-        y,
-        innerWidth,
-        Math.max(logsMinHeight, panelY + panelHeight - y - spacing.m),
-        phaserTheme.colors.bg.game,
-        0.72,
-      )
+      .rectangle(innerX, y, innerWidth, Math.max(compact ? 140 : 180, panelY + panelHeight - y - spacing.m), phaserTheme.colors.bg.game, 0.72)
       .setOrigin(0)
       .setStrokeStyle(1, phaserTheme.colors.surface.panelBorder, 0.7);
     this.elements.push(logsBackground);
@@ -247,13 +267,189 @@ export default class GameHud {
       })
       .setResolution(this.options.textResolution);
     this.elements.push(this.logsText);
+  }
 
-    this.applyButtonState(this.startButton, this.currentState.startEnabled);
-    this.applyButtonState(this.drawButton, this.currentState.drawEnabled);
+  private buildOverlayHud() {
+    const width = this.scene.scale.width;
+    const height = this.scene.scale.height;
+    const margin = this.options.margin;
+    const fontScale = this.options.fontScale ?? 1;
+    const bottomInset = 24;
+    const buttonHeight = 50;
+    const infoWidth = 92;
+    const leaveWidth = 92;
+    const gap = 10;
+    const maxPrimary = 220;
+    const primaryWidth = Math.max(132, Math.min(maxPrimary, width - margin * 2 - infoWidth - leaveWidth - gap * 2));
+    const baseY = height - margin - bottomInset;
+
+    this.statusText = this.scene.add
+      .text(width / 2, margin + 14, this.currentState.status || 'Conectando...', {
+        fontFamily: this.options.fontFamily,
+        fontSize: `${Math.max(13, Math.round(14 * fontScale))}px`,
+        color: theme.colors.text.primary,
+        fontStyle: '700',
+        align: 'center',
+        wordWrap: { width: width - margin * 4, useAdvancedWrap: true },
+      })
+      .setOrigin(0.5, 0)
+      .setResolution(this.options.textResolution);
+    this.elements.push(this.statusText);
+
+    const totalWidth = infoWidth + primaryWidth + leaveWidth + gap * 2;
+    const startX = width / 2 - totalWidth / 2;
+    const infoX = startX + infoWidth / 2;
+    const primaryX = startX + infoWidth + gap + primaryWidth / 2;
+    const leaveX = startX + infoWidth + gap + primaryWidth + gap + leaveWidth / 2;
+
+    const infoButton = this.createActionButton(infoX, baseY, infoWidth, buttonHeight, this.overlayOpen ? 'Fechar' : 'Menu', 'secondary', () => {
+      this.overlayOpen = !this.overlayOpen;
+      this.build();
+      this.refreshDynamicContent();
+    });
+
+    const primaryIsStart = !this.currentState.roundInProgress;
+    this.drawButton = this.createActionButton(
+      primaryX,
+      baseY,
+      primaryWidth,
+      buttonHeight,
+      primaryIsStart ? 'Iniciar' : 'Comprar',
+      'primary',
+      () => {
+        if (primaryIsStart) {
+          this.callbacks.onStartRequested();
+          return;
+        }
+        this.callbacks.onDrawRequested();
+      },
+    );
+    this.leaveButton = this.createActionButton(leaveX, baseY, leaveWidth, buttonHeight, 'Sair', 'danger', () => this.callbacks.onLeaveRequested());
+
+    this.applyButtonState(this.drawButton, primaryIsStart ? this.currentState.startEnabled : this.currentState.drawEnabled);
     this.applyButtonState(this.leaveButton, this.currentState.leaveEnabled);
 
-    this.animateEntry();
-    this.isBuilt = true;
+    if (!this.overlayOpen) {
+      return;
+    }
+
+    const overlayBg = this.scene.add
+      .rectangle(width / 2, height / 2, width, height, phaserTheme.colors.decor.overlay, 0.62)
+      .setInteractive({ useHandCursor: true });
+    overlayBg.on('pointerup', () => {
+      this.overlayOpen = false;
+      this.build();
+      this.refreshDynamicContent();
+    });
+
+    const panelWidth = Math.min(380, width - margin * 2);
+    const panelHeight = Math.min(360, Math.max(250, height * 0.62));
+    const panelX = width / 2;
+    const panelY = margin + 70;
+    const panel = this.scene.add
+      .rectangle(panelX, panelY, panelWidth, panelHeight, this.options.panelColor, 0.96)
+      .setOrigin(0.5, 0)
+      .setStrokeStyle(1, this.options.panelBorder, 0.95);
+
+    const innerX = panelX - panelWidth / 2 + 16;
+    const innerW = panelWidth - 32;
+    let y = panelY + 14;
+
+    const title = this.scene.add
+      .text(innerX, y, '📋 Sala e log', {
+        fontFamily: this.options.fontFamily,
+        fontSize: `${Math.max(14, Math.round(15 * fontScale))}px`,
+        color: theme.colors.text.primary,
+        fontStyle: '700',
+      })
+      .setResolution(this.options.textResolution);
+    y += title.height + 8;
+
+    this.roomLabelText = this.scene.add
+      .text(innerX, y, this.currentState.roomLabel, {
+        fontFamily: this.options.fontFamily,
+        fontSize: `${Math.max(12, Math.round(12 * fontScale))}px`,
+        color: theme.colors.text.muted,
+        wordWrap: { width: innerW, useAdvancedWrap: true },
+      })
+      .setResolution(this.options.textResolution);
+    y += this.roomLabelText.height + 12;
+
+    this.overlayStartButton = this.createActionButton(
+      panelX,
+      y + 22,
+      innerW,
+      44,
+      'Iniciar jogo',
+      'secondary',
+      () => this.callbacks.onStartRequested(),
+    );
+    this.applyButtonState(this.overlayStartButton, this.currentState.startEnabled);
+    y += 54;
+
+    this.playersHeaderText = this.scene.add
+      .text(innerX, y, '🧑‍🤝‍🧑 Jogadores', {
+        fontFamily: this.options.fontFamily,
+        fontSize: `${Math.max(12, Math.round(13 * fontScale))}px`,
+        color: theme.colors.text.muted,
+        fontStyle: '600',
+      })
+      .setResolution(this.options.textResolution);
+    y += this.playersHeaderText.height + 4;
+
+    this.playerText = this.scene.add
+      .text(innerX, y, this.getVisiblePlayerList(), {
+        fontFamily: this.options.fontFamily,
+        fontSize: `${Math.max(12, Math.round(12 * fontScale))}px`,
+        color: theme.colors.text.primary,
+        wordWrap: { width: innerW, useAdvancedWrap: true },
+        lineSpacing: 4,
+      })
+      .setResolution(this.options.textResolution)
+      .setFixedSize(innerW, this.getMaxPlayerLines() * 18 + 8);
+    y += this.playerText.height + 10;
+
+    this.logsHeaderText = this.scene.add
+      .text(innerX, y, '📝 Log', {
+        fontFamily: this.options.fontFamily,
+        fontSize: `${Math.max(12, Math.round(13 * fontScale))}px`,
+        color: theme.colors.text.muted,
+        fontStyle: '600',
+      })
+      .setResolution(this.options.textResolution);
+    y += this.logsHeaderText.height + 4;
+
+    const logsBgHeight = Math.max(84, panelY + panelHeight - y - 16);
+    const logsBg = this.scene.add
+      .rectangle(innerX, y, innerW, logsBgHeight, phaserTheme.colors.bg.game, 0.72)
+      .setOrigin(0)
+      .setStrokeStyle(1, phaserTheme.colors.surface.panelBorder, 0.7);
+
+    this.logsText = this.scene.add
+      .text(innerX + 8, y + 8, this.getVisibleLogText(), {
+        fontFamily: this.options.fontFamily,
+        fontSize: `${Math.max(11, Math.round(12 * fontScale))}px`,
+        color: theme.colors.text.muted,
+        lineSpacing: 4,
+        wordWrap: { width: innerW - 16, useAdvancedWrap: true },
+      })
+      .setResolution(this.options.textResolution);
+
+    this.elements.push(overlayBg, panel, title, this.roomLabelText, this.playersHeaderText, this.playerText, this.logsHeaderText, logsBg, this.logsText);
+
+    // mantém menu acima do overlay
+    infoButton.bg.setDepth(20);
+    infoButton.label.setDepth(21);
+    infoButton.zone.setDepth(22);
+    this.drawButton.bg.setDepth(20);
+    this.drawButton.label.setDepth(21);
+    this.drawButton.zone.setDepth(22);
+    this.leaveButton.bg.setDepth(20);
+    this.leaveButton.label.setDepth(21);
+    this.leaveButton.zone.setDepth(22);
+    this.overlayStartButton?.bg.setDepth(12);
+    this.overlayStartButton?.label.setDepth(13);
+    this.overlayStartButton?.zone.setDepth(14);
   }
 
   private refreshDynamicContent() {
@@ -261,6 +457,17 @@ export default class GameHud {
     this.roomLabelText?.setText(`🏷 ${this.currentState.roomLabel}`);
     this.playerText?.setText(this.getVisiblePlayerList());
     this.logsText?.setText(this.getVisibleLogText());
+    this.applyInteractiveStates();
+  }
+
+  private applyInteractiveStates() {
+    if (this.getHudMode() === 'overlay') {
+      const primaryIsStart = !this.currentState.roundInProgress;
+      this.applyButtonState(this.drawButton, primaryIsStart ? this.currentState.startEnabled : this.currentState.drawEnabled);
+      this.applyButtonState(this.leaveButton, this.currentState.leaveEnabled);
+      this.applyButtonState(this.overlayStartButton, this.currentState.startEnabled);
+      return;
+    }
 
     this.applyButtonState(this.startButton, this.currentState.startEnabled);
     this.applyButtonState(this.drawButton, this.currentState.drawEnabled);
@@ -275,7 +482,7 @@ export default class GameHud {
     labelText: string,
     tone: HudButtonTone,
     onClick: () => void,
-  ) {
+  ): ActionButton {
     const palette = this.getButtonPalette(tone);
     const shadow = this.scene.add.rectangle(centerX, centerY + 3, width, height, palette.shadow, 0.45).setOrigin(0.5);
     const bg = this.scene.add
@@ -320,21 +527,16 @@ export default class GameHud {
     });
 
     this.elements.push(shadow, bg, label, zone);
-
     return { bg, label, zone, tone };
   }
 
   private getButtonPalette(tone: HudButtonTone): { base: number; hover: number; border: number; shadow: number } {
-    if (tone === 'primary') {
-      return phaserTheme.colors.action.primary;
-    }
-    if (tone === 'secondary') {
-      return phaserTheme.colors.action.secondary;
-    }
+    if (tone === 'primary') return phaserTheme.colors.action.primary;
+    if (tone === 'secondary') return phaserTheme.colors.action.secondary;
     return phaserTheme.colors.action.danger;
   }
 
-  private applyButtonState(button: { bg: Phaser.GameObjects.Rectangle; label: Phaser.GameObjects.Text; zone: Phaser.GameObjects.Zone; tone: HudButtonTone } | undefined, enabled: boolean) {
+  private applyButtonState(button: ActionButton | undefined, enabled: boolean) {
     if (!button) return;
 
     if (enabled) {
@@ -353,29 +555,25 @@ export default class GameHud {
   private getVisiblePlayerList(): string {
     const maxLines = this.getMaxPlayerLines();
     const lines = this.currentState.playerList.split('\n').filter(Boolean);
-    if (!lines.length) {
-      return 'Nenhum jogador ainda.';
-    }
-    if (lines.length <= maxLines) {
-      return lines.join('\n');
-    }
+    if (!lines.length) return 'Nenhum jogador ainda.';
+    if (lines.length <= maxLines) return lines.join('\n');
     return `${lines.slice(0, maxLines).join('\n')}\n…`;
   }
 
   private getVisibleLogText(): string {
     const maxLines = this.getMaxLogLines();
     const lines = this.currentState.logLines.slice(0, maxLines);
-    if (!lines.length) {
-      return '• Nenhuma ação ainda.';
-    }
+    if (!lines.length) return '• Nenhuma ação ainda.';
     return lines.map((line) => `• ${line}`).join('\n');
   }
 
   private getMaxPlayerLines(): number {
+    if (this.getHudMode() === 'overlay') return 4;
     return this.options.compact ? 4 : 6;
   }
 
   private getMaxLogLines(): number {
+    if (this.getHudMode() === 'overlay') return 6;
     return this.options.compact ? 7 : 10;
   }
 
@@ -388,8 +586,8 @@ export default class GameHud {
         targets: target,
         alpha: 1,
         y: target.y - 6,
-        duration: 180,
-        delay: index * 18,
+        duration: 160,
+        delay: index * 10,
         ease: 'Sine.easeOut',
       });
     });
