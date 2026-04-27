@@ -58,6 +58,14 @@ type TurnIndicatorState = {
   currentTurnNickname?: string;
 };
 
+type HandSwipeState = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  lastAppliedX: number;
+  isDragging: boolean;
+};
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
@@ -65,6 +73,9 @@ function clamp(value: number, min: number, max: number) {
 export default class CardStage {
   private static readonly CARD_HOVER_OFFSET_Y = 16;
   private static readonly HAND_SCROLL_STEP = 1;
+  private static readonly HAND_SWIPE_ACTIVATION_PX = 24;
+  private static readonly HAND_SWIPE_STEP_PX = 44;
+  private static readonly HAND_SWIPE_TAP_SUPPRESS_MS = 180;
   private static readonly MOBILE_HUD_BUTTON_HEIGHT = 50;
   private static readonly MOBILE_HUD_BOTTOM_INSET = 24;
   private static readonly MOBILE_HAND_SAFE_GAP = 14;
@@ -99,6 +110,9 @@ export default class CardStage {
 
   private opponentViews: OpponentView[] = [];
   private wheelListenerRegistered = false;
+  private touchSwipeListenersRegistered = false;
+  private handSwipeState?: HandSwipeState;
+  private suppressCardTapUntil = 0;
   private turnIndicatorPhase: TurnIndicatorPhase = 'waiting';
   private isMyTurn = false;
   private currentTurnNickname?: string;
@@ -692,6 +706,19 @@ export default class CardStage {
 
     this.scene.input.on('wheel', this.handleMouseWheel, this);
     this.wheelListenerRegistered = true;
+    this.ensureTouchSwipeNavigationListeners();
+  }
+
+  private ensureTouchSwipeNavigationListeners(): void {
+    if (this.touchSwipeListenersRegistered) {
+      return;
+    }
+
+    this.scene.input.on('pointerdown', this.handlePointerDownForHandSwipe, this);
+    this.scene.input.on('pointermove', this.handlePointerMoveForHandSwipe, this);
+    this.scene.input.on('pointerup', this.handlePointerUpForHandSwipe, this);
+    this.scene.input.on('pointerupoutside', this.handlePointerUpForHandSwipe, this);
+    this.touchSwipeListenersRegistered = true;
   }
 
   private handleMouseWheel(
@@ -701,14 +728,14 @@ export default class CardStage {
     deltaY: number,
   ): void {
     const metrics = this.getMetrics();
-    const { baseY, cardHeight, maxVisible } = this.getHandLayout(metrics);
-    const hasOverflow = this.handCards.length > maxVisible;
+    const handContext = this.getHandInteractionContext(metrics);
+    const { baseY, cardHeight, hasOverflow } = handContext;
     if (!hasOverflow) {
       return;
     }
 
     const pointerY = pointer.worldY ?? pointer.y;
-    const isOverHandBand = pointerY >= baseY - cardHeight * 1.2 && pointerY <= baseY + cardHeight * 0.9;
+    const isOverHandBand = this.isPointerOverHandBand(pointerY, baseY, cardHeight);
     if (!isOverHandBand) {
       return;
     }
@@ -719,6 +746,111 @@ export default class CardStage {
     } else if (dominantDelta < 0) {
       this.shiftHandWindow(-CardStage.HAND_SCROLL_STEP);
     }
+  }
+
+  private handlePointerDownForHandSwipe(pointer: Phaser.Input.Pointer): void {
+    if (!this.isTouchSwipeEnabled(pointer)) {
+      return;
+    }
+
+    const metrics = this.getMetrics();
+    const { baseY, cardHeight, hasOverflow } = this.getHandInteractionContext(metrics);
+    if (!hasOverflow) {
+      this.handSwipeState = undefined;
+      return;
+    }
+
+    const pointerY = pointer.worldY ?? pointer.y;
+    if (!this.isPointerOverHandBand(pointerY, baseY, cardHeight)) {
+      this.handSwipeState = undefined;
+      return;
+    }
+
+    const pointerX = pointer.worldX ?? pointer.x;
+    this.handSwipeState = {
+      pointerId: pointer.id,
+      startX: pointerX,
+      startY: pointerY,
+      lastAppliedX: pointerX,
+      isDragging: false,
+    };
+  }
+
+  private handlePointerMoveForHandSwipe(pointer: Phaser.Input.Pointer): void {
+    const state = this.handSwipeState;
+    if (!state || pointer.id !== state.pointerId || !this.isTouchSwipeEnabled(pointer)) {
+      return;
+    }
+
+    const pointerX = pointer.worldX ?? pointer.x;
+    const pointerY = pointer.worldY ?? pointer.y;
+    const deltaX = pointerX - state.startX;
+    const deltaY = pointerY - state.startY;
+
+    if (!state.isDragging) {
+      const horizontalDistance = Math.abs(deltaX);
+      const verticalDistance = Math.abs(deltaY);
+      if (horizontalDistance < CardStage.HAND_SWIPE_ACTIVATION_PX || horizontalDistance <= verticalDistance) {
+        return;
+      }
+      state.isDragging = true;
+    }
+
+    let deltaSinceLastStep = pointerX - state.lastAppliedX;
+    while (Math.abs(deltaSinceLastStep) >= CardStage.HAND_SWIPE_STEP_PX) {
+      const direction = deltaSinceLastStep < 0 ? CardStage.HAND_SCROLL_STEP : -CardStage.HAND_SCROLL_STEP;
+      this.shiftHandWindow(direction);
+      state.lastAppliedX += Math.sign(deltaSinceLastStep) * CardStage.HAND_SWIPE_STEP_PX;
+      deltaSinceLastStep = pointerX - state.lastAppliedX;
+    }
+  }
+
+  private handlePointerUpForHandSwipe(pointer: Phaser.Input.Pointer): void {
+    const state = this.handSwipeState;
+    if (!state || pointer.id !== state.pointerId) {
+      return;
+    }
+
+    if (state.isDragging) {
+      this.suppressCardTapUntil = Date.now() + CardStage.HAND_SWIPE_TAP_SUPPRESS_MS;
+    }
+
+    this.handSwipeState = undefined;
+  }
+
+  private isPointerOverHandBand(pointerY: number, baseY: number, cardHeight: number): boolean {
+    return pointerY >= baseY - cardHeight * 1.2 && pointerY <= baseY + cardHeight * 0.9;
+  }
+
+  private isTouchSwipeEnabled(pointer: Phaser.Input.Pointer): boolean {
+    if (this.options.hudMode !== 'overlay') {
+      return false;
+    }
+
+    const nativeEvent = pointer.event as PointerEvent | TouchEvent | MouseEvent | undefined;
+    if (!nativeEvent) {
+      return false;
+    }
+
+    if ('pointerType' in nativeEvent) {
+      return nativeEvent.pointerType === 'touch';
+    }
+
+    if (typeof TouchEvent !== 'undefined' && nativeEvent instanceof TouchEvent) {
+      return true;
+    }
+
+    return nativeEvent.type.startsWith('touch');
+  }
+
+  private getHandInteractionContext(metrics: StageMetrics): {
+    baseY: number;
+    cardHeight: number;
+    hasOverflow: boolean;
+  } {
+    const { baseY, cardHeight, maxVisible } = this.getHandLayout(metrics);
+    const hasOverflow = this.handCards.length > maxVisible;
+    return { baseY, cardHeight, hasOverflow };
   }
 
   private createHandCardView(card: Card, cardWidth: number, cardHeight: number): HandCardView {
@@ -791,6 +923,10 @@ export default class CardStage {
     });
 
     container.on('pointerup', () => {
+      if (Date.now() < this.suppressCardTapUntil) {
+        return;
+      }
+
       this.scene.tweens.add({ targets: container, scaleX: 1.04, scaleY: 1.04, duration: 90, yoyo: true, ease: 'Back.easeOut' });
       const index = this.handCards.findIndex((handCard) => handCard.id === card.id);
       if (index !== -1) {
@@ -908,8 +1044,22 @@ export default class CardStage {
     this.wheelListenerRegistered = false;
   }
 
+  private unregisterTouchSwipeNavigationListeners(): void {
+    if (!this.touchSwipeListenersRegistered) {
+      return;
+    }
+
+    this.scene.input.off('pointerdown', this.handlePointerDownForHandSwipe, this);
+    this.scene.input.off('pointermove', this.handlePointerMoveForHandSwipe, this);
+    this.scene.input.off('pointerup', this.handlePointerUpForHandSwipe, this);
+    this.scene.input.off('pointerupoutside', this.handlePointerUpForHandSwipe, this);
+    this.touchSwipeListenersRegistered = false;
+    this.handSwipeState = undefined;
+  }
+
   destroy() {
     this.unregisterWheelNavigationListener();
+    this.unregisterTouchSwipeNavigationListeners();
     this.clearStageObjects();
   }
 }
