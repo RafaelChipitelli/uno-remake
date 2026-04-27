@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { io, type Socket } from 'socket.io-client';
 import { SOCKET_SERVER_URL } from '../config/network';
 import { getCardDisplayParts } from '../game/cardDisplay';
-import { COLOR_LABELS, type SelectableColor } from '../game/colors';
+import { getColorLabel, getColorLabels, type SelectableColor } from '../game/colors';
 import {
   canStackOverPendingDraw,
   getFirstPlayableCardIndex,
@@ -22,11 +22,11 @@ import type {
   RoomErrorPayload,
 } from '../types';
 import {
-  EMPTY_PLAYER_LIST_MESSAGE,
   FONT_FAMILY,
-  INITIAL_STATUS_MESSAGE,
-  INITIAL_TURN_MESSAGE,
-  INSTRUCTION_TEXT,
+  getEmptyPlayerListMessage,
+  getInitialStatusMessage,
+  getInitialTurnMessage,
+  getInstructionText,
   PANEL_ACCENT,
   PANEL_BORDER,
   PANEL_COLOR,
@@ -49,6 +49,7 @@ import {
 } from '../services/playerAccount';
 import { phaserTheme } from '../theme/tokens';
 import { askChoice, askConfirmation } from '../ui/modal';
+import { t } from '../i18n';
 
 export default class GameScene extends Phaser.Scene {
   private socket!: Socket;
@@ -63,8 +64,8 @@ export default class GameScene extends Phaser.Scene {
   private roomGameStatus: GameStatus = 'waiting';
 
   private logLines: string[] = [];
-  private statusMessage = INITIAL_STATUS_MESSAGE;
-  private lastPlayerListMessage = EMPTY_PLAYER_LIST_MESSAGE;
+  private statusMessage = getInitialStatusMessage();
+  private lastPlayerListMessage = getEmptyPlayerListMessage();
 
   private pendingAction?: 'quick_play' | 'create_private' | 'join';
   private pendingNickname?: string;
@@ -94,8 +95,8 @@ export default class GameScene extends Phaser.Scene {
     this.pendingRoomCode = data?.roomCode?.trim().toUpperCase();
 
     this.logLines = [];
-    this.statusMessage = INITIAL_STATUS_MESSAGE;
-    this.lastPlayerListMessage = EMPTY_PLAYER_LIST_MESSAGE;
+    this.statusMessage = getInitialStatusMessage();
+    this.lastPlayerListMessage = getEmptyPlayerListMessage();
     this.roomId = undefined;
     this.roomHostId = undefined;
     this.roomGameStatus = 'waiting';
@@ -144,7 +145,7 @@ export default class GameScene extends Phaser.Scene {
         accentColor: PANEL_ACCENT,
         fontFamily: FONT_FAMILY,
         textResolution: TEXT_RESOLUTION,
-        instructions: INSTRUCTION_TEXT,
+        instructions: getInstructionText(),
       },
       {
         onLeaveRequested: () => this.promptLeaveRoom(),
@@ -200,21 +201,21 @@ export default class GameScene extends Phaser.Scene {
     this.clearPendingDrawDecisionState();
     this.clearPendingStackDrawState();
     this.pushLog(payload.message);
-    this.pushLog(`🃏 Carta na mesa: ${payload.firstCard.color} ${payload.firstCard.value}`);
+    this.pushLog(t('game.log.tableCard', { color: payload.firstCard.color, value: payload.firstCard.value }));
     if (payload.currentPlayerTurn) {
-      this.pushLog(`⏳ Vez de: ${payload.currentPlayerTurn}`);
+      this.pushLog(t('game.log.turnOf', { nickname: payload.currentPlayerTurn }));
     }
 
     this.clearColorSelectionModal();
 
     this.cardStage?.setTableCard(payload.firstCard, payload.currentColor);
-    this.setStatus('✅ Partida em andamento', payload.currentPlayerTurn ?? INITIAL_TURN_MESSAGE);
+    this.setStatus(t('game.status.running'), payload.currentPlayerTurn ?? getInitialTurnMessage());
     this.syncHudActions();
 
     if (this.player?.hand && this.player.hand.length > 0) {
-      this.pushLog(`✅ Você recebeu ${this.player.hand.length} cartas!`);
+      this.pushLog(t('game.log.receivedCards', { count: this.player.hand.length }));
       this.player.hand.forEach((card, index) => {
-        this.pushLog(`  ${index + 1}. ${card.color} - ${card.value}`);
+        this.pushLog(t('game.log.receivedCardEntry', { index: index + 1, color: card.color, value: card.value }));
       });
     }
   }
@@ -226,8 +227,8 @@ export default class GameScene extends Phaser.Scene {
     this.clearColorSelectionModal();
 
     this.pushLog(payload.message);
-    this.pushLog('⏸️ Aguardando o dono da sala iniciar a próxima partida...');
-    this.setStatus(payload.message, 'Partida encerrada');
+    this.pushLog(t('game.log.waitingNextRound'));
+    this.setStatus(payload.message, t('game.status.ended'));
     this.syncHudActions();
 
     void this.recordAuthenticatedMatchResult(payload);
@@ -249,7 +250,10 @@ export default class GameScene extends Phaser.Scene {
 
       this.hasRecordedCurrentRoundResult = true;
       this.pushLog(
-        `📈 Stats atualizadas: ${profile.stats.gamesPlayed} partidas • ${profile.stats.gamesWon} vitórias`,
+        t('game.log.statsUpdated', {
+          gamesPlayed: profile.stats.gamesPlayed,
+          gamesWon: profile.stats.gamesWon,
+        }),
       );
     } catch (error) {
       console.error('[firebase] Falha ao salvar estatísticas da partida.', error);
@@ -286,7 +290,7 @@ export default class GameScene extends Phaser.Scene {
 
     if (event.drawDecisionPending && event.drawnCardPlayable && event.card) {
       this.pendingDrawDecisionCardId = event.card.id;
-      this.pushLog('🧠 Carta comprada é jogável: escolha jogar agora ou manter na mão.');
+      this.pushLog(t('game.log.drawnPlayableDecision'));
       void this.promptDrawDecision(event.card);
       return;
     }
@@ -302,8 +306,8 @@ export default class GameScene extends Phaser.Scene {
       this.player.roomId = roomId;
     }
 
-    this.pushLog(`Sala ${roomId} criada. Compartilhe o código!`);
-    this.setStatus(`🟢 Sala ${roomId} criada. Convide seus amigos.`);
+    this.pushLog(t('game.log.roomCreated', { roomId }));
+    this.setStatus(t('game.status.roomCreated', { roomId }));
     this.updateRoomDetails();
   }
 
@@ -313,8 +317,8 @@ export default class GameScene extends Phaser.Scene {
       this.player.roomId = roomId;
     }
 
-    this.pushLog(`Entrou na sala ${roomId}.`);
-    this.setStatus(`🟢 Você entrou na sala ${roomId}.`);
+    this.pushLog(t('game.log.roomJoined', { roomId }));
+    this.setStatus(t('game.status.roomJoined', { roomId }));
     this.updateRoomDetails();
   }
 
@@ -357,7 +361,7 @@ export default class GameScene extends Phaser.Scene {
           : undefined;
 
       if (this.pendingStackDrawForMe && me.isTurn && room.gameStatus === 'in_progress') {
-        this.statusMessage = `⚠️ Penalidade +${this.pendingStackDrawForMe.amount}: jogue +2/+4 ou compre`;
+        this.statusMessage = t('game.status.penaltyMustPlayOrDraw', { amount: this.pendingStackDrawForMe.amount });
       }
 
       if (!me.isTurn && this.isColorSelectionOpen) {
@@ -369,13 +373,13 @@ export default class GameScene extends Phaser.Scene {
           ? `🏆 O ${room.winnerNickname} ganhou o jogo!`
           : '🏆 Partida encerrada';
       } else if (room.gameStatus === 'waiting') {
-        this.statusMessage = 'Aguardando o dono da sala iniciar a partida';
+        this.statusMessage = t('game.status.waitingHost');
       } else if (this.pendingStackDrawForMe && me.isTurn) {
-        this.statusMessage = `⚠️ Penalidade +${this.pendingStackDrawForMe.amount}: jogue +2/+4 ou compre`;
+        this.statusMessage = t('game.status.penaltyMustPlayOrDraw', { amount: this.pendingStackDrawForMe.amount });
       } else {
-        this.statusMessage = '✅ Partida em andamento';
+        this.statusMessage = t('game.status.running');
       }
-      this.setStatus(this.statusMessage, currentPlayer?.nickname ?? INITIAL_TURN_MESSAGE);
+      this.setStatus(this.statusMessage, currentPlayer?.nickname ?? getInitialTurnMessage());
       this.syncHudActions();
     }
 
@@ -394,16 +398,16 @@ export default class GameScene extends Phaser.Scene {
       room.players
         .map((player) => {
           const hostMarker = player.id === room.hostId ? '⭐ ' : '';
-          const selfMarker = player.id === this.player?.id ? ' (você)' : '';
+          const selfMarker = player.id === this.player?.id ? t('game.players.selfSuffix') : '';
           return `${hostMarker}${player.nickname}${selfMarker}`;
         })
-        .join('\n') || 'Sala vazia';
+        .join('\n') || t('game.players.roomEmpty');
 
     this.updateRoomDetails(playerList);
   }
 
   private handleRoomError(payload: RoomErrorPayload): void {
-    this.pushLog(`Erro: ${payload.message}`);
+    this.pushLog(t('game.log.roomError', { message: payload.message }));
     this.setStatus(`⚠️ ${payload.message}`);
     this.isLeavingRoom = false;
     this.hud?.update({ leaveEnabled: this.canLeaveRoom() });
@@ -416,7 +420,7 @@ export default class GameScene extends Phaser.Scene {
     this.isLeavingRoom = false;
 
     this.clearColorSelectionModal();
-    this.updateRoomDetails(EMPTY_PLAYER_LIST_MESSAGE);
+    this.updateRoomDetails(getEmptyPlayerListMessage());
     this.syncHudActions();
     this.cardStage?.setTurnIndicator({
       phase: 'waiting',
@@ -424,12 +428,12 @@ export default class GameScene extends Phaser.Scene {
       currentTurnNickname: undefined,
     });
     this.cardStage?.setOpponents([]);
-    this.goBackToLobby('Você saiu da sala.');
+    this.goBackToLobby(t('game.log.leftRoom'));
   }
 
   private handleConnectError(err: Error): void {
     console.error('Socket error', err);
-    this.setStatus('❌ Falha na conexão com o servidor.');
+    this.setStatus(t('game.status.connectError'));
   }
 
   private drawBackdrop(): void {
@@ -474,7 +478,7 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
-    this.statusMessage = `Conectado como ${nickname}`;
+    this.statusMessage = t('game.status.connectedAs', { nickname });
     this.hud.update({ status: this.statusMessage });
     this.cardStage.pulsePlaceholder();
   }
@@ -515,7 +519,7 @@ export default class GameScene extends Phaser.Scene {
     } else {
       const roomCode = this.pendingRoomCode;
       if (!roomCode) {
-        this.pushLog('Código de sala ausente para entrar automaticamente.');
+        this.pushLog(t('game.log.roomCodeMissing'));
         this.pendingAction = undefined;
         return;
       }
@@ -530,45 +534,45 @@ export default class GameScene extends Phaser.Scene {
 
   private handleCardClick(card: Card, index: number): void {
     if (!this.player || !this.roomId) {
-      this.pushLog('Entre ou crie uma sala antes de jogar cartas.');
+      this.pushLog(t('game.log.mustJoinToPlay'));
       return;
     }
 
     if (this.isColorSelectionOpen) {
-      this.pushLog('🎨 Escolha uma cor para o curinga antes de continuar.');
+      this.pushLog(t('game.log.chooseWildBeforeContinue'));
       return;
     }
 
     if (this.hasPendingDrawDecision()) {
-      this.pushLog('🧠 Primeiro decida se quer jogar a carta comprada ou manter ela na mão.');
+      this.pushLog(t('game.log.decideDrawnCardFirst'));
       return;
     }
 
     const pendingStackForMe = this.pendingStackDrawForMe;
     if (pendingStackForMe) {
       if (!isStackDrawCard(card)) {
-        this.pushLog(`⚠️ Penalidade acumulada +${pendingStackForMe.amount}: jogue +2/+4 ou compre.`);
+        this.pushLog(t('game.log.penaltyMustPlayOrDraw', { amount: pendingStackForMe.amount }));
         return;
       }
 
       if (!canStackOverPendingDraw(card, pendingStackForMe.topCardValue)) {
-        this.pushLog('❌ Não pode jogar +2 em cima de +4 na pilha de compra.');
+        this.pushLog(t('game.log.invalidStackPlusTwoOnPlusFour'));
         return;
       }
     }
 
     if (!this.isRoundInProgress()) {
-      this.pushLog('⏸️ Rodada encerrada. Aguarde o próximo jogo.');
+      this.pushLog(t('game.log.roundFinishedWait'));
       return;
     }
 
     if (!this.player.hand || this.player.hand.length === 0) {
-      this.pushLog('Você não tem cartas para jogar!');
+      this.pushLog(t('game.log.noCardsToPlay'));
       return;
     }
 
     if (!this.player.isTurn) {
-      this.pushLog('⏳ Não é a sua vez de jogar! Aguarde sua vez.');
+      this.pushLog(t('game.log.notYourTurnToPlay'));
       return;
     }
 
@@ -576,7 +580,7 @@ export default class GameScene extends Phaser.Scene {
     const currentColor = this.cardStage?.getCurrentColor();
 
     if (topCard && currentColor && !isValidCardPlay(card, topCard, currentColor)) {
-      this.pushLog('❌ Jogada inválida! Essa carta não combina com a mesa.');
+      this.pushLog(t('game.log.invalidPlay'));
       return;
     }
 
@@ -592,8 +596,8 @@ export default class GameScene extends Phaser.Scene {
       card,
     });
 
-    this.pushLog(`Você jogou ${card.color} ${card.value}`);
-    this.setStatus('✅ Jogada enviada. Aguardando atualização da sala...');
+    this.pushLog(t('game.log.playedCard', { color: card.color, value: card.value }));
+    this.setStatus(t('game.status.playSent'));
     this.cardStage?.setHandCards(this.player.hand);
     this.cardStage?.setTableCard(card);
   }
@@ -603,7 +607,7 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
-    this.pushLog('🎨 Escolha a cor que quer definir:');
+    this.pushLog(t('game.log.chooseWildColor'));
     this.clearColorSelectionModal();
     this.isColorSelectionOpen = true;
 
@@ -638,8 +642,8 @@ export default class GameScene extends Phaser.Scene {
 
       this.isDrawDecisionSubmitting = true;
       this.socket.emit('card:draw-decision', payload);
-      this.pushLog(`✅ Você decidiu jogar a carta comprada com cor ${COLOR_LABELS[selectedColor]}.`);
-      this.setStatus(`🎨 Cor escolhida: ${COLOR_LABELS[selectedColor]}.`);
+      this.pushLog(t('game.log.drawDecisionPlayedWithColor', { color: getColorLabel(selectedColor) }));
+      this.setStatus(t('game.status.colorChosen', { color: getColorLabel(selectedColor) }));
       return;
     }
 
@@ -656,8 +660,8 @@ export default class GameScene extends Phaser.Scene {
       selectedColor,
     });
 
-    this.pushLog(`✅ Você definiu a cor ${COLOR_LABELS[selectedColor]}.`);
-    this.setStatus(`🎨 Cor escolhida: ${COLOR_LABELS[selectedColor]}.`);
+    this.pushLog(t('game.log.colorChosen', { color: getColorLabel(selectedColor) }));
+    this.setStatus(t('game.status.colorChosen', { color: getColorLabel(selectedColor) }));
     this.cardStage?.setHandCards(this.player.hand);
     this.cardStage?.setTableCard(card, selectedColor);
   }
@@ -677,32 +681,32 @@ export default class GameScene extends Phaser.Scene {
 
   private handlePlayCardShortcut(): void {
     if (!this.player || !this.roomId) {
-      this.pushLog('Entre ou crie uma sala antes de jogar cartas.');
+      this.pushLog(t('game.log.mustJoinToPlay'));
       return;
     }
 
     if (this.isColorSelectionOpen) {
-      this.pushLog('🎨 Escolha uma cor para o curinga antes de continuar.');
+      this.pushLog(t('game.log.chooseWildBeforeContinue'));
       return;
     }
 
     if (this.hasPendingDrawDecision()) {
-      this.pushLog('🧠 Primeiro decida se quer jogar a carta comprada ou manter ela na mão.');
+      this.pushLog(t('game.log.decideDrawnCardFirst'));
       return;
     }
 
     if (!this.isRoundInProgress()) {
-      this.pushLog('⏸️ Rodada encerrada. Aguarde o próximo jogo.');
+      this.pushLog(t('game.log.roundFinishedWait'));
       return;
     }
 
     if (!this.player.hand || this.player.hand.length === 0) {
-      this.pushLog('Você não tem cartas para jogar!');
+      this.pushLog(t('game.log.noCardsToPlay'));
       return;
     }
 
     if (!this.player.isTurn) {
-      this.pushLog('⏳ Não é a sua vez de jogar! Aguarde sua vez.');
+      this.pushLog(t('game.log.notYourTurnToPlay'));
       return;
     }
 
@@ -715,9 +719,9 @@ export default class GameScene extends Phaser.Scene {
 
     if (playableIndex === -1) {
       if (this.pendingStackDrawForMe) {
-        this.pushLog(`❌ Sem +2/+4 válido. Comprando penalidade +${this.pendingStackDrawForMe.amount}...`);
+        this.pushLog(t('game.log.noPlayablePenaltyDrawing', { amount: this.pendingStackDrawForMe.amount }));
       } else {
-        this.pushLog('❌ Nenhuma carta jogável. Comprando uma carta automaticamente...');
+        this.pushLog(t('game.log.noPlayableAutoDraw'));
       }
       this.handleDrawCard();
       return;
@@ -733,17 +737,17 @@ export default class GameScene extends Phaser.Scene {
 
   private handleDrawCard(): void {
     if (!this.player || !this.roomId) {
-      this.pushLog('Entre ou crie uma sala antes de comprar cartas.');
+      this.pushLog(t('game.log.mustJoinToDraw'));
       return;
     }
 
     if (this.isColorSelectionOpen) {
-      this.pushLog('🎨 Escolha uma cor para o curinga antes de comprar.');
+      this.pushLog(t('game.log.chooseWildBeforeDraw'));
       return;
     }
 
     if (this.hasPendingDrawDecision()) {
-      this.pushLog('🧠 Decida primeiro o que fazer com a carta comprada.');
+      this.pushLog(t('game.log.decideDrawnCardBeforeDraw'));
       return;
     }
 
@@ -753,17 +757,17 @@ export default class GameScene extends Phaser.Scene {
         playerId: this.player.id,
       });
 
-      this.setStatus(`🃏 Comprando penalidade acumulada (+${pendingStackForMe.amount})...`);
+      this.setStatus(t('game.status.drawPenalty', { amount: pendingStackForMe.amount }));
       return;
     }
 
     if (!this.isRoundInProgress()) {
-      this.pushLog('⏸️ Rodada encerrada. Aguarde o próximo jogo.');
+      this.pushLog(t('game.log.roundFinishedWait'));
       return;
     }
 
     if (!this.player.isTurn) {
-      this.pushLog('⏳ Não é a sua vez de comprar carta! Aguarde sua vez.');
+      this.pushLog(t('game.log.notYourTurnToDraw'));
       return;
     }
 
@@ -771,7 +775,7 @@ export default class GameScene extends Phaser.Scene {
       playerId: this.player.id,
     });
 
-    this.setStatus('🃏 Comprando carta...');
+    this.setStatus(t('game.status.drawCard'));
   }
 
   private setStatus(status: string, currentTurn?: string): void {
@@ -792,7 +796,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private describeEvent(event: CardActionEvent): string {
-    return describeCardActionEvent(event, this.player?.id, COLOR_LABELS);
+    return describeCardActionEvent(event, this.player?.id, getColorLabels());
   }
 
   private clearColorSelectionModal(): void {
@@ -851,12 +855,12 @@ export default class GameScene extends Phaser.Scene {
     this.isDrawDecisionPromptOpen = true;
 
     const choice = await askChoice<'play' | 'keep'>({
-      title: 'Carta comprada é jogável!',
-      message: 'Você quer jogar essa carta agora ou manter na mão e passar a vez?',
+      title: t('game.modal.drawDecision.title'),
+      message: t('game.modal.drawDecision.message'),
       renderContent: (container) => this.renderDrawDecisionCardPreview(container, drawnCard),
       choices: [
-        { label: 'Jogar agora', value: 'play', tone: 'primary' },
-        { label: 'Manter e passar', value: 'keep', tone: 'ghost' },
+        { label: t('game.modal.drawDecision.playNow'), value: 'play', tone: 'primary' },
+        { label: t('game.modal.drawDecision.keepPass'), value: 'keep', tone: 'ghost' },
       ],
     });
 
@@ -874,8 +878,8 @@ export default class GameScene extends Phaser.Scene {
 
       this.isDrawDecisionSubmitting = true;
       this.socket.emit('card:draw-decision', payload);
-      this.pushLog('🫳 Você decidiu manter a carta comprada e passar a vez.');
-      this.setStatus('✅ Escolha enviada. Passando a vez...');
+      this.pushLog(t('game.log.keepDrawnCardPass'));
+      this.setStatus(t('game.status.choiceSentPassingTurn'));
       return;
     }
 
@@ -892,8 +896,8 @@ export default class GameScene extends Phaser.Scene {
 
     this.isDrawDecisionSubmitting = true;
     this.socket.emit('card:draw-decision', playPayload);
-    this.pushLog(`🔥 Você decidiu jogar a carta comprada (${drawnCard.color} ${drawnCard.value}).`);
-    this.setStatus('✅ Jogando carta comprada...');
+    this.pushLog(t('game.log.playDrawnCard', { color: drawnCard.color, value: drawnCard.value }));
+    this.setStatus(t('game.status.playingDrawnCard'));
   }
 
   private renderDrawDecisionCardPreview(container: HTMLElement, drawnCard: Card): void {
@@ -915,18 +919,18 @@ export default class GameScene extends Phaser.Scene {
 
     const title = document.createElement('p');
     title.className = 'ui-draw-decision-title';
-    title.textContent = 'Carta comprada';
+    title.textContent = t('game.modal.drawDecision.cardTitle');
 
     const description = document.createElement('p');
     description.className = 'ui-draw-decision-description';
-    description.textContent = `${COLOR_LABELS[drawnCard.color]} ${drawnCard.value}`;
+    description.textContent = `${getColorLabel(drawnCard.color)} ${drawnCard.value}`;
 
     details.append(title, description);
 
     if (drawnCard.color === 'wild') {
       const hint = document.createElement('p');
       hint.className = 'ui-draw-decision-hint';
-      hint.textContent = 'Se jogar agora, você vai escolher a cor em seguida.';
+      hint.textContent = t('game.modal.drawDecision.wildHint');
       details.appendChild(hint);
     }
 
@@ -940,15 +944,15 @@ export default class GameScene extends Phaser.Scene {
 
   private async promptLeaveRoom(): Promise<void> {
     if (!this.roomId) {
-      this.pushLog('Nenhuma sala ativa para sair.');
+      this.pushLog(t('game.log.noActiveRoomToLeave'));
       return;
     }
 
     const shouldLeave = await askConfirmation({
-      title: 'Sair da sala?',
-      message: 'Você perderá acesso à partida atual. Deseja continuar?',
-      confirmLabel: 'Sair',
-      cancelLabel: 'Ficar',
+      title: t('game.modal.leave.title'),
+      message: t('game.modal.leave.message'),
+      confirmLabel: t('game.modal.leave.confirm'),
+      cancelLabel: t('game.modal.leave.cancel'),
       confirmTone: 'danger',
     });
 
@@ -957,7 +961,7 @@ export default class GameScene extends Phaser.Scene {
     }
 
     this.isLeavingRoom = true;
-    this.pushLog('Saindo da sala...');
+    this.pushLog(t('game.log.leavingRoom'));
     this.hud?.update({ leaveEnabled: this.canLeaveRoom() });
     this.socket.emit('room:leave');
   }
@@ -1019,7 +1023,7 @@ export default class GameScene extends Phaser.Scene {
       startEnabled: this.canStartGame(),
       drawEnabled: this.canDrawCard(),
       roundInProgress: this.isRoundInProgress(),
-      currentTurn: INITIAL_TURN_MESSAGE,
+      currentTurn: getInitialTurnMessage(),
     };
   }
 
@@ -1044,9 +1048,12 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private getRoomLabel(): string {
-    return this.roomId ? `Sala atual: ${this.roomId}` : 'Nenhuma sala ativa.';
+    return this.roomId ? t('game.room.current', { roomId: this.roomId }) : t('game.room.none');
   }
 }
+
+
+
 
 
 

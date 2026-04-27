@@ -1,5 +1,6 @@
 import type { Card } from '../../types';
 import { phaserTheme, theme } from '../../theme/tokens';
+import { t } from '../../i18n';
 
 export const HUD_WIDTH = 360;
 export const HUD_MARGIN = 32;
@@ -17,11 +18,21 @@ export const PANEL_SECONDARY = theme.colors.status.info;
 export const FONT_FAMILY = '"Inter", system-ui, sans-serif';
 export const TEXT_RESOLUTION = Math.min(window.devicePixelRatio || 1, 2);
 
-export const INSTRUCTION_TEXT = 'P • jogar carta\nD • comprar carta';
+export function getInstructionText(): string {
+  return t('game.instructions');
+}
 
-export const INITIAL_STATUS_MESSAGE = 'Conectando...';
-export const EMPTY_PLAYER_LIST_MESSAGE = 'Nenhum jogador ainda.';
-export const INITIAL_TURN_MESSAGE = 'Aguardando jogo começar';
+export function getInitialStatusMessage(): string {
+  return t('game.status.connecting');
+}
+
+export function getEmptyPlayerListMessage(): string {
+  return t('game.players.none');
+}
+
+export function getInitialTurnMessage(): string {
+  return t('game.turn.waitingStart');
+}
 
 export const DEFAULT_CARD_DRAW_COUNT = 10;
 

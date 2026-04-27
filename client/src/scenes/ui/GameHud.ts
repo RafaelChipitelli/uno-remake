@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { phaserTheme, theme } from '../../theme/tokens';
+import { t } from '../../i18n';
 
 export type HudSnapshot = {
   status: string;
@@ -79,7 +80,7 @@ export default class GameHud {
       startEnabled: true,
       drawEnabled: false,
       roundInProgress: false,
-      currentTurn: 'Aguardando jogo começar',
+      currentTurn: t('game.turn.waitingStart'),
     };
   }
 
@@ -187,11 +188,11 @@ export default class GameHud {
         })
         .setResolution(this.options.textResolution);
 
-    const titleText = makeText('👤 Painel', compact ? 17 : 19, theme.colors.text.primary, '700');
+    const titleText = makeText(t('game.hud.panel'), compact ? 17 : 19, theme.colors.text.primary, '700');
     this.elements.push(titleText);
     y += titleText.height + spacing.m;
 
-    this.statusText = makeText(this.currentState.status || 'Conectando...', compact ? 13 : 14, theme.colors.text.primary, '600');
+    this.statusText = makeText(this.currentState.status || t('game.status.connecting'), compact ? 13 : 14, theme.colors.text.primary, '600');
     this.elements.push(this.statusText);
     y += this.statusText.height + spacing.s;
 
@@ -205,17 +206,17 @@ export default class GameHud {
     this.elements.push(this.roomLabelText);
     y += this.roomLabelText.height + spacing.m;
 
-    const controlsHeader = makeText('⚡ Ações', compact ? 13 : 14, theme.colors.text.muted, '600');
+    const controlsHeader = makeText(t('game.hud.actions'), compact ? 13 : 14, theme.colors.text.muted, '600');
     this.elements.push(controlsHeader);
     y += controlsHeader.height + spacing.s;
 
     const buttonWidth = innerWidth;
     const buttonHeight = compact ? 42 : 46;
-    this.startButton = this.createActionButton(innerX + buttonWidth / 2, y + buttonHeight / 2, buttonWidth, buttonHeight, 'Iniciar jogo', 'primary', () => this.callbacks.onStartRequested());
+    this.startButton = this.createActionButton(innerX + buttonWidth / 2, y + buttonHeight / 2, buttonWidth, buttonHeight, t('game.hud.start'), 'primary', () => this.callbacks.onStartRequested());
     y += buttonHeight + spacing.s;
-    this.drawButton = this.createActionButton(innerX + buttonWidth / 2, y + buttonHeight / 2, buttonWidth, buttonHeight, 'Comprar carta', 'secondary', () => this.callbacks.onDrawRequested());
+    this.drawButton = this.createActionButton(innerX + buttonWidth / 2, y + buttonHeight / 2, buttonWidth, buttonHeight, t('game.hud.draw'), 'secondary', () => this.callbacks.onDrawRequested());
     y += buttonHeight + spacing.s;
-    this.leaveButton = this.createActionButton(innerX + buttonWidth / 2, y + buttonHeight / 2, buttonWidth, buttonHeight, 'Sair da sala', 'danger', () => this.callbacks.onLeaveRequested());
+    this.leaveButton = this.createActionButton(innerX + buttonWidth / 2, y + buttonHeight / 2, buttonWidth, buttonHeight, t('game.hud.leaveRoom'), 'danger', () => this.callbacks.onLeaveRequested());
     y += buttonHeight + spacing.m;
 
     const instructions = this.scene.add
@@ -230,7 +231,7 @@ export default class GameHud {
     this.elements.push(instructions);
     y += instructions.height + spacing.m;
 
-    this.playersHeaderText = makeText('🧑‍🤝‍🧑 Jogadores', compact ? 13 : 14, theme.colors.text.muted, '600');
+    this.playersHeaderText = makeText(t('game.hud.players'), compact ? 13 : 14, theme.colors.text.muted, '600');
     this.elements.push(this.playersHeaderText);
     y += this.playersHeaderText.height + spacing.s;
 
@@ -247,7 +248,7 @@ export default class GameHud {
     this.elements.push(this.playerText);
     y += this.playerText.height + spacing.m;
 
-    this.logsHeaderText = makeText('📝 Log da partida', compact ? 13 : 14, theme.colors.text.muted, '600');
+    this.logsHeaderText = makeText(t('game.hud.log'), compact ? 13 : 14, theme.colors.text.muted, '600');
     this.elements.push(this.logsHeaderText);
     y += this.logsHeaderText.height + spacing.s;
 
@@ -284,7 +285,7 @@ export default class GameHud {
     const baseY = height - margin - bottomInset;
 
     this.statusText = this.scene.add
-      .text(width / 2, margin + 14, this.currentState.status || 'Conectando...', {
+      .text(width / 2, margin + 14, this.currentState.status || t('game.status.connecting'), {
         fontFamily: this.options.fontFamily,
         fontSize: `${Math.max(13, Math.round(14 * fontScale))}px`,
         color: theme.colors.text.primary,
@@ -302,7 +303,7 @@ export default class GameHud {
     const primaryX = startX + infoWidth + gap + primaryWidth / 2;
     const leaveX = startX + infoWidth + gap + primaryWidth + gap + leaveWidth / 2;
 
-    const infoButton = this.createActionButton(infoX, baseY, infoWidth, buttonHeight, this.overlayOpen ? 'Fechar' : 'Menu', 'secondary', () => {
+    const infoButton = this.createActionButton(infoX, baseY, infoWidth, buttonHeight, this.overlayOpen ? t('game.hud.overlay.close') : t('game.hud.overlay.menu'), 'secondary', () => {
       this.overlayOpen = !this.overlayOpen;
       this.build();
       this.refreshDynamicContent();
@@ -314,7 +315,7 @@ export default class GameHud {
       baseY,
       primaryWidth,
       buttonHeight,
-      primaryIsStart ? 'Iniciar' : 'Comprar',
+      primaryIsStart ? t('game.hud.overlay.startShort') : t('game.hud.overlay.drawShort'),
       'primary',
       () => {
         if (primaryIsStart) {
@@ -324,7 +325,7 @@ export default class GameHud {
         this.callbacks.onDrawRequested();
       },
     );
-    this.leaveButton = this.createActionButton(leaveX, baseY, leaveWidth, buttonHeight, 'Sair', 'danger', () => this.callbacks.onLeaveRequested());
+    this.leaveButton = this.createActionButton(leaveX, baseY, leaveWidth, buttonHeight, t('game.hud.overlay.leaveShort'), 'danger', () => this.callbacks.onLeaveRequested());
 
     this.applyButtonState(this.drawButton, primaryIsStart ? this.currentState.startEnabled : this.currentState.drawEnabled);
     this.applyButtonState(this.leaveButton, this.currentState.leaveEnabled);
@@ -356,7 +357,7 @@ export default class GameHud {
     let y = panelY + 14;
 
     const title = this.scene.add
-      .text(innerX, y, '📋 Sala e log', {
+      .text(innerX, y, t('game.hud.overlay.roomAndLog'), {
         fontFamily: this.options.fontFamily,
         fontSize: `${Math.max(14, Math.round(15 * fontScale))}px`,
         color: theme.colors.text.primary,
@@ -380,7 +381,7 @@ export default class GameHud {
       y + 22,
       innerW,
       44,
-      'Iniciar jogo',
+      t('game.hud.start'),
       'secondary',
       () => this.callbacks.onStartRequested(),
     );
@@ -388,7 +389,7 @@ export default class GameHud {
     y += 54;
 
     this.playersHeaderText = this.scene.add
-      .text(innerX, y, '🧑‍🤝‍🧑 Jogadores', {
+      .text(innerX, y, t('game.hud.players'), {
         fontFamily: this.options.fontFamily,
         fontSize: `${Math.max(12, Math.round(13 * fontScale))}px`,
         color: theme.colors.text.muted,
@@ -410,7 +411,7 @@ export default class GameHud {
     y += this.playerText.height + 10;
 
     this.logsHeaderText = this.scene.add
-      .text(innerX, y, '📝 Log', {
+      .text(innerX, y, t('game.hud.log'), {
         fontFamily: this.options.fontFamily,
         fontSize: `${Math.max(12, Math.round(13 * fontScale))}px`,
         color: theme.colors.text.muted,
@@ -453,7 +454,7 @@ export default class GameHud {
   }
 
   private refreshDynamicContent() {
-    this.statusText?.setText(this.currentState.status || 'Conectando...');
+    this.statusText?.setText(this.currentState.status || t('game.status.connecting'));
     this.roomLabelText?.setText(`🏷 ${this.currentState.roomLabel}`);
     this.playerText?.setText(this.getVisiblePlayerList());
     this.logsText?.setText(this.getVisibleLogText());
@@ -555,7 +556,7 @@ export default class GameHud {
   private getVisiblePlayerList(): string {
     const maxLines = this.getMaxPlayerLines();
     const lines = this.currentState.playerList.split('\n').filter(Boolean);
-    if (!lines.length) return 'Nenhum jogador ainda.';
+    if (!lines.length) return t('game.players.none');
     if (lines.length <= maxLines) return lines.join('\n');
     return `${lines.slice(0, maxLines).join('\n')}\n…`;
   }
@@ -563,7 +564,7 @@ export default class GameHud {
   private getVisibleLogText(): string {
     const maxLines = this.getMaxLogLines();
     const lines = this.currentState.logLines.slice(0, maxLines);
-    if (!lines.length) return '• Nenhuma ação ainda.';
+    if (!lines.length) return t('game.hud.log.empty');
     return lines.map((line) => `• ${line}`).join('\n');
   }
 

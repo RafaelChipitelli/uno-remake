@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
 import {
   CARD_COLOR_HEX,
-  COLOR_LABELS,
+  getColorLabel,
   SELECTABLE_WILD_COLORS,
   type SelectableColor,
 } from '../../game/colors';
 import { phaserTheme, theme } from '../../theme/tokens';
+import { t } from '../../i18n';
 
 type WildColorModalOptions = {
   fontFamily: string;
@@ -37,10 +38,22 @@ export function createWildColorModal(
 
   const width = scene.scale.width;
   const height = scene.scale.height;
-  const panelWidth = Math.min(620, width - 80);
-  const panelHeight = 220;
+  const isCompactLayout = width <= 560;
+  const panelWidth = Math.min(620, width - (isCompactLayout ? 40 : 80));
   const panelX = width / 2;
   const panelY = height / 2;
+
+  const buttonSize = isCompactLayout ? 80 : 96;
+  const buttonsPerRow = isCompactLayout ? 2 : SELECTABLE_WILD_COLORS.length;
+  const buttonHorizontalStep = isCompactLayout ? buttonSize + 18 : 120;
+  const buttonVerticalStep = isCompactLayout ? buttonSize + 18 : 0;
+  const totalRows = Math.ceil(SELECTABLE_WILD_COLORS.length / buttonsPerRow);
+  const titleOffsetY = isCompactLayout ? 94 : 70;
+  const firstRowY = panelY + (isCompactLayout ? -8 : 18);
+  const lastRowY = firstRowY + (totalRows - 1) * buttonVerticalStep;
+  const halfHeightFromTitle = titleOffsetY + 26;
+  const halfHeightFromButtons = (lastRowY - panelY) + buttonSize / 2 + 24;
+  const panelHeight = Math.max(isCompactLayout ? 280 : 220, Math.ceil(Math.max(halfHeightFromTitle, halfHeightFromButtons) * 2));
 
   const overlay = scene.add
     .rectangle(panelX, panelY, width, height, phaserTheme.colors.decor.overlay, 0.55)
@@ -55,7 +68,7 @@ export function createWildColorModal(
     .setDepth(2001);
 
   const title = scene.add
-    .text(panelX, panelY - 70, 'Escolha a cor do curinga', {
+    .text(panelX, panelY - titleOffsetY, t('game.wild.title'), {
       fontFamily: options.fontFamily,
       fontSize: '24px',
       color: theme.colors.text.primary,
@@ -67,12 +80,14 @@ export function createWildColorModal(
 
   elements.push(overlay, panel, title);
 
-  const buttonSize = 96;
-  const buttonSpacing = 120;
-
   SELECTABLE_WILD_COLORS.forEach((color, buttonIndex) => {
-    const x = panelX - ((SELECTABLE_WILD_COLORS.length - 1) * buttonSpacing) / 2 + buttonIndex * buttonSpacing;
-    const y = panelY + 18;
+    const rowIndex = Math.floor(buttonIndex / buttonsPerRow);
+    const columnIndex = buttonIndex % buttonsPerRow;
+    const rowStart = rowIndex * buttonsPerRow;
+    const rowItemCount = Math.min(buttonsPerRow, SELECTABLE_WILD_COLORS.length - rowStart);
+    const rowFirstX = panelX - ((rowItemCount - 1) * buttonHorizontalStep) / 2;
+    const x = rowFirstX + columnIndex * buttonHorizontalStep;
+    const y = firstRowY + rowIndex * buttonVerticalStep;
 
     const button = scene.add
       .rectangle(x, y, buttonSize, buttonSize, CARD_COLOR_HEX[color])
@@ -82,7 +97,7 @@ export function createWildColorModal(
       .setInteractive({ useHandCursor: true });
 
     const label = scene.add
-      .text(x, y, COLOR_LABELS[color], {
+      .text(x, y, getColorLabel(color), {
         fontFamily: options.fontFamily,
         fontSize: '14px',
         color: theme.colors.text.inverse,
