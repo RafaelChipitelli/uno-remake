@@ -7,6 +7,7 @@ import type {
   Room,
   RoomErrorPayload,
 } from '../../types';
+import { t } from '../../i18n';
 import type { GameStartedPayload } from './constants';
 
 export type GameSceneSocketCallbacks = {
@@ -46,18 +47,23 @@ export function describeCardActionEvent(
   colorLabels: Record<Card['color'], string>,
 ): string {
   if (event.action === 'draw' && event.drawReason === 'stack_penalty') {
-    const actor = event.playerId === myPlayerId ? 'Você' : event.nickname;
+    const actor = event.playerId === myPlayerId ? t('game.event.you') : event.nickname;
     const drawCount = event.drawCount ?? 0;
-    return `${actor} comprou ${drawCount} carta${drawCount === 1 ? '' : 's'} de penalidade acumulada`;
+    const cards = drawCount === 1 ? t('common.card.single') : t('common.card.plural');
+    return t('game.event.accumulatedPenaltyDraw', {
+      actor,
+      count: drawCount,
+      cards,
+    });
   }
 
-  const actor = event.playerId === myPlayerId ? 'Você' : event.nickname;
-  const actionVerb = event.action === 'play' ? 'jogou' : 'comprou';
+  const actor = event.playerId === myPlayerId ? t('game.event.you') : event.nickname;
+  const actionVerb = event.action === 'play' ? t('game.event.played') : t('game.event.drew');
   const cardLabel = event.card
     ? `${colorLabels[event.card.color]} ${event.card.value}`
     : event.action === 'draw' && typeof event.drawCount === 'number'
-      ? `${event.drawCount} carta${event.drawCount === 1 ? '' : 's'}`
-      : 'uma carta';
+      ? `${event.drawCount} ${event.drawCount === 1 ? t('common.card.single') : t('common.card.plural')}`
+      : t('game.event.oneCard');
 
   if (
     event.action === 'play' &&
@@ -65,7 +71,7 @@ export function describeCardActionEvent(
     event.currentColor &&
     event.currentColor !== 'wild'
   ) {
-    return `${actor} ${actionVerb} ${cardLabel} e escolheu ${colorLabels[event.currentColor]}`;
+    return `${actor} ${actionVerb} ${cardLabel} ${t('game.event.chose')} ${colorLabels[event.currentColor]}`;
   }
 
   return `${actor} ${actionVerb} ${cardLabel}`;

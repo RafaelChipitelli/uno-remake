@@ -3,6 +3,7 @@ import { CARD_COLOR_HEX } from '../../game/colors';
 import { getCardDisplayParts, getCardDisplayScale, getCardDisplayValue } from '../../game/cardDisplay';
 import { phaserTheme, theme } from '../../theme/tokens';
 import type { Card } from '../../types';
+import { t } from '../../i18n';
 
 type CardStageOptions = {
   hudWidth: number;
@@ -272,7 +273,7 @@ export default class CardStage {
       .setOrigin(0.5)
       .setStrokeStyle(1, phaserTheme.colors.surface.panelBorder, 0.9);
     this.turnIndicatorText = this.scene.add
-      .text(0, 0, '⏳ Aguardando turno...', {
+      .text(0, 0, t('game.stage.turn.waiting'), {
         fontFamily: this.options.fontFamily,
         fontSize: `${Math.round(clamp((this.options.compact ? 15 : 17) * (this.options.fontScale ?? 1), 12, 20))}px`,
         color: theme.colors.text.muted,
@@ -434,7 +435,7 @@ export default class CardStage {
 
     if (this.turnIndicatorPhase === 'in_progress' && this.isMyTurn) {
       this.turnIndicatorText
-        .setText('🔥 SUA VEZ DE JOGAR')
+        .setText(t('game.stage.turn.myTurn'))
         .setColor(theme.colors.status.success)
         .setFontStyle('700');
       this.turnIndicatorBg
@@ -457,7 +458,7 @@ export default class CardStage {
     }
 
     if (this.turnIndicatorPhase === 'waiting') {
-      const waitingText = '⏳ Aguardando o host iniciar o jogo';
+      const waitingText = t('game.stage.turn.waitingHost');
 
       this.turnIndicatorText
         .setText(waitingText)
@@ -479,7 +480,7 @@ export default class CardStage {
 
     if (this.turnIndicatorPhase === 'finished') {
       this.turnIndicatorText
-        .setText('🏁 Rodada encerrada')
+        .setText(t('game.stage.turn.finished'))
         .setColor(theme.colors.text.muted)
         .setFontStyle('600');
       this.turnIndicatorBg
@@ -497,8 +498,8 @@ export default class CardStage {
     }
 
     const waitingText = this.currentTurnNickname
-      ? `⏳ Vez de: ${this.currentTurnNickname}`
-      : '⏳ Aguardando turno...';
+      ? t('game.stage.turn.of', { nickname: this.currentTurnNickname })
+      : t('game.stage.turn.waiting');
     this.turnIndicatorText
       .setText(waitingText)
       .setColor(theme.colors.text.muted)

@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
 import {
   CARD_COLOR_HEX,
-  COLOR_LABELS,
+  getColorLabel,
   SELECTABLE_WILD_COLORS,
   type SelectableColor,
 } from '../../game/colors';
 import { phaserTheme, theme } from '../../theme/tokens';
+import { t } from '../../i18n';
 
 type WildColorModalOptions = {
   fontFamily: string;
@@ -55,7 +56,7 @@ export function createWildColorModal(
     .setDepth(2001);
 
   const title = scene.add
-    .text(panelX, panelY - 70, 'Escolha a cor do curinga', {
+    .text(panelX, panelY - 70, t('game.wild.title'), {
       fontFamily: options.fontFamily,
       fontSize: '24px',
       color: theme.colors.text.primary,
@@ -82,7 +83,7 @@ export function createWildColorModal(
       .setInteractive({ useHandCursor: true });
 
     const label = scene.add
-      .text(x, y, COLOR_LABELS[color], {
+      .text(x, y, getColorLabel(color), {
         fontFamily: options.fontFamily,
         fontSize: '14px',
         color: theme.colors.text.inverse,

@@ -10,6 +10,7 @@ import {
 } from '../services/playerAccount';
 import { phaserTheme, theme } from '../theme/tokens';
 import { askTextInput } from '../ui/modal';
+import { getLanguage, setLanguage, subscribeLanguageChange, t, type Language } from '../i18n';
 
 type ButtonConfig = {
   label: string;
@@ -33,6 +34,7 @@ export default class TitleScene extends Phaser.Scene {
   private lastNickname = '';
   private authSession: AuthSession = getCurrentAuthSession();
   private unsubscribeAuthSession?: () => void;
+  private unsubscribeLanguageChange?: () => void;
   private iconFloatBaseY = 0;
   private iconFloatContainer?: Phaser.GameObjects.Container;
   private isStartingGame = false;
@@ -60,6 +62,10 @@ export default class TitleScene extends Phaser.Scene {
       }
     });
 
+    this.unsubscribeLanguageChange = subscribeLanguageChange(() => {
+      this.buildLayout();
+    });
+
     this.scale.on('resize', this.handleResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off('resize', this.handleResize, this);
@@ -67,6 +73,8 @@ export default class TitleScene extends Phaser.Scene {
       this.resizeDebounceCall = undefined;
       this.unsubscribeAuthSession?.();
       this.unsubscribeAuthSession = undefined;
+      this.unsubscribeLanguageChange?.();
+      this.unsubscribeLanguageChange = undefined;
       this.clearLayout();
     });
   }
@@ -213,7 +221,7 @@ export default class TitleScene extends Phaser.Scene {
     cursorY += Math.max(unoText.height, remakeText.height) + intraBlockGap;
 
     const subtitle = this.add
-      .text(centerX, cursorY, 'Multiplayer em tempo real', {
+      .text(centerX, cursorY, t('title.subtitle'), {
         fontFamily: FONT,
         fontSize: subtitleSize,
         color: theme.colors.text.secondary,
@@ -287,7 +295,7 @@ export default class TitleScene extends Phaser.Scene {
     const primaryButtonY = cursorY + buttonHeight / 2;
     const needsLogin = isAuthenticationAvailable() && !this.authSession.user;
     this.createPrimaryActionButton(centerX, primaryButtonY, contentWidth, buttonHeight, primaryButtonFontSize, {
-      label: needsLogin ? '» Entrar' : '» Jogar',
+      label: needsLogin ? t('title.primary.enter') : t('title.primary.play'),
       onClick: () => (needsLogin ? this.handleGoogleSignIn() : this.handleQuickPlay()),
     });
     cursorY += buttonHeight + intraBlockGapMedium;
@@ -350,7 +358,7 @@ export default class TitleScene extends Phaser.Scene {
   private createTopRightSignOut() {
     const { width } = this.scale;
     const label = this.add
-      .text(width - 32, 28, 'Sair da Conta Google', {
+      .text(width - 32, 28, t('title.auth.signOutGoogle'), {
         fontFamily: FONT,
         fontSize: '13px',
         color: theme.colors.text.muted,
@@ -377,6 +385,8 @@ export default class TitleScene extends Phaser.Scene {
     this.staticElements.push(label);
     this.buttons.push(zone);
     this.actionElements.push(label);
+
+    this.createLanguageSelector(width - 32, 52);
   }
 
   private createTopRightAuthStatus() {
@@ -386,7 +396,7 @@ export default class TitleScene extends Phaser.Scene {
 
     const { width } = this.scale;
     this.authStatusText = this.add
-      .text(width - 32, 46, 'Verificando sessão de login...', {
+      .text(width - 32, 46, t('title.auth.checkingSession'), {
         fontFamily: FONT,
         fontSize: '13px',
         color: theme.colors.text.muted,
@@ -397,6 +407,49 @@ export default class TitleScene extends Phaser.Scene {
 
     this.staticElements.push(this.authStatusText);
     this.actionElements.push(this.authStatusText);
+  }
+
+  private createLanguageSelector(anchorRightX: number, y: number): void {
+    const activeLanguage = getLanguage();
+    const items: Array<{ language: Language; flag: string; offsetX: number }> = [
+      { language: 'pt-BR', flag: t('language.flag.br'), offsetX: -22 },
+      { language: 'en-US', flag: t('language.flag.us'), offsetX: 0 },
+    ];
+
+    items.forEach((item) => {
+      const isActive = item.language === activeLanguage;
+      const label = this.add
+        .text(anchorRightX + item.offsetX, y, item.flag, {
+          fontFamily: FONT,
+          fontSize: '18px',
+          color: isActive ? theme.colors.text.primary : theme.colors.text.muted,
+        })
+        .setOrigin(1, 0)
+        .setAlpha(isActive ? 1 : 0.8)
+        .setResolution(TEXT_RESOLUTION);
+
+      const zone = this.add
+        .zone(label.x - label.width / 2, label.y + label.height / 2, label.width + 8, label.height + 8)
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
+
+      zone.on('pointerup', () => {
+        setLanguage(item.language);
+        this.showToast(t('title.language.changed'));
+      });
+
+      zone.on('pointerover', () => {
+        label.setColor(theme.colors.text.primary);
+      });
+
+      zone.on('pointerout', () => {
+        label.setColor(isActive ? theme.colors.text.primary : theme.colors.text.muted);
+      });
+
+      this.staticElements.push(label);
+      this.buttons.push(zone);
+      this.actionElements.push(label);
+    });
   }
 
   private createBackgroundDecorations(width: number, height: number) {
@@ -636,7 +689,7 @@ export default class TitleScene extends Phaser.Scene {
     }
 
     if (isAuthenticationAvailable() && !this.authSession.user) {
-      this.showInfo('Faça login com Google para jogar e salvar progresso.');
+      this.showInfo(t('title.auth.loginToPlay'));
       return;
     }
 
@@ -648,22 +701,22 @@ export default class TitleScene extends Phaser.Scene {
       if (autoAction === 'join') {
         roomCode = (
           await askTextInput({
-            title: 'Entrar com código',
-            message: 'Digite o código da sala para entrar no jogo.',
-            placeholder: 'Ex: ABCD',
-            confirmLabel: 'Entrar',
-            cancelLabel: 'Cancelar',
+            title: t('title.joinRoom.title'),
+            message: t('title.joinRoom.message'),
+            placeholder: t('title.joinRoom.placeholder'),
+            confirmLabel: t('title.joinRoom.confirm'),
+            cancelLabel: t('title.common.cancel'),
           })
         )?.trim().toUpperCase();
         if (!roomCode) {
-          this.showInfo('Informe um código válido.');
+          this.showInfo(t('title.joinRoom.invalidCode'));
           return;
         }
       }
 
       const nickname = await this.promptNickname();
       if (!nickname && isAuthenticationAvailable()) {
-        this.showInfo('Não foi possível iniciar sem nickname.');
+        this.showInfo(t('title.start.noNickname'));
         return;
       }
 
@@ -690,40 +743,40 @@ export default class TitleScene extends Phaser.Scene {
 
   private getSecondaryButtonConfigs(): ButtonConfig[] {
     return [
-      { label: 'Criar Sala Privada', tone: 'secondary', onClick: () => this.handleCreateRoom() },
-      { label: 'Entrar com Código', tone: 'secondary', onClick: () => this.handleJoinRoom() },
+      { label: t('title.secondary.createPrivate'), tone: 'secondary', onClick: () => this.handleCreateRoom() },
+      { label: t('title.secondary.joinCode'), tone: 'secondary', onClick: () => this.handleJoinRoom() },
     ];
   }
 
   private getIdentityDetails(): { nickname: string; statsLabel: string; hint?: string } {
     if (!isAuthenticationAvailable()) {
       return {
-        nickname: this.lastNickname || 'Jogador convidado',
-        statsLabel: 'Partidas: 0 • Vitórias: 0',
-        hint: 'Firebase não configurado no .env.local. Login e estatísticas ficam desativados.',
+        nickname: this.lastNickname || t('title.identity.guest'),
+        statsLabel: t('title.identity.stats.empty'),
+        hint: t('title.identity.hint.firebaseDisabled'),
       };
     }
 
     if (this.authSession.isLoading) {
       return {
-        nickname: 'Carregando perfil...',
-        statsLabel: 'Partidas: -- • Vitórias: --',
+        nickname: t('title.identity.loadingProfile'),
+        statsLabel: t('title.identity.stats.loading'),
       };
     }
 
     if (!this.authSession.user) {
       return {
-        nickname: this.lastNickname || 'Jogador',
-        statsLabel: 'Partidas: 0 • Vitórias: 0',
-        hint: 'Faça login com Google para salvar nickname e estatísticas.',
+        nickname: this.lastNickname || t('title.identity.player'),
+        statsLabel: t('title.identity.stats.empty'),
+        hint: t('title.identity.hint.loginForStats'),
       };
     }
 
-    const nickname = this.authSession.profile?.nickname ?? this.authSession.user.displayName ?? 'Jogador';
+    const nickname = this.authSession.profile?.nickname ?? this.authSession.user.displayName ?? t('title.identity.player');
     const stats = this.authSession.profile?.stats;
     const statsLabel = stats
-      ? `Partidas: ${stats.gamesPlayed} • Vitórias: ${stats.gamesWon}`
-      : 'Partidas: 0 • Vitórias: 0';
+      ? t('title.identity.stats.dynamic', { gamesPlayed: stats.gamesPlayed, gamesWon: stats.gamesWon })
+      : t('title.identity.stats.empty');
 
     return {
       nickname,
@@ -733,16 +786,16 @@ export default class TitleScene extends Phaser.Scene {
 
   private getDefaultInfoMessage(): string {
     if (isAuthenticationAvailable() && !this.authSession.user) {
-      return 'Entre com Google para continuar';
+      return t('title.info.loginRequired');
     }
 
-    return 'Escolha uma opção para continuar';
+    return t('title.info.chooseOption');
   }
 
   private async handleGoogleSignIn(): Promise<void> {
     try {
       await signInWithGoogle();
-      this.showToast('Conectado com sucesso');
+      this.showToast(t('title.auth.connectedSuccess'));
     } catch (error) {
       console.error('[auth] Falha no login com Google', error);
       this.showInfo(this.getGoogleSignInErrorMessage(error));
@@ -794,31 +847,29 @@ export default class TitleScene extends Phaser.Scene {
 
     switch (code) {
       case 'auth/unauthorized-domain':
-        return 'Domínio não autorizado no Firebase. Adicione localhost (e 127.0.0.1, se usar) em Authentication > Settings > Authorized domains.';
+        return t('title.auth.error.unauthorizedDomain');
       case 'auth/operation-not-allowed':
-        return 'Login Google desativado no Firebase. Ative em Authentication > Sign-in method > Google.';
+        return t('title.auth.error.operationNotAllowed');
       case 'auth/popup-blocked':
-        return 'O navegador bloqueou o popup de login. Permita popups para este site e tente novamente.';
+        return t('title.auth.error.popupBlocked');
       case 'auth/popup-closed-by-user':
-        return 'Popup de login fechado antes de concluir. Tente novamente.';
+        return t('title.auth.error.popupClosed');
       case 'auth/cancelled-popup-request':
-        return 'Tentativa anterior de popup foi cancelada. Tente clicar no botão novamente.';
+        return t('title.auth.error.cancelledPopup');
       case 'auth/network-request-failed':
-        return 'Falha de rede ao conectar com Firebase. Verifique internet/VPN/firewall e tente novamente.';
+        return t('title.auth.error.network');
       default:
-        return code
-          ? `Não foi possível fazer login com Google (${code}). Veja o console para mais detalhes.`
-          : 'Não foi possível fazer login com Google. Veja o console para mais detalhes.';
+        return code ? t('title.auth.error.withCode', { code }) : t('title.auth.error.default');
     }
   }
 
   private async handleGoogleSignOut(): Promise<void> {
     try {
       await signOutCurrentUser();
-      this.showInfo('Você saiu da conta Google.');
+      this.showInfo(t('title.auth.signedOut'));
     } catch (error) {
       console.error('[auth] Falha ao sair da conta', error);
-      this.showInfo('Não foi possível sair da conta agora.');
+      this.showInfo(t('title.auth.signOutError'));
     }
   }
 
@@ -849,12 +900,12 @@ export default class TitleScene extends Phaser.Scene {
 
       const input =
         (await askTextInput({
-          title: 'Escolha seu nickname',
-          message: 'Esse nome aparecerá para os outros jogadores na sala.',
-          placeholder: 'Digite seu nickname',
+          title: t('title.nickname.title'),
+          message: t('title.nickname.message.auth'),
+          placeholder: t('title.nickname.placeholder'),
           initialValue: fallbackNickname,
-          confirmLabel: 'Continuar',
-          cancelLabel: 'Cancelar',
+          confirmLabel: t('title.nickname.confirm'),
+          cancelLabel: t('title.common.cancel'),
         })) ?? '';
       const finalNickname = input || fallbackNickname;
 
@@ -869,7 +920,7 @@ export default class TitleScene extends Phaser.Scene {
           await updateCurrentUserNickname(finalNickname);
         } catch (error) {
           console.error('[auth] Falha ao atualizar nickname no Firestore', error);
-          this.showInfo('Nickname aplicado localmente, mas não foi salvo na nuvem.');
+          this.showInfo(t('title.nickname.cloudSaveFailed'));
         }
       }
 
@@ -878,12 +929,12 @@ export default class TitleScene extends Phaser.Scene {
 
     const input =
       (await askTextInput({
-        title: 'Escolha seu nickname',
-        message: 'Digite o nome que será mostrado na partida.',
-        placeholder: 'Digite seu nickname',
+        title: t('title.nickname.title'),
+        message: t('title.nickname.message.guest'),
+        placeholder: t('title.nickname.placeholder'),
         initialValue: this.lastNickname || 'Player',
-        confirmLabel: 'Continuar',
-        cancelLabel: 'Cancelar',
+        confirmLabel: t('title.nickname.confirm'),
+        cancelLabel: t('title.common.cancel'),
       })) ?? '';
     if (input) {
       this.lastNickname = input;
