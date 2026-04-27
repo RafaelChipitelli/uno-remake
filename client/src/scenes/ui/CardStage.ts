@@ -65,6 +65,9 @@ function clamp(value: number, min: number, max: number) {
 export default class CardStage {
   private static readonly CARD_HOVER_OFFSET_Y = 16;
   private static readonly HAND_SCROLL_STEP = 1;
+  private static readonly MOBILE_HUD_BUTTON_HEIGHT = 50;
+  private static readonly MOBILE_HUD_BOTTOM_INSET = 24;
+  private static readonly MOBILE_HAND_SAFE_GAP = 14;
 
   private scene: Phaser.Scene;
   private options: CardStageOptions;
@@ -657,12 +660,27 @@ export default class CardStage {
     cardGap: number;
     maxVisible: number;
   } {
-    const baseY = this.scene.scale.height - (this.options.handBottomOffset ?? 92);
+    const viewportHeight = this.scene.scale.height;
+    const baseYRaw = viewportHeight - (this.options.handBottomOffset ?? 92);
     const isCompact = Boolean(this.options.compact);
     const cardWidth = clamp(74 * (this.options.tableCardScale ?? 1), isCompact ? 48 : 54, 90);
     const cardHeight = cardWidth * 1.42;
     const cardGap = clamp(10 * (this.options.tableCardScale ?? 1), 6, 14);
     const maxVisible = clamp(Math.floor(metrics.stageWidth / (cardWidth + cardGap)), 4, 11);
+
+    let baseY = baseYRaw;
+    if (this.options.hudMode === 'overlay') {
+      const overlayButtonsTopY =
+        viewportHeight -
+        this.options.hudMargin -
+        CardStage.MOBILE_HUD_BOTTOM_INSET -
+        CardStage.MOBILE_HUD_BUTTON_HEIGHT / 2;
+      const maxSafeBaseY =
+        overlayButtonsTopY -
+        CardStage.MOBILE_HAND_SAFE_GAP -
+        cardHeight / 2;
+      baseY = Math.min(baseYRaw, maxSafeBaseY);
+    }
 
     return { baseY, cardWidth, cardHeight, cardGap, maxVisible };
   }
