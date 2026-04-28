@@ -1,16 +1,20 @@
 # UNO Remake
 
-Protótipo de jogo multiplayer em tempo real inspirado em UNO, com:
+Protótipo multiplayer em tempo real inspirado em UNO, com foco em partidas rápidas entre amigos.
+
+## 🟢 Fase atual do projeto
+
+Estamos em uma fase de **alpha funcional**: o loop principal da partida já está implementado e jogável, com sincronização em tempo real entre clientes.
 
 - **Cliente:** Phaser 3 + Vite + TypeScript
 - **Servidor:** Node.js + Express + Socket.IO + TypeScript
 - **Opcional (cliente):** Firebase Auth (Google) + Firestore para perfil/estatísticas
 
-Este README foi pensado para quem chegou agora no repositório e quer entender rápido **o que já existe** e **como rodar localmente**.
+Em resumo: já dá para criar sala, jogar rodada completa e encerrar com vencedor; agora o foco está em completar regras restantes do UNO e polir a experiência.
 
 ---
 
-## 📌 O que já está funcionando
+## 📌 Status atual (o que já funciona)
 
 - Criação e entrada em salas com código curto.
 - Lobby e partida sincronizados em tempo real via Socket.IO.
@@ -28,15 +32,16 @@ Este README foi pensado para quem chegou agora no repositório e quer entender r
   - `+4`: próximo jogador compra 4 e perde a vez
 - Condição de vitória: quando alguém zera a mão, a rodada termina e o vencedor é anunciado.
 - Health-check REST: `GET /health`.
+- Login com Google e persistência de perfil/estatísticas em Firestore (**opcional**, no cliente).
 
 ---
 
-## 🧩 Em evolução (próximas melhorias)
+## 🧩 Em evolução (prioridades atuais)
 
 - Regra de UNO (anúncio e penalidade).
 - Reciclagem automática do descarte quando o baralho acabar.
-- Polimento visual/animações e UX da mesa.
-- Modos extras (pontuação por rodada, timer, bots etc.).
+- Polimento visual/animações, UX da mesa e refinamentos de responsividade.
+- Modos extras (pontuação por rodada, timer, bots, matchmaking etc.).
 
 ---
 
@@ -122,6 +127,8 @@ Cliente: `http://localhost:5173`
 
 Para testar multiplayer local, abra duas abas (ou dois navegadores) e entre na mesma sala.
 
+> Dica: para detalhes específicos de cada app, consulte também `client/README.md` e `server/README.md`.
+
 ---
 
 ## 🎮 Controles básicos no jogo
@@ -202,10 +209,22 @@ Se quiser habilitar login Google e persistência de perfil/estatísticas:
 
 ---
 
-## 🛣️ Roadmap sugerido
+## 🛣️ Roadmap por fases
+
+### Fase atual — Alpha jogável (concluída em grande parte)
+
+- Salas multiplayer e partida em tempo real.
+- Regras principais de turno, compra e cartas especiais.
+- Encerramento de rodada com vencedor.
+
+### Próxima fase — Regras completas + robustez
 
 1. Regra de UNO (chamada + punição).
 2. Reaproveitamento do descarte quando o draw pile zerar.
-3. Melhorias de UX/animações de jogada e turno.
-4. Sistema de pontuação por rodada e histórico.
-5. Bots e/ou matchmaking expandido.
+3. Ajustes adicionais de consistência de estado e UX de feedback.
+
+### Fase seguinte — Expansão de produto
+
+1. Sistema de pontuação por rodada e histórico.
+2. Modos de jogo (timer, variações de regras, ranked/casual).
+3. Bots e/ou matchmaking expandido.
