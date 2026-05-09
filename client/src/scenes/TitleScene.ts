@@ -21,6 +21,8 @@ type ButtonConfig = {
 const FONT = '"Inter", system-ui, sans-serif';
 const TEXT_RESOLUTION = Math.min(window.devicePixelRatio || 1, 2);
 const DECOR_DEPTH = -10;
+const MAX_NICKNAME_LENGTH = 20;
+const NICKNAME_INPUT_LABEL = 'Username';
 
 export default class TitleScene extends Phaser.Scene {
   private staticElements: Phaser.GameObjects.GameObject[] = [];
@@ -31,6 +33,9 @@ export default class TitleScene extends Phaser.Scene {
   private actionElements: Phaser.GameObjects.GameObject[] = [];
   private infoText?: Phaser.GameObjects.Text;
   private authStatusText?: Phaser.GameObjects.Text;
+  private nicknameInput?: HTMLInputElement;
+  private nicknameInputWrapper?: HTMLDivElement;
+  private nicknameOutsidePointerHandler?: (event: PointerEvent) => void;
   private lastNickname = '';
   private authSession: AuthSession = getCurrentAuthSession();
   private unsubscribeAuthSession?: () => void;
@@ -234,31 +239,13 @@ export default class TitleScene extends Phaser.Scene {
 
     const profileBoxWidth = contentWidth;
     const profileBoxHeight = inputBlockHeight;
-    const profileShadow = this.add
-      .rectangle(
-        centerX,
-        cursorY + profileBoxHeight / 2 + 3,
-        profileBoxWidth,
-        profileBoxHeight,
-        phaserTheme.colors.decor.shadowDeep,
-        0.42,
-      )
-      .setOrigin(0.5);
-    const profileBox = this.add
-      .rectangle(centerX, cursorY + profileBoxHeight / 2, profileBoxWidth, profileBoxHeight, phaserTheme.colors.surface.card, 0.92)
-      .setStrokeStyle(1, phaserTheme.colors.surface.panelBorder, 0.9)
-      .setOrigin(0.5);
-    const profileName = this.add
-      .text(centerX - profileBoxWidth / 2 + 14, cursorY + profileBoxHeight / 2, identity.nickname, {
-        fontFamily: FONT,
-        fontSize: `${inputFontSize}px`,
-        color: theme.colors.text.primary,
-        fontStyle: '600',
-      })
-      .setOrigin(0, 0.5)
-      .setResolution(TEXT_RESOLUTION);
-    this.staticElements.push(profileShadow, profileBox, profileName);
-    this.subtitleElements.push(profileShadow, profileBox, profileName);
+    this.createNicknameInput(
+      centerX,
+      cursorY + profileBoxHeight / 2,
+      profileBoxWidth,
+      profileBoxHeight,
+      inputFontSize,
+    );
     cursorY += profileBoxHeight + intraBlockGap;
 
     const statsLine = this.add
@@ -293,10 +280,9 @@ export default class TitleScene extends Phaser.Scene {
     }
 
     const primaryButtonY = cursorY + buttonHeight / 2;
-    const needsLogin = isAuthenticationAvailable() && !this.authSession.user;
     this.createPrimaryActionButton(centerX, primaryButtonY, contentWidth, buttonHeight, primaryButtonFontSize, {
-      label: needsLogin ? t('title.primary.enter') : t('title.primary.play'),
-      onClick: () => (needsLogin ? this.handleGoogleSignIn() : this.handleQuickPlay()),
+      label: t('title.primary.play'),
+      onClick: () => this.handleQuickPlay(),
     });
     cursorY += buttonHeight + intraBlockGapMedium;
 
@@ -343,9 +329,7 @@ export default class TitleScene extends Phaser.Scene {
     this.staticElements.push(this.infoText);
     this.subtitleElements.push(this.infoText);
 
-    if (isAuthenticationAvailable() && this.authSession.user) {
-      this.createTopRightSignOut();
-    }
+    this.createTopRightAccountActions();
     this.createTopRightAuthStatus();
 
     if (!this.hasPlayedInitialEntry) {
@@ -353,6 +337,54 @@ export default class TitleScene extends Phaser.Scene {
       this.hasPlayedInitialEntry = true;
     }
     this.startIconFloating();
+  }
+
+  private createTopRightAccountActions() {
+    if (isAuthenticationAvailable() && this.authSession.user) {
+      this.createTopRightSignOut();
+      return;
+    }
+
+    if (isAuthenticationAvailable()) {
+      this.createTopRightSignIn();
+      return;
+    }
+
+    this.createLanguageSelector(this.scale.width - 32, 28);
+  }
+
+  private createTopRightSignIn() {
+    const { width } = this.scale;
+    const label = this.add
+      .text(width - 32, 28, t('title.auth.signInGoogle'), {
+        fontFamily: FONT,
+        fontSize: '13px',
+        color: theme.colors.text.muted,
+      })
+      .setOrigin(1, 0)
+      .setResolution(TEXT_RESOLUTION);
+
+    const zone = this.add
+      .zone(label.x - label.width / 2, label.y + label.height / 2, label.width + 8, label.height + 8)
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    zone.on('pointerover', () => {
+      label.setColor(theme.colors.text.primary);
+      this.tweens.add({ targets: label, alpha: 1, duration: 150, ease: 'Sine.easeOut' });
+    });
+    zone.on('pointerout', () => {
+      label.setColor(theme.colors.text.muted);
+    });
+    zone.on('pointerup', () => {
+      void this.handleGoogleSignIn();
+    });
+
+    this.staticElements.push(label);
+    this.buttons.push(zone);
+    this.actionElements.push(label);
+
+    this.createLanguageSelector(width - 32, 52);
   }
 
   private createTopRightSignOut() {
@@ -688,11 +720,6 @@ export default class TitleScene extends Phaser.Scene {
       return;
     }
 
-    if (isAuthenticationAvailable() && !this.authSession.user) {
-      this.showInfo(t('title.auth.loginToPlay'));
-      return;
-    }
-
     this.isStartingGame = true;
     this.setButtonsEnabled(false);
 
@@ -714,8 +741,8 @@ export default class TitleScene extends Phaser.Scene {
         }
       }
 
-      const nickname = await this.promptNickname();
-      if (!nickname && isAuthenticationAvailable()) {
+      const nickname = await this.ensureNicknameForPlay();
+      if (!nickname) {
         this.showInfo(t('title.start.noNickname'));
         return;
       }
@@ -751,7 +778,7 @@ export default class TitleScene extends Phaser.Scene {
   private getIdentityDetails(): { nickname: string; statsLabel: string; hint?: string } {
     if (!isAuthenticationAvailable()) {
       return {
-        nickname: this.lastNickname || t('title.identity.guest'),
+        nickname: this.getPreferredNickname(),
         statsLabel: t('title.identity.stats.empty'),
         hint: t('title.identity.hint.firebaseDisabled'),
       };
@@ -759,20 +786,20 @@ export default class TitleScene extends Phaser.Scene {
 
     if (this.authSession.isLoading) {
       return {
-        nickname: t('title.identity.loadingProfile'),
+        nickname: this.getPreferredNickname(),
         statsLabel: t('title.identity.stats.loading'),
       };
     }
 
     if (!this.authSession.user) {
       return {
-        nickname: this.lastNickname || t('title.identity.player'),
+        nickname: this.getPreferredNickname(),
         statsLabel: t('title.identity.stats.empty'),
         hint: t('title.identity.hint.loginForStats'),
       };
     }
 
-    const nickname = this.authSession.profile?.nickname ?? this.authSession.user.displayName ?? t('title.identity.player');
+    const nickname = this.getPreferredNickname();
     const stats = this.authSession.profile?.stats;
     const statsLabel = stats
       ? t('title.identity.stats.dynamic', { gamesPlayed: stats.gamesPlayed, gamesWon: stats.gamesWon })
@@ -785,10 +812,6 @@ export default class TitleScene extends Phaser.Scene {
   }
 
   private getDefaultInfoMessage(): string {
-    if (isAuthenticationAvailable() && !this.authSession.user) {
-      return t('title.info.loginRequired');
-    }
-
     return t('title.info.chooseOption');
   }
 
@@ -886,65 +909,156 @@ export default class TitleScene extends Phaser.Scene {
     }
   }
 
-  private async promptNickname(): Promise<string | undefined> {
-    if (isAuthenticationAvailable()) {
-      const profileNickname = this.authSession.profile?.nickname;
+  private sanitizeNickname(rawNickname: string | null | undefined): string {
+    return rawNickname?.trim().slice(0, MAX_NICKNAME_LENGTH) ?? '';
+  }
 
-      if (profileNickname?.trim()) {
-        this.lastNickname = profileNickname.trim();
-        return this.lastNickname;
-      }
+  private sanitizeNicknameDraft(rawNickname: string | null | undefined): string {
+    return rawNickname?.slice(0, MAX_NICKNAME_LENGTH) ?? '';
+  }
 
-      const fallbackNickname =
-        profileNickname ?? this.authSession.user?.displayName ?? this.lastNickname ?? 'Player';
+  private getPreferredNickname(): string {
+    return this.sanitizeNickname(
+      this.lastNickname || this.authSession.profile?.nickname || this.authSession.user?.displayName || 'Player',
+    );
+  }
 
-      const input =
-        (await askTextInput({
-          title: t('title.nickname.title'),
-          message: t('title.nickname.message.auth'),
-          placeholder: t('title.nickname.placeholder'),
-          initialValue: fallbackNickname,
-          confirmLabel: t('title.nickname.confirm'),
-          cancelLabel: t('title.common.cancel'),
-        })) ?? '';
-      const finalNickname = input || fallbackNickname;
+  private createNicknameInput(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    fontSize: number,
+  ): void {
+    this.destroyNicknameInput();
 
-      if (!finalNickname) {
-        return undefined;
-      }
-
-      this.lastNickname = finalNickname;
-
-      if (finalNickname !== profileNickname && this.authSession.user) {
-        try {
-          await updateCurrentUserNickname(finalNickname);
-        } catch (error) {
-          console.error('[auth] Falha ao atualizar nickname no Firestore', error);
-          this.showInfo(t('title.nickname.cloudSaveFailed'));
-        }
-      }
-
-      return finalNickname;
+    const appRoot = document.getElementById('app');
+    if (!appRoot) {
+      return;
     }
 
-    const input =
-      (await askTextInput({
-        title: t('title.nickname.title'),
-        message: t('title.nickname.message.guest'),
-        placeholder: t('title.nickname.placeholder'),
-        initialValue: this.lastNickname || 'Player',
-        confirmLabel: t('title.nickname.confirm'),
-        cancelLabel: t('title.common.cancel'),
-      })) ?? '';
-    if (input) {
-      this.lastNickname = input;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'title-form-control';
+    wrapper.style.left = `${x - width / 2}px`;
+    wrapper.style.top = `${y - height / 2 - 8}px`;
+    wrapper.style.width = `${width}px`;
+
+    const input = document.createElement('input');
+    input.type = 'value';
+    input.maxLength = MAX_NICKNAME_LENGTH;
+    input.value = '';
+    input.style.fontSize = `${fontSize}px`;
+    input.setAttribute('aria-label', t('title.nickname.title'));
+    input.required = true;
+
+    const label = document.createElement('label');
+    label.setAttribute('aria-hidden', 'true');
+
+    [...NICKNAME_INPUT_LABEL].forEach((letter, index) => {
+      const span = document.createElement('span');
+      span.textContent = letter;
+      span.style.transitionDelay = `${index * 50}ms`;
+      label.appendChild(span);
+    });
+
+    const syncFilledState = () => {
+      wrapper.classList.toggle('is-filled', this.sanitizeNickname(input.value).length > 0);
+    };
+
+    input.addEventListener('input', () => {
+      const sanitizedDraft = this.sanitizeNicknameDraft(input.value);
+      if (input.value !== sanitizedDraft) {
+        input.value = sanitizedDraft;
+      }
+      this.lastNickname = this.sanitizeNickname(input.value);
+      syncFilledState();
+    });
+
+    input.addEventListener('blur', syncFilledState);
+    input.addEventListener('focus', syncFilledState);
+
+    input.addEventListener('keydown', (event) => {
+      event.stopPropagation();
+      if (event.key === 'Enter') {
+        input.blur();
+      }
+    });
+
+    input.addEventListener('pointerdown', (event) => {
+      event.stopPropagation();
+    });
+
+    this.nicknameOutsidePointerHandler = (event: PointerEvent) => {
+      if (!this.nicknameInput || !this.nicknameInputWrapper) {
+        return;
+      }
+
+      const target = event.target;
+      if (target instanceof Node && this.nicknameInputWrapper.contains(target)) {
+        return;
+      }
+
+      this.nicknameInput.blur();
+    };
+    window.addEventListener('pointerdown', this.nicknameOutsidePointerHandler);
+
+    wrapper.append(input, label);
+    appRoot.appendChild(wrapper);
+
+    this.nicknameInputWrapper = wrapper;
+    this.nicknameInput = input;
+    this.lastNickname = this.sanitizeNickname(input.value);
+    syncFilledState();
+  }
+
+  private destroyNicknameInput(): void {
+    if (this.nicknameOutsidePointerHandler) {
+      window.removeEventListener('pointerdown', this.nicknameOutsidePointerHandler);
+      this.nicknameOutsidePointerHandler = undefined;
+    }
+    this.nicknameInputWrapper?.remove();
+    this.nicknameInput = undefined;
+    this.nicknameInputWrapper = undefined;
+  }
+
+  private getNicknameInputValue(): string {
+    return this.sanitizeNickname(this.nicknameInput?.value ?? this.lastNickname);
+  }
+
+  private generateRandomNickname(): string {
+    return `Player-${Phaser.Math.Between(1000, 9999)}`;
+  }
+
+  private async ensureNicknameForPlay(): Promise<string | undefined> {
+    let nickname = this.getNicknameInputValue();
+    if (!nickname) {
+      nickname = this.generateRandomNickname();
+      if (this.nicknameInput) {
+        this.nicknameInput.value = nickname;
+        this.nicknameInputWrapper?.classList.add('is-filled');
+      }
     }
 
-    return input || undefined;
+    this.lastNickname = nickname;
+    if (this.nicknameInput && this.nicknameInput.value !== nickname) {
+      this.nicknameInput.value = nickname;
+    }
+
+    if (this.authSession.user && nickname !== this.authSession.profile?.nickname) {
+      try {
+        await updateCurrentUserNickname(nickname);
+      } catch (error) {
+        console.error('[auth] Falha ao atualizar nickname no Firestore', error);
+        this.showInfo(t('title.nickname.cloudSaveFailed'));
+      }
+    }
+
+    return nickname;
   }
 
   private clearLayout() {
     this.tweens.killAll();
+    this.destroyNicknameInput();
     this.staticElements.forEach((el) => el.destroy());
     this.buttons.forEach((btn) => btn.destroy());
     this.staticElements = [];

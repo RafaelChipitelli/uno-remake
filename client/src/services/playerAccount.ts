@@ -65,7 +65,7 @@ function sanitizeNickname(rawNickname: string | null | undefined): string {
     return '';
   }
 
-  return nickname.slice(0, 24);
+  return nickname.slice(0, 20);
 }
 
 function getDefaultNickname(user: User): string {
