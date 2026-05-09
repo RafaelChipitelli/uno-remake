@@ -3,7 +3,7 @@ import express from 'express';
 import { Server } from 'socket.io';
 import { CLIENT_ORIGIN, SERVER_PORT } from './config/env';
 import { createUnoDeck, isValidCardPlay, shuffleDeck } from './core/cards';
-import { drawCardsForPlayer } from './core/draw';
+import { drawCardsForPlayer, refillDrawPileFromDiscard } from './core/draw';
 import { createActionEvent } from './core/events';
 import { getNextPlayer } from './core/players';
 import { generateRoomCode, normalizeRoomCode } from './core/roomCode';
@@ -459,8 +459,13 @@ io.on('connection', (socket) => {
     }
 
     const deck = store.serverDecks.get(actor.roomId);
-    if (!room || !deck || deck.length === 0) {
+    if (!deck) {
       socket.emit('room:error', { message: 'O baralho está vazio ou não foi encontrado!' });
+      return;
+    }
+
+    if (!refillDrawPileFromDiscard(deck, room)) {
+      socket.emit('room:error', { message: 'Não há cartas suficientes no descarte para formar um novo baralho.' });
       return;
     }
 
@@ -707,6 +712,7 @@ app.get('/health', (_req, res) => {
 server.listen(SERVER_PORT, () => {
   console.log(`Server listening on http://localhost:${SERVER_PORT}`);
 });
+
 
 
 
