@@ -117,7 +117,7 @@ export default class TitleScene extends Phaser.Scene {
     // ETAPA 6.3 — relative type scale hierarchy (rem based)
     const titleSize = Math.round(Phaser.Math.Clamp(rem * 3.4, 3.2 * 16, 3.8 * 16));
     const subtitleSize = Math.round(rem * 1);
-    const inputFontSize = Math.round(rem * 0.95);
+    const inputFontSize = Math.max(16, Math.round(rem * 0.95));
     const primaryButtonFontSize = Math.round(rem * 1.2);
     const secondaryButtonFontSize = Math.round(rem * 0.85);
     const metaTextSize = Math.round(rem * 0.8);
@@ -944,7 +944,7 @@ export default class TitleScene extends Phaser.Scene {
     wrapper.style.width = `${width}px`;
 
     const input = document.createElement('input');
-    input.type = 'value';
+    input.type = 'text';
     input.maxLength = MAX_NICKNAME_LENGTH;
     input.value = '';
     input.style.fontSize = `${fontSize}px`;
