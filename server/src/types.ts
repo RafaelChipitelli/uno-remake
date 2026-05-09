@@ -1,5 +1,7 @@
 // Estruturas compartilhadas entre servidor e cliente
 export type CardColor = 'red' | 'green' | 'blue' | 'yellow' | 'wild';
+export type CardKind = 'number' | 'action' | 'wild' | 'custom';
+export type CustomPowerId = 'draw-multiplier-x2' | 'draw-shield';
 export type GameStatus = 'waiting' | 'in_progress' | 'finished';
 export type RoomVisibility = 'public' | 'private';
 
@@ -7,6 +9,8 @@ export interface Card {
   id: string;
   color: CardColor;
   value: string; // números ou ações customizadas
+  kind?: CardKind;
+  powerId?: CustomPowerId;
 }
 
 export interface Player {

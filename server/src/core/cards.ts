@@ -1,4 +1,5 @@
 import type { Card } from '../types';
+import { createCustomCards, isDrawMultiplierCard, isDrawShieldCard } from './customCards';
 
 const STANDARD_COLORS: Array<Exclude<Card['color'], 'wild'>> = ['red', 'green', 'blue', 'yellow'];
 const NUMBER_AND_ACTION_VALUES = [
@@ -33,9 +34,11 @@ export function createUnoDeck(): Card[] {
   }
 
   for (let index = 0; index < 4; index += 1) {
-    deck.push({ id: createCardId(['wild', 'color', index]), color: 'wild', value: 'wild' });
-    deck.push({ id: createCardId(['wild', '+4', index]), color: 'wild', value: '+4' });
+    deck.push({ id: createCardId(['wild', 'color', index]), color: 'wild', value: 'wild', kind: 'wild' });
+    deck.push({ id: createCardId(['wild', '+4', index]), color: 'wild', value: '+4', kind: 'wild' });
   }
+
+  deck.push(...createCustomCards(createCardId));
 
   return deck;
 }
@@ -52,6 +55,10 @@ export function shuffleDeck(deck: Card[]): Card[] {
 }
 
 export function isValidCardPlay(card: Card, topCard: Card, currentColor: Card['color']): boolean {
+  if (isDrawMultiplierCard(card) || isDrawShieldCard(card)) {
+    return false;
+  }
+
   if (card.color === 'wild') {
     return true;
   }

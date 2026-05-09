@@ -6,6 +6,8 @@ type CardDisplayParts = {
 const ACTION_CARD_DISPLAY_VALUES: Record<string, CardDisplayParts> = {
   reverse: { label: 'REV', symbol: '↺' },
   skip: { label: 'SKIP', symbol: '⊘' },
+  x2: { label: 'COMPRA', symbol: 'x2' },
+  shield: { label: 'ESCUDO', symbol: '🛡' },
 };
 
 export function getCardDisplayParts(value: string): CardDisplayParts {

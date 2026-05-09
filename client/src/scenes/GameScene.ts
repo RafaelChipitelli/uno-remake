@@ -6,6 +6,7 @@ import { getColorLabel, getColorLabels, type SelectableColor } from '../game/col
 import {
   canStackOverPendingDraw,
   getFirstPlayableCardIndex,
+  isCustomDrawReactionCard,
   isStackDrawCard,
   isValidCardPlay,
 } from '../game/rules';
@@ -550,12 +551,12 @@ export default class GameScene extends Phaser.Scene {
 
     const pendingStackForMe = this.pendingStackDrawForMe;
     if (pendingStackForMe) {
-      if (!isStackDrawCard(card)) {
+      if (!isStackDrawCard(card) && !isCustomDrawReactionCard(card)) {
         this.pushLog(t('game.log.penaltyMustPlayOrDraw', { amount: pendingStackForMe.amount }));
         return;
       }
 
-      if (!canStackOverPendingDraw(card, pendingStackForMe.topCardValue)) {
+      if (isStackDrawCard(card) && !canStackOverPendingDraw(card, pendingStackForMe.topCardValue)) {
         this.pushLog(t('game.log.invalidStackPlusTwoOnPlusFour'));
         return;
       }
@@ -579,7 +580,7 @@ export default class GameScene extends Phaser.Scene {
     const topCard = this.cardStage?.getTableCard();
     const currentColor = this.cardStage?.getCurrentColor();
 
-    if (topCard && currentColor && !isValidCardPlay(card, topCard, currentColor)) {
+    if (!pendingStackForMe && topCard && currentColor && !isValidCardPlay(card, topCard, currentColor)) {
       this.pushLog(t('game.log.invalidPlay'));
       return;
     }
@@ -1051,6 +1052,7 @@ export default class GameScene extends Phaser.Scene {
     return this.roomId ? t('game.room.current', { roomId: this.roomId }) : t('game.room.none');
   }
 }
+
 
 
 

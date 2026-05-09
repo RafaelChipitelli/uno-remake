@@ -3,6 +3,7 @@ import express from 'express';
 import { Server } from 'socket.io';
 import { CLIENT_ORIGIN, SERVER_PORT } from './config/env';
 import { createUnoDeck, isValidCardPlay, shuffleDeck } from './core/cards';
+import { isCustomDrawReactionCard, isDrawMultiplierCard, isDrawShieldCard } from './core/customCards';
 import { drawCardsForPlayer, refillDrawPileFromDiscard } from './core/draw';
 import { createActionEvent } from './core/events';
 import { getNextPlayer } from './core/players';
@@ -38,6 +39,10 @@ const STARTING_HAND_SIZE = 10;
 
 function isStackDrawCardValue(value: string): value is '+2' | '+4' {
   return value === '+2' || value === '+4';
+}
+
+function isStackDrawCard(card: Card): boolean {
+  return isStackDrawCardValue(card.value);
 }
 
 function canStackOverPendingDraw(cardValue: string, pendingTopCardValue: '+2' | '+4'): boolean {
@@ -141,7 +146,18 @@ io.on('connection', (socket) => {
         break;
       }
       default:
-        delete room.pendingStackDraw;
+        if (isDrawMultiplierCard(playedCard)) {
+          if (room.pendingStackDraw) {
+            room.pendingStackDraw.amount *= 2;
+            room.pendingStackDraw.targetPlayerId = getNextPlayer(room, currentPlayerIndex)?.id ?? room.pendingStackDraw.targetPlayerId;
+          }
+          stepsToAdvance = 1;
+        } else if (isDrawShieldCard(playedCard)) {
+          delete room.pendingStackDraw;
+          stepsToAdvance = 1;
+        } else {
+          delete room.pendingStackDraw;
+        }
         break;
     }
 
@@ -386,14 +402,14 @@ io.on('connection', (socket) => {
         return;
       }
 
-      if (!isStackDrawCardValue(payload.card.value)) {
+      if (!isStackDrawCard(payload.card) && !isCustomDrawReactionCard(payload.card)) {
         socket.emit('room:error', {
-          message: `Você precisa jogar +2/+4 ou comprar ${pendingStackDraw.amount} cartas de penalidade.`,
+          message: `Você precisa jogar +2/+4, Compra x2, Escudo ou comprar ${pendingStackDraw.amount} cartas de penalidade.`,
         });
         return;
       }
 
-      if (!canStackOverPendingDraw(payload.card.value, pendingStackDraw.topCardValue)) {
+      if (isStackDrawCard(payload.card) && !canStackOverPendingDraw(payload.card.value, pendingStackDraw.topCardValue)) {
         socket.emit('room:error', {
           message: 'Não é permitido jogar +2 em cima de +4 na pilha de compra.',
         });
@@ -712,6 +728,7 @@ app.get('/health', (_req, res) => {
 server.listen(SERVER_PORT, () => {
   console.log(`Server listening on http://localhost:${SERVER_PORT}`);
 });
+
 
 
 

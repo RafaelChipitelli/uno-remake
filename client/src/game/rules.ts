@@ -4,6 +4,18 @@ export function isStackDrawCard(card: Card): boolean {
   return card.value === '+2' || card.value === '+4';
 }
 
+export function isDrawMultiplierCard(card: Card): boolean {
+  return card.powerId === 'draw-multiplier-x2' || card.value === 'x2';
+}
+
+export function isDrawShieldCard(card: Card): boolean {
+  return card.powerId === 'draw-shield' || card.value === 'shield';
+}
+
+export function isCustomDrawReactionCard(card: Card): boolean {
+  return isDrawMultiplierCard(card) || isDrawShieldCard(card);
+}
+
 export function canStackOverPendingDraw(card: Card, pendingTopCardValue: '+2' | '+4'): boolean {
   if (card.value === '+4') {
     return true;
@@ -16,6 +28,10 @@ export function canStackOverPendingDraw(card: Card, pendingTopCardValue: '+2' | 
  * Regras básicas de validação de jogada no UNO.
  */
 export function isValidCardPlay(card: Card, topCard: Card, currentColor: Card['color']): boolean {
+  if (isCustomDrawReactionCard(card)) {
+    return false;
+  }
+
   if (card.color === 'wild') {
     return true;
   }
@@ -42,7 +58,11 @@ export function getFirstPlayableCardIndex(
   }
 
   if (pendingStackTopCardValue) {
-    return hand.findIndex((card) => isStackDrawCard(card) && canStackOverPendingDraw(card, pendingStackTopCardValue));
+    return hand.findIndex(
+      (card) =>
+        (isStackDrawCard(card) && canStackOverPendingDraw(card, pendingStackTopCardValue)) ||
+        isCustomDrawReactionCard(card),
+    );
   }
 
   if (!topCard || !currentColor) {
