@@ -98,6 +98,7 @@ export const translations = {
     'game.stage.turn.waitingHost': '⏳ Aguardando o host iniciar o jogo',
     'game.stage.turn.finished': '🏁 Rodada encerrada',
     'game.stage.turn.of': '⏳ Vez de: {nickname}',
+    'game.stage.hand.swipeHint': 'Deslize para ver mais cartas',
 
     'game.wild.title': 'Escolha a cor do curinga',
 
@@ -264,6 +265,7 @@ export const translations = {
     'game.stage.turn.waitingHost': '⏳ Waiting for host to start the game',
     'game.stage.turn.finished': '🏁 Round finished',
     'game.stage.turn.of': '⏳ Turn: {nickname}',
+    'game.stage.hand.swipeHint': 'Swipe to see more cards',
 
     'game.wild.title': 'Choose wild card color',
 

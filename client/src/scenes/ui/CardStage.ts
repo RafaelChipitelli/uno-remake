@@ -103,10 +103,13 @@ export default class CardStage {
   private turnIndicatorBg?: Phaser.GameObjects.Rectangle;
   private turnIndicatorText?: Phaser.GameObjects.Text;
   private turnIndicatorPulseTween?: Phaser.Tweens.Tween;
+  private handNavLeftBg?: Phaser.GameObjects.Ellipse;
+  private handNavRightBg?: Phaser.GameObjects.Ellipse;
   private handNavLeft?: Phaser.GameObjects.Text;
   private handNavRight?: Phaser.GameObjects.Text;
   private handHiddenLeftCount?: Phaser.GameObjects.Text;
   private handHiddenRightCount?: Phaser.GameObjects.Text;
+  private handSwipeHint?: Phaser.GameObjects.Text;
 
   private opponentViews: OpponentView[] = [];
   private wheelListenerRegistered = false;
@@ -302,56 +305,101 @@ export default class CardStage {
     this.allObjects.push(this.turnIndicatorContainer);
     this.syncTurnIndicator();
 
+    this.handNavLeftBg = this.scene.add
+      .ellipse(0, 0, 42, 42, phaserTheme.colors.decor.overlay, 0.74)
+      .setStrokeStyle(2, phaserTheme.colors.text.inverse, 0.72)
+      .setDepth(20)
+      .setVisible(false)
+      .setInteractive({ useHandCursor: true });
+
+    this.handNavRightBg = this.scene.add
+      .ellipse(0, 0, 42, 42, phaserTheme.colors.decor.overlay, 0.74)
+      .setStrokeStyle(2, phaserTheme.colors.text.inverse, 0.72)
+      .setDepth(20)
+      .setVisible(false)
+      .setInteractive({ useHandCursor: true });
+
     this.handNavLeft = this.scene.add
-      .text(0, 0, '<', {
+      .text(0, 0, '‹', {
         fontFamily: this.options.fontFamily,
-        fontSize: `${Math.round(clamp(28 * (this.options.fontScale ?? 1), 20, 34))}px`,
+        fontSize: `${Math.round(clamp(36 * (this.options.fontScale ?? 1), 28, 42))}px`,
         color: theme.colors.text.primary,
-        fontStyle: '700',
+        fontStyle: '800',
       })
       .setOrigin(0.5)
+      .setDepth(21)
       .setResolution(this.options.textResolution)
       .setInteractive({ useHandCursor: true });
 
     this.handNavRight = this.scene.add
-      .text(0, 0, '>', {
+      .text(0, 0, '›', {
         fontFamily: this.options.fontFamily,
-        fontSize: `${Math.round(clamp(28 * (this.options.fontScale ?? 1), 20, 34))}px`,
+        fontSize: `${Math.round(clamp(36 * (this.options.fontScale ?? 1), 28, 42))}px`,
         color: theme.colors.text.primary,
-        fontStyle: '700',
+        fontStyle: '800',
       })
       .setOrigin(0.5)
+      .setDepth(21)
       .setResolution(this.options.textResolution)
       .setInteractive({ useHandCursor: true });
 
+    this.handNavLeftBg.on('pointerup', () => this.shiftHandWindow(-1));
+    this.handNavRightBg.on('pointerup', () => this.shiftHandWindow(1));
     this.handNavLeft.on('pointerup', () => this.shiftHandWindow(-1));
     this.handNavRight.on('pointerup', () => this.shiftHandWindow(1));
 
     this.handHiddenLeftCount = this.scene.add
       .text(0, 0, '0', {
         fontFamily: this.options.fontFamily,
-        fontSize: `${Math.round(clamp(11 * (this.options.fontScale ?? 1), 9, 13))}px`,
-        color: theme.colors.text.muted,
-        fontStyle: '500',
+        fontSize: `${Math.round(clamp(13 * (this.options.fontScale ?? 1), 11, 15))}px`,
+        color: theme.colors.text.primary,
+        fontStyle: '800',
       })
       .setOrigin(0.5)
-      .setAlpha(0.75)
+      .setAlpha(0.95)
+      .setDepth(22)
+      .setPadding(6, 2, 6, 2)
+      .setBackgroundColor('rgba(7, 10, 20, 0.86)')
       .setResolution(this.options.textResolution)
       .setVisible(false);
 
     this.handHiddenRightCount = this.scene.add
       .text(0, 0, '0', {
         fontFamily: this.options.fontFamily,
-        fontSize: `${Math.round(clamp(11 * (this.options.fontScale ?? 1), 9, 13))}px`,
-        color: theme.colors.text.muted,
-        fontStyle: '500',
+        fontSize: `${Math.round(clamp(13 * (this.options.fontScale ?? 1), 11, 15))}px`,
+        color: theme.colors.text.primary,
+        fontStyle: '800',
       })
       .setOrigin(0.5)
-      .setAlpha(0.75)
+      .setAlpha(0.95)
+      .setDepth(22)
+      .setPadding(6, 2, 6, 2)
+      .setBackgroundColor('rgba(7, 10, 20, 0.86)')
       .setResolution(this.options.textResolution)
       .setVisible(false);
 
-    this.allObjects.push(this.handNavLeft, this.handNavRight, this.handHiddenLeftCount, this.handHiddenRightCount);
+    this.handSwipeHint = this.scene.add
+      .text(0, 0, t('game.stage.hand.swipeHint'), {
+        fontFamily: this.options.fontFamily,
+        fontSize: `${Math.round(clamp(12 * (this.options.fontScale ?? 1), 10, 14))}px`,
+        color: theme.colors.text.muted,
+        fontStyle: '600',
+      })
+      .setOrigin(0.5)
+      .setDepth(19)
+      .setAlpha(0.92)
+      .setResolution(this.options.textResolution)
+      .setVisible(false);
+
+    this.allObjects.push(
+      this.handNavLeftBg,
+      this.handNavRightBg,
+      this.handNavLeft,
+      this.handNavRight,
+      this.handHiddenLeftCount,
+      this.handHiddenRightCount,
+      this.handSwipeHint,
+    );
 
     this.createOpponentSlots();
   }
@@ -613,26 +661,46 @@ export default class CardStage {
     totalWidth: number,
     maxStart: number,
   ): void {
-    if (!this.handNavLeft || !this.handNavRight || !this.handHiddenLeftCount || !this.handHiddenRightCount) {
+    if (
+      !this.handNavLeftBg ||
+      !this.handNavRightBg ||
+      !this.handNavLeft ||
+      !this.handNavRight ||
+      !this.handHiddenLeftCount ||
+      !this.handHiddenRightCount ||
+      !this.handSwipeHint
+    ) {
       return;
     }
 
     const hasOverflow = maxStart > 0;
     if (!hasOverflow) {
+      this.handNavLeftBg.setVisible(false).disableInteractive();
+      this.handNavRightBg.setVisible(false).disableInteractive();
       this.handNavLeft.setVisible(false).disableInteractive();
       this.handNavRight.setVisible(false).disableInteractive();
       this.handHiddenLeftCount.setVisible(false);
       this.handHiddenRightCount.setVisible(false);
+      this.handSwipeHint.setVisible(false);
       return;
     }
 
     const leftEdge = metrics.stageX - totalWidth / 2;
     const rightEdge = metrics.stageX + totalWidth / 2;
-    const y = baseY;
+    const y = baseY - cardHeight * 0.05;
     const offset = cardWidth * 0.75;
+    const isCompact = Boolean(this.options.compact) || this.options.hudMode === 'overlay';
+    const navSize = isCompact ? 46 : 42;
+    const safeInset = navSize / 2 + 8;
+    const leftRawX = isCompact ? leftEdge + navSize * 0.35 : leftEdge - offset;
+    const rightRawX = isCompact ? rightEdge - navSize * 0.35 : rightEdge + offset;
+    const leftX = clamp(leftRawX, metrics.stageLeft + safeInset, metrics.stageRight - safeInset);
+    const rightX = clamp(rightRawX, metrics.stageLeft + safeInset, metrics.stageRight - safeInset);
 
-    this.handNavLeft.setPosition(leftEdge - offset, y).setVisible(true);
-    this.handNavRight.setPosition(rightEdge + offset, y).setVisible(true);
+    this.handNavLeftBg.setPosition(leftX, y).setSize(navSize, navSize).setVisible(true);
+    this.handNavRightBg.setPosition(rightX, y).setSize(navSize, navSize).setVisible(true);
+    this.handNavLeft.setPosition(leftX, y - 2).setVisible(true);
+    this.handNavRight.setPosition(rightX, y - 2).setVisible(true);
 
     const canGoLeft = this.handWindowStart > 0;
     const canGoRight = this.handWindowStart < maxStart;
@@ -640,31 +708,37 @@ export default class CardStage {
     const hiddenRightCount = maxStart - this.handWindowStart;
 
     if (canGoLeft) {
+      this.handNavLeftBg.setAlpha(0.92).setInteractive({ useHandCursor: true });
       this.handNavLeft.setAlpha(1).setInteractive({ useHandCursor: true });
     } else {
+      this.handNavLeftBg.setAlpha(0.26).disableInteractive();
       this.handNavLeft.setAlpha(0.35).disableInteractive();
     }
 
     if (canGoRight) {
+      this.handNavRightBg.setAlpha(0.92).setInteractive({ useHandCursor: true });
       this.handNavRight.setAlpha(1).setInteractive({ useHandCursor: true });
     } else {
+      this.handNavRightBg.setAlpha(0.26).disableInteractive();
       this.handNavRight.setAlpha(0.35).disableInteractive();
     }
 
     this.handNavLeft.setScale(1);
     this.handNavRight.setScale(1);
-    this.handNavLeft.setY(y - cardHeight * 0.05);
-    this.handNavRight.setY(y - cardHeight * 0.05);
 
-    const countOffsetY = cardHeight * 0.27;
+    const countOffsetY = cardHeight * 0.32;
     this.handHiddenLeftCount
       .setPosition(this.handNavLeft.x, this.handNavLeft.y + countOffsetY)
-      .setText(String(hiddenLeftCount))
-      .setVisible(true);
+      .setText(`+${hiddenLeftCount}`)
+      .setVisible(hiddenLeftCount > 0);
     this.handHiddenRightCount
       .setPosition(this.handNavRight.x, this.handNavRight.y + countOffsetY)
-      .setText(String(hiddenRightCount))
-      .setVisible(true);
+      .setText(`+${hiddenRightCount}`)
+      .setVisible(hiddenRightCount > 0);
+
+    this.handSwipeHint
+      .setPosition(metrics.stageX, baseY - cardHeight * 0.72)
+      .setVisible(isCompact);
   }
 
   private getHandLayout(metrics: StageMetrics): {
@@ -1031,8 +1105,11 @@ export default class CardStage {
     this.turnIndicatorText = undefined;
     this.handNavLeft = undefined;
     this.handNavRight = undefined;
+    this.handNavLeftBg = undefined;
+    this.handNavRightBg = undefined;
     this.handHiddenLeftCount = undefined;
     this.handHiddenRightCount = undefined;
+    this.handSwipeHint = undefined;
   }
 
   private unregisterWheelNavigationListener(): void {
