@@ -7,6 +7,7 @@ import { isCustomDrawReactionCard, isDrawMultiplierCard, isDrawShieldCard } from
 import { drawCardsForPlayer, refillDrawPileFromDiscard } from './core/draw';
 import { createActionEvent } from './core/events';
 import { getNextPlayer } from './core/players';
+import { canDeclareUno, resolveUnoAfterPlay } from './core/uno';
 import { generateRoomCode, normalizeRoomCode } from './core/roomCode';
 import { passTurnToNextPlayer } from './core/turns';
 import { emitRoomState, removePlayerFromRoom } from './state/roomState';
@@ -105,6 +106,20 @@ io.on('connection', (socket) => {
 
       console.log(`[game:end] ${actor.nickname} venceu na sala ${actor.roomId}`);
       return { gameEnded: true };
+    }
+
+    const unoOutcome = resolveUnoAfterPlay(actor.hand.length, Boolean(actor.calledUno));
+    if (unoOutcome.penalty > 0 && actor.roomId) {
+      drawCardsForPlayer(store.serverDecks, actor.roomId, room, actor, unoOutcome.penalty);
+      io.to(actor.roomId).emit('uno:penalty', {
+        playerId: actor.id,
+        nickname: actor.nickname,
+        cards: unoOutcome.penalty,
+      });
+      console.log(`[uno:penalty] ${actor.nickname} esqueceu o UNO (+${unoOutcome.penalty}) na sala ${actor.roomId}`);
+    }
+    if (unoOutcome.cleared) {
+      actor.calledUno = false;
     }
 
     const currentPlayerIndex = room.players.findIndex((roomPlayer) => roomPlayer.id === actor.id);
@@ -345,6 +360,28 @@ io.on('connection', (socket) => {
     console.log(`[room:join] ${player.nickname} entrou na sala ${roomCode}`);
   });
 
+  socket.on('uno:declare', () => {
+    const player = store.players.get(socket.id);
+    if (!player?.roomId) {
+      return;
+    }
+    const room = store.rooms.get(player.roomId);
+    if (!room || room.gameStatus !== 'in_progress') {
+      return;
+    }
+    if (!canDeclareUno(player.hand.length)) {
+      socket.emit('room:error', { message: 'Você só pode chamar UNO com 1 ou 2 cartas na mão.' });
+      return;
+    }
+
+    player.calledUno = true;
+    io.to(player.roomId).emit('uno:called', {
+      playerId: player.id,
+      nickname: player.nickname,
+    });
+    console.log(`[uno:declare] ${player.nickname} chamou UNO na sala ${player.roomId}`);
+  });
+
   socket.on('room:leave', () => {
     const player = store.players.get(socket.id);
     if (!player?.roomId) {
@@ -492,6 +529,7 @@ io.on('connection', (socket) => {
     }
 
     actor.hand.push(drawnCard);
+    actor.calledUno = false;
     room.drawPileCount = deck.length;
 
     const topCard = room.discardPile[room.discardPile.length - 1];

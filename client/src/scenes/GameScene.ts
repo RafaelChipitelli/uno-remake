@@ -125,6 +125,13 @@ export default class GameScene extends Phaser.Scene {
       onRoomError: (payload) => this.handleRoomError(payload),
       onRoomLeft: () => this.handleRoomLeft(),
       onConnectError: (err) => this.handleConnectError(err),
+      onUnoCalled: ({ playerId, nickname }) =>
+        this.pushLog(
+          playerId === this.player?.id
+            ? t('game.uno.youDeclared')
+            : t('game.uno.declared', { nickname }),
+        ),
+      onUnoPenalty: ({ nickname, cards }) => this.pushLog(t('game.uno.penalty', { nickname, cards })),
     });
   }
 
@@ -492,6 +499,11 @@ export default class GameScene extends Phaser.Scene {
 
     keyboard.on('keydown-P', this.handlePlayCardShortcut, this);
     keyboard.on('keydown-D', this.handleDrawCard, this);
+    keyboard.on('keydown-U', this.handleDeclareUno, this);
+  }
+
+  private handleDeclareUno(): void {
+    this.socket.emit('uno:declare');
   }
 
   private unregisterKeyboardShortcuts(): void {
@@ -502,6 +514,7 @@ export default class GameScene extends Phaser.Scene {
 
     keyboard.off('keydown-P', this.handlePlayCardShortcut, this);
     keyboard.off('keydown-D', this.handleDrawCard, this);
+    keyboard.off('keydown-U', this.handleDeclareUno, this);
   }
 
   private tryAutoAction(): void {
