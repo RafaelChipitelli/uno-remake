@@ -160,21 +160,41 @@ export default class TitleScene extends Phaser.Scene {
 
     const iconContainer = this.add.container(centerX, cursorY + iconRadius);
     const iconGlow = this.add.ellipse(0, 4, iconRadius * 2.8, iconRadius * 1.8, phaserTheme.colors.action.primary.base, 0.2);
-    const cardBackLeft = this.add
-      .rectangle(-16, 2, iconRadius * 1.1, iconRadius * 1.5, phaserTheme.colors.decor.cardBackLeft, 0.95)
-      .setStrokeStyle(2, phaserTheme.colors.action.secondary.base, 0.45)
-      .setAngle(-20)
-      .setOrigin(0.5);
-    const cardBackRight = this.add
-      .rectangle(14, 3, iconRadius * 1.1, iconRadius * 1.5, phaserTheme.colors.decor.cardBackRight, 0.95)
-      .setStrokeStyle(2, phaserTheme.colors.action.secondary.hover, 0.45)
-      .setAngle(16)
-      .setOrigin(0.5);
-    const cardFront = this.add
-      .rectangle(0, -2, iconRadius * 1.2, iconRadius * 1.65, phaserTheme.colors.action.primary.base, 1)
-      .setStrokeStyle(2, phaserTheme.colors.text.inverse, 0.75)
-      .setAngle(-8)
-      .setOrigin(0.5);
+    const makeRoundedCard = (
+      offsetX: number,
+      offsetY: number,
+      w: number,
+      h: number,
+      fill: number,
+      fillAlpha: number,
+      strokeColor: number,
+      strokeAlpha: number,
+      angle: number,
+    ): Phaser.GameObjects.Graphics => {
+      const r = Math.round(Math.min(w, h) * 0.22);
+      const g = this.add.graphics();
+      g.fillStyle(fill, fillAlpha);
+      g.fillRoundedRect(-w / 2, -h / 2, w, h, r);
+      g.lineStyle(2, strokeColor, strokeAlpha);
+      g.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
+      g.setPosition(offsetX, offsetY).setAngle(angle);
+      return g;
+    };
+    const cardBackLeft = makeRoundedCard(
+      -16, 2, iconRadius * 1.1, iconRadius * 1.5,
+      phaserTheme.colors.decor.cardBackLeft, 0.95,
+      phaserTheme.colors.action.secondary.base, 0.45, -20,
+    );
+    const cardBackRight = makeRoundedCard(
+      14, 3, iconRadius * 1.1, iconRadius * 1.5,
+      phaserTheme.colors.decor.cardBackRight, 0.95,
+      phaserTheme.colors.action.secondary.hover, 0.45, 16,
+    );
+    const cardFront = makeRoundedCard(
+      0, -2, iconRadius * 1.2, iconRadius * 1.65,
+      phaserTheme.colors.action.primary.base, 1,
+      phaserTheme.colors.text.inverse, 0.75, -8,
+    );
     const cardFrontMark = this.add
       .ellipse(0, -2, iconRadius * 0.95, iconRadius * 0.45, phaserTheme.colors.text.inverse, 0.18)
       .setAngle(-22);
@@ -508,9 +528,16 @@ export default class TitleScene extends Phaser.Scene {
       { x: width * 0.66, y: height + 44, w: 96, h: 136, color: phaserTheme.colors.action.secondary.base, angle: 28, label: 'DECK' },
     ];
 
-    this.staticElements.push(leftGlow, rightGlow);
+    // Deep radial vignette darkening the edges, like Richup's lobby backdrop.
+    const vignette = this.add.graphics().setDepth(DECOR_DEPTH - 5);
+    vignette.fillStyle(phaserTheme.colors.decor.shadowDeep, 0.55);
+    vignette.fillRect(0, 0, width, height);
+    vignette.fillStyle(phaserTheme.colors.bg.canvas, 0.92);
+    vignette.fillEllipse(width / 2, height * 0.46, width * 1.05, height * 1.15);
 
-    ambientDecor.forEach((item) => {
+    this.staticElements.push(vignette, leftGlow, rightGlow);
+
+    ambientDecor.forEach((item, index) => {
       const symbol = this.add
         .text(item.x, item.y, item.text, {
           fontFamily: FONT,
@@ -523,6 +550,15 @@ export default class TitleScene extends Phaser.Scene {
         .setAngle(item.angle)
         .setResolution(TEXT_RESOLUTION)
         .setDepth(DECOR_DEPTH);
+      this.tweens.add({
+        targets: symbol,
+        y: item.y - 14,
+        angle: item.angle + 3,
+        duration: 3600 + index * 420,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
       this.staticElements.push(symbol);
     });
 
@@ -595,54 +631,7 @@ export default class TitleScene extends Phaser.Scene {
     fontSize: number,
     config: ButtonConfig,
   ) {
-    const palette = {
-      base: phaserTheme.colors.action.primary.base,
-      hover: phaserTheme.colors.action.primary.hover,
-      border: phaserTheme.colors.action.primary.border,
-      shadow: phaserTheme.colors.action.primary.shadow,
-    };
-    const shadow = this.add.rectangle(x, y + 4, width, height, palette.shadow, 0.45).setOrigin(0.5);
-
-    const buttonRect = this.add
-      .rectangle(x, y, width, height, palette.base, 0.9)
-      .setStrokeStyle(1, palette.border, 0.8)
-      .setOrigin(0.5);
-    const label = this.add
-      .text(x, y, config.label, {
-        fontFamily: FONT,
-        fontSize,
-        color: theme.colors.text.inverse,
-        fontStyle: '700',
-      })
-      .setOrigin(0.5)
-      .setResolution(TEXT_RESOLUTION);
-
-    const zone = this.add
-      .zone(x, y, width, height)
-      .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
-
-    zone.on('pointerover', () => {
-      buttonRect.setFillStyle(palette.hover);
-      this.tweens.add({ targets: [buttonRect, label, shadow], y: '-=2', scaleX: 1.02, scaleY: 1.02, duration: 200, ease: 'Quad.easeOut' });
-      shadow.setAlpha(0.62);
-    });
-    zone.on('pointerout', () => {
-      buttonRect.setFillStyle(palette.base);
-      this.tweens.add({ targets: [buttonRect, label, shadow], y: y, scaleX: 1, scaleY: 1, duration: 200, ease: 'Quad.easeOut' });
-      shadow.setAlpha(0.45);
-    });
-    zone.on('pointerdown', () => {
-      this.tweens.add({ targets: [buttonRect, label, shadow], scaleX: 0.97, scaleY: 0.97, duration: 120, ease: 'Quad.easeInOut' });
-    });
-    zone.on('pointerup', () => {
-      this.tweens.add({ targets: [buttonRect, label, shadow], scaleX: 1, scaleY: 1, duration: 120, ease: 'Quad.easeOut' });
-      void config.onClick();
-    });
-
-    this.staticElements.push(shadow, buttonRect, label);
-    this.buttons.push(zone);
-    this.actionElements.push(shadow, buttonRect, label);
+    this.createRoundedButton(x, y, width, height, fontSize, config, 'primary');
   }
 
   private createSecondaryActionButton(
@@ -653,54 +642,94 @@ export default class TitleScene extends Phaser.Scene {
     fontSize: number,
     config: ButtonConfig,
   ) {
-    const palette = {
-      base: phaserTheme.colors.action.neutral.base,
-      hover: phaserTheme.colors.action.neutral.hover,
-      border: phaserTheme.colors.action.neutral.border,
-      shadow: phaserTheme.colors.action.neutral.shadow,
-    };
+    this.createRoundedButton(x, y, width, height, fontSize, config, 'secondary');
+  }
 
-    const shadow = this.add.rectangle(x, y + 3, width, height, palette.shadow, 0.42).setOrigin(0.5);
-    const buttonRect = this.add
-      .rectangle(x, y, width, height, palette.base, 0.86)
-      .setStrokeStyle(1, palette.border, 0.75)
+  // Richup-style soft pill button: rounded corners, ambient glow, depth shadow,
+  // and a subtle lift on hover. Phaser's rectangle GameObject can't round
+  // corners, so the body is drawn with Graphics and redrawn on state change.
+  private createRoundedButton(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    fontSize: number,
+    config: ButtonConfig,
+    variant: 'primary' | 'secondary',
+  ) {
+    const palette =
+      variant === 'primary' ? phaserTheme.colors.action.primary : phaserTheme.colors.action.neutral;
+    const radius = Math.min(20, Math.round(height * 0.34));
+    const container = this.add.container(x, y);
+
+    const glow = this.add
+      .ellipse(0, height * 0.34, width * 1.04, height * 1.15, palette.base, variant === 'primary' ? 0.26 : 0.16)
       .setOrigin(0.5);
+    const shadow = this.add.graphics();
+    shadow.fillStyle(palette.shadow, variant === 'primary' ? 0.5 : 0.42);
+    shadow.fillRoundedRect(-width / 2, -height / 2 + 5, width, height, radius);
+
+    const body = this.add.graphics();
+    const drawBody = (fill: number, fillAlpha: number) => {
+      body.clear();
+      body.fillStyle(fill, fillAlpha);
+      body.fillRoundedRect(-width / 2, -height / 2, width, height, radius);
+      body.lineStyle(1.5, palette.border, variant === 'primary' ? 0.85 : 0.6);
+      body.strokeRoundedRect(-width / 2, -height / 2, width, height, radius);
+      // Top sheen for a soft 3D pill feel.
+      body.fillStyle(phaserTheme.colors.text.inverse, variant === 'primary' ? 0.1 : 0.05);
+      body.fillRoundedRect(-width / 2 + 3, -height / 2 + 3, width - 6, height * 0.42, radius * 0.7);
+    };
+    drawBody(palette.base, variant === 'primary' ? 0.95 : 0.85);
+
     const label = this.add
-      .text(x, y, config.label, {
+      .text(0, 0, config.label, {
         fontFamily: FONT,
         fontSize: `${fontSize}px`,
-        color: theme.colors.text.secondary,
-        fontStyle: '600',
+        color: variant === 'primary' ? theme.colors.text.inverse : theme.colors.text.secondary,
+        fontStyle: variant === 'primary' ? '700' : '600',
       })
       .setOrigin(0.5)
       .setResolution(TEXT_RESOLUTION);
+
+    container.add([glow, shadow, body, label]);
 
     const zone = this.add
       .zone(x, y, width, height)
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
 
+    const lift = (active: boolean) => {
+      this.tweens.add({
+        targets: container,
+        y: active ? y - 3 : y,
+        scaleX: active ? 1.025 : 1,
+        scaleY: active ? 1.025 : 1,
+        duration: 200,
+        ease: 'Quad.easeOut',
+      });
+      this.tweens.add({ targets: glow, alpha: active ? (variant === 'primary' ? 0.42 : 0.28) : (variant === 'primary' ? 0.26 : 0.16), duration: 200 });
+    };
+
     zone.on('pointerover', () => {
-      buttonRect.setFillStyle(palette.hover, 0.95);
-      this.tweens.add({ targets: [buttonRect, label, shadow], y: '-=2', scaleX: 1.02, scaleY: 1.02, duration: 200, ease: 'Quad.easeOut' });
-      shadow.setAlpha(0.58);
+      drawBody(palette.hover, variant === 'primary' ? 1 : 0.95);
+      lift(true);
     });
     zone.on('pointerout', () => {
-      buttonRect.setFillStyle(palette.base, 0.86);
-      this.tweens.add({ targets: [buttonRect, label, shadow], y: y, scaleX: 1, scaleY: 1, duration: 200, ease: 'Quad.easeOut' });
-      shadow.setAlpha(0.42);
+      drawBody(palette.base, variant === 'primary' ? 0.95 : 0.85);
+      lift(false);
     });
     zone.on('pointerdown', () => {
-      this.tweens.add({ targets: [buttonRect, label, shadow], scaleX: 0.97, scaleY: 0.97, duration: 120, ease: 'Quad.easeInOut' });
+      this.tweens.add({ targets: container, scaleX: 0.97, scaleY: 0.97, duration: 110, ease: 'Quad.easeInOut' });
     });
     zone.on('pointerup', () => {
-      this.tweens.add({ targets: [buttonRect, label, shadow], scaleX: 1, scaleY: 1, duration: 120, ease: 'Quad.easeOut' });
+      this.tweens.add({ targets: container, scaleX: 1.025, scaleY: 1.025, duration: 110, ease: 'Quad.easeOut' });
       void config.onClick();
     });
 
-    this.staticElements.push(shadow, buttonRect, label);
+    this.staticElements.push(container);
     this.buttons.push(zone);
-    this.actionElements.push(shadow, buttonRect, label);
+    this.actionElements.push(container);
   }
 
   private handleQuickPlay() {
