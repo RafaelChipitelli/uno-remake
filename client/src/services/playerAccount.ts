@@ -27,6 +27,7 @@ import {
   isFirebaseConfigured,
 } from '../config/firebase';
 import { karmaForMatch } from './karma';
+import { getDefaultCosmeticId } from './cosmetics';
 
 export type UserStats = {
   gamesPlayed: number;
@@ -43,6 +44,7 @@ export type UserProfile = {
   emailVerified: boolean;
   photoURL: string | null;
   stats: UserStats;
+  equippedCosmetic: string;
 };
 
 export type MatchSummary = {
@@ -136,6 +138,13 @@ function normalizeStats(rawStats: unknown): UserStats {
   };
 }
 
+// Older profiles predate cosmetics; missing/garbage normalizes to the
+// default skin id. Validity against the catalog (and unlock gating) is the
+// cosmetics layer's job — this only guarantees a non-empty string.
+function normalizeEquippedCosmetic(raw: unknown): string {
+  return typeof raw === 'string' && raw.length > 0 ? raw : getDefaultCosmeticId();
+}
+
 function emitSession(): void {
   listeners.forEach((listener) => listener(currentSession));
 }
@@ -174,6 +183,7 @@ async function ensureUserProfile(user: User): Promise<UserProfile> {
 
   const existingData = snapshot.exists() ? snapshot.data() : undefined;
   const existingStats = normalizeStats(existingData?.stats);
+  const equippedCosmetic = normalizeEquippedCosmetic(existingData?.equippedCosmetic);
   const nickname = sanitizeNickname(existingData?.nickname as string | undefined) || getDefaultNickname(user);
 
   const profile: UserProfile = {
@@ -184,6 +194,7 @@ async function ensureUserProfile(user: User): Promise<UserProfile> {
     emailVerified: user.emailVerified,
     photoURL: user.photoURL ?? null,
     stats: existingStats,
+    equippedCosmetic,
   };
 
   const providerIds = getAuthProviderIds(user);
@@ -198,6 +209,7 @@ async function ensureUserProfile(user: User): Promise<UserProfile> {
     authProvider: getPrimaryAuthProvider(user),
     providerIds,
     stats: profile.stats,
+    equippedCosmetic: profile.equippedCosmetic,
     updatedAt: serverTimestamp(),
     lastLoginAt: serverTimestamp(),
     lastSeenAt: serverTimestamp(),
@@ -266,6 +278,7 @@ function startAuthObserverIfNeeded(): void {
             emailVerified: user.emailVerified,
             photoURL: user.photoURL ?? null,
             stats: { ...DEFAULT_STATS },
+            equippedCosmetic: getDefaultCosmeticId(),
           },
           isLoading: false,
         });
@@ -346,6 +359,7 @@ export async function updateCurrentUserNickname(rawNickname: string): Promise<Us
     authProvider: getPrimaryAuthProvider(user),
     providerIds: getAuthProviderIds(user),
     stats: currentSession.profile?.stats ?? { ...DEFAULT_STATS },
+    equippedCosmetic: currentSession.profile?.equippedCosmetic ?? getDefaultCosmeticId(),
     updatedAt: serverTimestamp(),
     lastLoginAt: serverTimestamp(),
     lastSeenAt: serverTimestamp(),
@@ -369,10 +383,45 @@ export async function updateCurrentUserNickname(rawNickname: string): Promise<Us
     emailVerified: user.emailVerified,
     photoURL: user.photoURL ?? null,
     stats: currentSession.profile?.stats ?? { ...DEFAULT_STATS },
+    equippedCosmetic: currentSession.profile?.equippedCosmetic ?? getDefaultCosmeticId(),
   };
 
   setSession({ profile: updatedProfile });
   return updatedProfile;
+}
+
+/**
+ * Persists the equipped card-back skin on the user's Firestore profile.
+ * Guarded like the other writers (no-op when unauth / Firebase unavailable)
+ * and never throws into the UI — equipping must always succeed locally even
+ * if the cloud write fails. Validity/unlock gating is the cosmetics layer's
+ * job; this only stores the chosen id and mirrors it into the session.
+ */
+export async function setEquippedCosmetic(id: string): Promise<void> {
+  if (!isFirebaseConfigured || !currentSession.user || !id) {
+    return;
+  }
+
+  const user = currentSession.user;
+
+  if (currentSession.profile) {
+    setSession({ profile: { ...currentSession.profile, equippedCosmetic: id } });
+  }
+
+  try {
+    const db = getFirestoreDb();
+    const userRef = doc(db, 'users', user.uid);
+    await updateDoc(userRef, {
+      equippedCosmetic: id,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('[firebase] Falha ao salvar cosmético equipado.', {
+      code: getFirebaseErrorCode(error),
+      message: getFirebaseErrorMessage(error),
+      context: buildFirebaseDebugContext(user),
+    });
+  }
 }
 
 export async function recordCurrentUserMatchResult(didWin: boolean): Promise<UserProfile | null> {
@@ -403,6 +452,7 @@ export async function recordCurrentUserMatchResult(didWin: boolean): Promise<Use
     authProvider: getPrimaryAuthProvider(user),
     providerIds: getAuthProviderIds(user),
     stats: existingStats,
+    equippedCosmetic: profile.equippedCosmetic ?? getDefaultCosmeticId(),
     updatedAt: serverTimestamp(),
     lastLoginAt: serverTimestamp(),
     lastSeenAt: serverTimestamp(),
@@ -441,6 +491,7 @@ export async function recordCurrentUserMatchResult(didWin: boolean): Promise<Use
       gamesLost: existingStats.gamesLost + (didWin ? 0 : 1),
       karma: existingStats.karma + earnedKarma,
     },
+    equippedCosmetic: profile.equippedCosmetic ?? getDefaultCosmeticId(),
   };
 
   setSession({ profile: updatedProfile });

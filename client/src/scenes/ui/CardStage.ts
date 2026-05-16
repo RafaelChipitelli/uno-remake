@@ -4,6 +4,9 @@ import { getCardDisplayParts, getCardDisplayScale, getCardDisplayValue } from '.
 import { phaserTheme, theme } from '../../theme/tokens';
 import type { Card } from '../../types';
 import { t } from '../../i18n';
+import { getEffectiveCosmetic } from '../../services/equippedCosmetic';
+
+const hexToNumber = (hex: string): number => Number.parseInt(hex.replace('#', ''), 16);
 
 type CardStageOptions = {
   hudWidth: number;
@@ -323,10 +326,15 @@ export default class CardStage {
 
     this.placeholderContainer = this.scene.add.container(metrics.stageX, centerY);
     const placeholderShadow = addRoundedShadow(this.scene, cardWidth, cardHeight, 4, 6, phaserTheme.colors.decor.overlay, 0.35, tableRadius);
+    // Card-back skin: only the placeholder fill/stroke are parameterized. The
+    // default `classic` cosmetic carries exactly card.wild / surface.disabled,
+    // so the resolved numbers and alphas match the previous hardcoded values
+    // (zero visual change for the default skin). Read once at build time.
+    const skin = getEffectiveCosmetic().colors;
     const placeholderCard = createRoundedSurface(this.scene, cardWidth, cardHeight, tableRadius, {
-      fill: phaserTheme.colors.card.wild,
+      fill: hexToNumber(skin.fill),
       fillAlpha: 0.96,
-      stroke: phaserTheme.colors.surface.disabled,
+      stroke: hexToNumber(skin.stroke),
       strokeAlpha: 0.5,
       strokeWidth: 2,
     }).gfx;

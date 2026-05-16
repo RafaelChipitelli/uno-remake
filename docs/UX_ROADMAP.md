@@ -59,6 +59,11 @@ avatares (cosmético, liga com inventário).
 
 ## 4. Social / amigos
 
+> ⏸️ **Adiado para um lote dedicado (Lote F).** Amizade (pedido/aceite) +
+> presença online exigem trabalho no servidor de socket (presença em tempo
+> real) e um modelo de relações — design próprio, não cabe no autopilot dos
+> lotes A–E sem um desenho específico.
+
 ### 4.1 🟡 Lista de amigos + presença online
 "X amigos online" no topo; lista com status. Precisa modelo de amizade
 (pedido/aceite) e presença (socket).
@@ -78,13 +83,14 @@ Botão "convidar" na sala privada, gera link/code (code já existe).
 nível (`levelForKarma`). Persistido em `stats.karma` (Firestore, increment +
 otimista). Card de nível/progresso no perfil + "Nível N" no dropdown.
 
-### 5.2 🟢 Inventário de cosméticos
-Itens equipáveis (temas de carta, avatares — ref.: "Mr. Worldwide", "Lucky
-Wheel"). Começa simples: 2–3 skins de verso de carta selecionáveis.
+### 5.2 ✅ Inventário de cosméticos — RESOLVIDO
+4 skins de verso de carta (`classic` nv1, `amethyst` nv2, `emerald` nv4,
+`crimson` nv7). Equipável, persistido (Firestore p/ logado, localStorage p/
+convidado), aplicado no verso/placeholder do CardStage (default byte-idêntico).
 
-### 5.3 🟢 Store
-Vitrine de itens (grátis/por pontos). Depende de §5.1 e §5.2. Pode começar só
-com itens grátis equipáveis, sem moeda real.
+### 5.3 ✅ Store — RESOLVIDO
+Overlay DOM (item "Loja" no dropdown): grid com preview, estados
+Equipado/Equipar/🔒 Nível N (desbloqueio por nível do Karma).
 
 ---
 
@@ -121,5 +127,5 @@ Idioma (já existe no lobby — mover/replicar aqui), reduzir animações
 2. ~~**2.1** + **6.1/6.2**~~ — ✅ feito (Lote A).
 3. **3.1** — perfil com win rate + últimos jogos (precisa histórico no server).
 4. **5.1** — pontos/níveis (alimenta store/inventário).
-5. **4.x / 5.2 / 5.3** — social e economia.
+5. ~~**5.2 / 5.3**~~ — ✅ feito (Lote D). **4.x** adiado → Lote F (precisa server).
 6. **7.x** — polimento contínuo.

@@ -1364,3 +1364,161 @@ canvas:focus-visible {
     transition: none;
   }
 }
+
+/* ===== Lote D — Cosmetics store + inventory ===== */
+
+.sc-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sc-subtitle {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text-secondary, #b9aedb);
+}
+
+.sc-progress {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.sc-progress-level {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text-primary, #fff);
+}
+
+.sc-progress-karma {
+  font-size: 13px;
+  color: var(--color-text-secondary, #b9aedb);
+}
+
+.sc-guest-note {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  border-radius: 12px;
+  background: rgba(156, 163, 175, 0.12);
+  border: 1px solid var(--color-surface-panel-border, rgba(156, 163, 175, 0.18));
+  color: var(--color-text-secondary, #b9aedb);
+}
+
+.sc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+}
+
+.sc-item {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 14px;
+  background: rgba(156, 163, 175, 0.1);
+  border: 1px solid var(--color-surface-panel-border, rgba(156, 163, 175, 0.18));
+}
+
+.sc-item.is-equipped {
+  border-color: color-mix(in srgb, var(--color-status-success, #8bffb0) 60%, transparent);
+  background: color-mix(in srgb, var(--color-status-success, #8bffb0) 12%, rgba(156, 163, 175, 0.1));
+}
+
+.sc-item.is-locked .sc-preview {
+  filter: grayscale(0.55);
+  opacity: 0.7;
+}
+
+.sc-preview {
+  position: relative;
+  aspect-ratio: 5 / 7;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: var(--sc-fill, #20172d);
+  border: 2px solid var(--sc-stroke, #2a2435);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.sc-preview-mark {
+  position: relative;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--color-text-inverse, #fff);
+  text-shadow:
+    0 0 4px rgba(0, 0, 0, 0.85),
+    0 1px 3px rgba(0, 0, 0, 0.85),
+    0 0 1px rgba(0, 0, 0, 0.9);
+}
+
+/* Dark scrim behind the decorative mark so the white "UNO" keeps contrast on
+   lighter fills (emerald/crimson) without recoloring any skin. */
+.sc-preview-mark::before {
+  content: '';
+  position: absolute;
+  inset: -8px -14px;
+  z-index: -1;
+  border-radius: 999px;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0.45) 0%,
+    rgba(0, 0, 0, 0.32) 55%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+
+.sc-item-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text-primary, #fff);
+}
+
+.sc-action {
+  width: 100%;
+  text-align: center;
+}
+
+.sc-action--equipped {
+  background: color-mix(in srgb, var(--color-status-success, #8bffb0) 22%, var(--color-bg-canvas, #120d1c));
+  border-color: color-mix(in srgb, var(--color-status-success, #8bffb0) 55%, transparent);
+  cursor: default;
+  opacity: 1;
+}
+
+.sc-action--locked {
+  background: rgba(156, 163, 175, 0.16);
+  color: var(--color-text-secondary, #b9aedb);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.sc-action:disabled {
+  transform: none;
+  filter: none;
+}
+
+.sc-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 480px) {
+  .sc-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
