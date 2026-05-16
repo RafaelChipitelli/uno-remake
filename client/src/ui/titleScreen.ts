@@ -9,6 +9,7 @@ import {
 } from '../services/playerAccount';
 import { getLanguage, setLanguage, subscribeLanguageChange, t, type Language } from '../i18n';
 import { askTextInput } from './modal';
+import { mountSettingsScreen, type SettingsScreenHandle } from './settingsScreen';
 import type { SceneLaunchData } from '../scenes/game/constants';
 
 const MAX_NICKNAME_LENGTH = 20;
@@ -28,6 +29,8 @@ export function mountTitleScreen(root: HTMLElement, onStart: StartHandler): Titl
   let authSession: AuthSession = getCurrentAuthSession();
   let lastNickname = '';
   let isStarting = false;
+  let isMenuOpen = false;
+  let settings: SettingsScreenHandle | null = null;
 
   const container = document.createElement('div');
   container.className = 'ts-root';
@@ -52,6 +55,16 @@ export function mountTitleScreen(root: HTMLElement, onStart: StartHandler): Titl
 
   const syncFieldFilled = () => {
     nicknameField.classList.toggle('is-filled', sanitize(nicknameInput.value).length > 0);
+  };
+
+  const getNickname = (): string => sanitize(nicknameInput.value || lastNickname);
+  // Settings shares this lobby field as its single source of truth so a guest's
+  // edit survives the Settings remount and actually feeds ensureNicknameForPlay.
+  const setNickname = (raw: string) => {
+    const next = sanitize(raw);
+    lastNickname = next;
+    nicknameInput.value = next;
+    syncFieldFilled();
   };
 
   const identityDetails = (): { statsLabel: string; hint?: string } => {
@@ -141,47 +154,183 @@ export function mountTitleScreen(root: HTMLElement, onStart: StartHandler): Titl
     renderTopRight();
   };
 
+  const initialsFromNickname = (): string => {
+    const source =
+      authSession.profile?.nickname ||
+      authSession.user?.displayName ||
+      sanitize(nicknameInput.value || lastNickname) ||
+      '?';
+    const parts = source.trim().split(/\s+/).filter(Boolean);
+    const letters =
+      parts.length >= 2 ? parts[0][0] + parts[1][0] : source.trim().slice(0, 2);
+    return letters.toUpperCase() || '?';
+  };
+
+  const closeMenu = () => {
+    if (!isMenuOpen) {
+      return;
+    }
+    isMenuOpen = false;
+    renderTopRight();
+  };
+
+  const openMenu = () => {
+    if (isMenuOpen) {
+      return;
+    }
+    isMenuOpen = true;
+    renderTopRight();
+    const firstItem = topRight.querySelector<HTMLButtonElement>('.ts-menu-item');
+    firstItem?.focus();
+  };
+
+  const avatarButton = (): HTMLButtonElement | null =>
+    topRight.querySelector<HTMLButtonElement>('.ts-avatar');
+
+  const onDocumentPointerDown = (event: MouseEvent) => {
+    if (isMenuOpen && !topRight.contains(event.target as Node)) {
+      closeMenu();
+    }
+  };
+  const onDocumentKeydown = (event: KeyboardEvent) => {
+    if (event.key === 'Escape' && isMenuOpen) {
+      closeMenu();
+      avatarButton()?.focus();
+    }
+  };
+  document.addEventListener('pointerdown', onDocumentPointerDown);
+  document.addEventListener('keydown', onDocumentKeydown);
+
+  const addMenuItem = (
+    menu: HTMLElement,
+    label: string,
+    onClick: () => void,
+    tone?: 'danger',
+  ) => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'ts-menu-item';
+    if (tone === 'danger') {
+      item.classList.add('ts-menu-item--danger');
+    }
+    item.setAttribute('role', 'menuitem');
+    item.textContent = label;
+    item.addEventListener('click', () => {
+      closeMenu();
+      onClick();
+    });
+    menu.appendChild(item);
+  };
+
   const renderTopRight = () => {
     topRight.innerHTML = '';
 
-    if (isAuthenticationAvailable() && authSession.isLoading) {
-      const status = document.createElement('span');
-      status.className = 'ts-top-link ts-top-status';
-      status.textContent = t('title.auth.checkingSession');
-      topRight.appendChild(status);
-    } else if (isAuthenticationAvailable()) {
-      const authLink = document.createElement('button');
-      authLink.type = 'button';
-      authLink.className = 'ts-top-link';
-      if (authSession.user) {
-        authLink.textContent = t('title.auth.signOutGoogle');
-        authLink.addEventListener('click', () => void handleGoogleSignOut());
+    const wrap = document.createElement('div');
+    wrap.className = 'ts-account';
+
+    const avatar = document.createElement('button');
+    avatar.type = 'button';
+    avatar.className = 'ts-avatar';
+    avatar.setAttribute('aria-haspopup', 'menu');
+    avatar.setAttribute('aria-expanded', String(isMenuOpen));
+    avatar.setAttribute('aria-label', t('title.menu.open'));
+
+    const renderInitialsAvatar = () => {
+      const initials = document.createElement('span');
+      initials.className = 'ts-avatar-initials';
+      initials.setAttribute('aria-hidden', 'true');
+      initials.textContent = initialsFromNickname();
+      return initials;
+    };
+
+    const photo = authSession.user?.photoURL;
+    if (photo) {
+      const img = document.createElement('img');
+      img.className = 'ts-avatar-img';
+      img.src = photo;
+      img.alt = '';
+      img.referrerPolicy = 'no-referrer';
+      // A dead/throttled Google photo URL must not render a broken image.
+      img.addEventListener('error', () => {
+        img.replaceWith(renderInitialsAvatar());
+      });
+      avatar.appendChild(img);
+    } else {
+      avatar.appendChild(renderInitialsAvatar());
+    }
+    avatar.addEventListener('click', () => {
+      if (isMenuOpen) {
+        closeMenu();
       } else {
-        authLink.textContent = t('title.auth.signInGoogle');
-        authLink.addEventListener('click', () => void handleGoogleSignIn());
+        openMenu();
       }
-      topRight.appendChild(authLink);
+    });
+    wrap.appendChild(avatar);
+
+    if (isMenuOpen) {
+      const menu = document.createElement('div');
+      menu.className = 'ts-menu';
+      menu.setAttribute('role', 'menu');
+
+      addMenuItem(menu, t('title.menu.profile'), () => {
+        showToast(t('title.menu.profileSoon'));
+      });
+      addMenuItem(menu, t('title.menu.settings'), () => showSettings());
+
+      if (isAuthenticationAvailable() && !authSession.isLoading) {
+        if (authSession.user) {
+          addMenuItem(menu, t('title.menu.signOut'), () => void handleGoogleSignOut(), 'danger');
+        } else {
+          addMenuItem(menu, t('title.auth.signInGoogle'), () => void handleGoogleSignIn());
+        }
+      }
+
+      const langRow = document.createElement('div');
+      langRow.className = 'ts-menu-lang';
+      langRow.setAttribute('role', 'group');
+      langRow.setAttribute('aria-label', t('title.menu.language'));
+      const active = getLanguage();
+      ([
+        { language: 'pt-BR' as Language, flag: t('language.flag.br'), name: t('language.pt-BR') },
+        { language: 'en-US' as Language, flag: t('language.flag.us'), name: t('language.en-US') },
+      ]).forEach((item) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'ts-flag';
+        btn.classList.toggle('is-active', item.language === active);
+        btn.textContent = item.flag;
+        btn.setAttribute('aria-label', item.name);
+        btn.setAttribute('aria-pressed', String(item.language === active));
+        btn.addEventListener('click', () => {
+          setLanguage(item.language);
+          closeMenu();
+          showToast(t('title.language.changed'));
+        });
+        langRow.appendChild(btn);
+      });
+      menu.appendChild(langRow);
+
+      wrap.appendChild(menu);
     }
 
-    const langWrap = document.createElement('div');
-    langWrap.className = 'ts-lang';
-    const active = getLanguage();
-    ([
-      { language: 'pt-BR' as Language, flag: t('language.flag.br') },
-      { language: 'en-US' as Language, flag: t('language.flag.us') },
-    ]).forEach((item) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'ts-flag';
-      btn.classList.toggle('is-active', item.language === active);
-      btn.textContent = item.flag;
-      btn.addEventListener('click', () => {
-        setLanguage(item.language);
-        showToast(t('title.language.changed'));
-      });
-      langWrap.appendChild(btn);
+    topRight.appendChild(wrap);
+  };
+
+  const showSettings = () => {
+    if (settings) {
+      return;
+    }
+    container.classList.add('is-hidden');
+    settings = mountSettingsScreen(root, {
+      getNickname,
+      setNickname,
+      onBack: () => {
+        settings?.destroy();
+        settings = null;
+        container.classList.remove('is-hidden');
+        avatarButton()?.focus();
+      },
     });
-    topRight.appendChild(langWrap);
   };
 
   async function handleGoogleSignIn(): Promise<void> {
@@ -302,6 +451,10 @@ export function mountTitleScreen(root: HTMLElement, onStart: StartHandler): Titl
     destroy: () => {
       unsubscribeAuth();
       unsubscribeLanguage();
+      document.removeEventListener('pointerdown', onDocumentPointerDown);
+      document.removeEventListener('keydown', onDocumentKeydown);
+      settings?.destroy();
+      settings = null;
       container.remove();
     },
   };
