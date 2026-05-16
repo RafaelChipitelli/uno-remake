@@ -308,15 +308,46 @@ export function mountTitleScreen(root: HTMLElement, onStart: StartHandler): Titl
 }
 
 function renderShell(): string {
-  const glyphs = ['⟲', '⊘', '+4', 'UNO', '↺', '🃏', 'SKIP'];
+  // UNO-themed marks (numbers + the four action cards), scattered like
+  // Richup: many, small, very faint, mostly fanning out from a warm glow
+  // near the bottom-center. Positions are curated (not random) so the
+  // cluster reads as intentional.
+  const glyphs: Array<{ c: string; x: number; y: number; s: number }> = [
+    { c: '7', x: 50, y: 70, s: 46 },
+    { c: '+4', x: 43, y: 78, s: 40 },
+    { c: '⇆', x: 57, y: 80, s: 38 },
+    { c: '0', x: 36, y: 88, s: 34 },
+    { c: '+2', x: 64, y: 87, s: 34 },
+    { c: 'Ø', x: 50, y: 92, s: 36 },
+    { c: '9', x: 28, y: 80, s: 28 },
+    { c: '✦', x: 72, y: 78, s: 30 },
+    { c: '3', x: 22, y: 92, s: 24 },
+    { c: '5', x: 78, y: 90, s: 24 },
+    { c: '+4', x: 15, y: 84, s: 22 },
+    { c: '⇆', x: 85, y: 84, s: 22 },
+    { c: '1', x: 9, y: 74, s: 20 },
+    { c: 'Ø', x: 91, y: 73, s: 20 },
+    { c: '8', x: 12, y: 33, s: 30 },
+    { c: '+2', x: 88, y: 30, s: 30 },
+    { c: '✦', x: 7, y: 52, s: 22 },
+    { c: '6', x: 93, y: 50, s: 22 },
+    { c: '⇆', x: 50, y: 14, s: 26 },
+    { c: '4', x: 30, y: 20, s: 20 },
+    { c: '+4', x: 70, y: 18, s: 20 },
+    { c: '2', x: 60, y: 60, s: 18 },
+  ];
   const decor = glyphs
-    .map((g, i) => `<span class="ts-glyph ts-glyph--${i}" aria-hidden="true">${g}</span>`)
+    .map(
+      (g, i) =>
+        `<span class="ts-glyph" aria-hidden="true" style="left:${g.x}%;top:${g.y}%;font-size:${g.s}px;animation-delay:${(i % 7) * 0.6}s;animation-duration:${6 + (i % 5)}s">${g.c}</span>`,
+    )
     .join('');
 
   return `
     <div class="ts-bg" aria-hidden="true">
       <span class="ts-glow ts-glow--left"></span>
       <span class="ts-glow ts-glow--right"></span>
+      <span class="ts-glow ts-glow--bottom"></span>
       ${decor}
     </div>
     <div class="ts-topright"></div>
