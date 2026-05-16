@@ -6,6 +6,12 @@ import { createCustomCards } from '../core/customCards';
 import { drawCardsForPlayer, refillDrawPileFromDiscard } from '../core/draw';
 import { getNextPlayerIndex, passTurnToNextPlayer } from '../core/turns';
 import { canDeclareUno, isUnoVulnerable, shouldClearUnoFlag, UNO_PENALTY_CARDS } from '../core/uno';
+import {
+  clampStartingHandSize,
+  DEFAULT_STARTING_HAND_SIZE,
+  MAX_STARTING_HAND_SIZE,
+  MIN_STARTING_HAND_SIZE,
+} from '../core/handSize';
 import type { Card, Player, Room } from '../types';
 
 let cardSeq = 0;
@@ -195,4 +201,15 @@ test('shouldClearUnoFlag resets the declaration unless still at one card', () =>
 
 test('UNO penalty is two cards', () => {
   assert.equal(UNO_PENALTY_CARDS, 2);
+});
+
+test('clampStartingHandSize keeps values within 2..15', () => {
+  assert.equal(clampStartingHandSize(7), 7);
+  assert.equal(clampStartingHandSize(1), MIN_STARTING_HAND_SIZE);
+  assert.equal(clampStartingHandSize(99), MAX_STARTING_HAND_SIZE);
+  assert.equal(clampStartingHandSize(5.9), 5);
+});
+
+test('clampStartingHandSize falls back to the default for non-finite input', () => {
+  assert.equal(clampStartingHandSize(Number.NaN), DEFAULT_STARTING_HAND_SIZE);
 });

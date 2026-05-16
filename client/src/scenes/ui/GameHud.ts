@@ -12,6 +12,8 @@ export type HudSnapshot = {
   drawEnabled: boolean;
   roundInProgress: boolean;
   currentTurn: string;
+  startingCards: number;
+  canConfigureStart: boolean;
 };
 
 type HudMode = 'sidebar' | 'overlay';
@@ -35,6 +37,7 @@ type HudCallbacks = {
   onLeaveRequested: () => void;
   onStartRequested: () => void;
   onDrawRequested: () => void;
+  onStartingCardsChange: (count: number) => void;
 };
 
 type HudButtonTone = 'primary' | 'secondary' | 'danger';
@@ -50,6 +53,10 @@ type ActionButton = {
 };
 
 export default class GameHud {
+  private static readonly MIN_STARTING_CARDS = 2;
+  private static readonly MAX_STARTING_CARDS = 15;
+  private static readonly DEFAULT_STARTING_CARDS = 10;
+
   private scene: Phaser.Scene;
   private options: HudOptions;
   private callbacks: HudCallbacks;
@@ -84,6 +91,8 @@ export default class GameHud {
       drawEnabled: false,
       roundInProgress: false,
       currentTurn: t('game.turn.waitingStart'),
+      startingCards: GameHud.DEFAULT_STARTING_CARDS,
+      canConfigureStart: false,
     };
   }
 
@@ -107,7 +116,9 @@ export default class GameHud {
     const actionStateChanged =
       previousState.startEnabled !== this.currentState.startEnabled ||
       previousState.drawEnabled !== this.currentState.drawEnabled ||
-      previousState.roundInProgress !== this.currentState.roundInProgress;
+      previousState.roundInProgress !== this.currentState.roundInProgress ||
+      previousState.startingCards !== this.currentState.startingCards ||
+      previousState.canConfigureStart !== this.currentState.canConfigureStart;
 
     if (!this.isBuilt || actionStateChanged) {
       this.build();
@@ -209,6 +220,9 @@ export default class GameHud {
 
     const buttonWidth = innerWidth;
     const buttonHeight = compact ? 42 : 46;
+    if (this.currentState.canConfigureStart) {
+      y += this.createStartingCardsStepper(innerX, innerWidth, y, fontScale, compact) + spacing.m;
+    }
     this.startButton = this.createActionButton(innerX + buttonWidth / 2, y + buttonHeight / 2, buttonWidth, buttonHeight, t('game.hud.start'), 'primary', () => this.callbacks.onStartRequested());
     y += buttonHeight + spacing.s;
     this.drawButton = this.createActionButton(innerX + buttonWidth / 2, y + buttonHeight / 2, buttonWidth, buttonHeight, t('game.hud.draw'), 'secondary', () => this.callbacks.onDrawRequested());
@@ -572,9 +586,71 @@ export default class GameHud {
     return { container, label, zone, tone, redraw };
   }
 
-  // "UNO!" button. Declare variant (purple) for the player holding one card;
-  // challenge variant (red, struck through) for everyone else to catch a
-  // player who forgot to declare.
+  // Host-only stepper to pick how many cards each player starts with.
+  // Returns the vertical space it consumed so the caller can advance layout.
+  private createStartingCardsStepper(
+    innerX: number,
+    innerWidth: number,
+    y: number,
+    fontScale: number,
+    compact: boolean,
+  ): number {
+    const value = this.currentState.startingCards;
+    const title = this.scene.add
+      .text(innerX, y, t('game.hud.startingCards'), {
+        fontFamily: this.options.fontFamily,
+        fontSize: `${Math.max(11, Math.round((compact ? 12 : 13) * fontScale))}px`,
+        color: theme.colors.text.muted,
+        fontStyle: '600',
+      })
+      .setResolution(this.options.textResolution);
+    this.elements.push(title);
+
+    const rowY = y + title.height + 8;
+    const size = compact ? 36 : 40;
+    const clampValue = (n: number) =>
+      Math.max(GameHud.MIN_STARTING_CARDS, Math.min(GameHud.MAX_STARTING_CARDS, n));
+
+    const minus = this.createActionButton(
+      innerX + size / 2,
+      rowY + size / 2,
+      size,
+      size,
+      '−',
+      'secondary',
+      () => this.callbacks.onStartingCardsChange(clampValue(value - 1)),
+    );
+    const plus = this.createActionButton(
+      innerX + innerWidth - size / 2,
+      rowY + size / 2,
+      size,
+      size,
+      '+',
+      'secondary',
+      () => this.callbacks.onStartingCardsChange(clampValue(value + 1)),
+    );
+
+    const valueText = this.scene.add
+      .text(innerX + innerWidth / 2, rowY + size / 2, `${value}`, {
+        fontFamily: this.options.fontFamily,
+        fontSize: `${Math.max(16, Math.round((compact ? 18 : 20) * fontScale))}px`,
+        color: theme.colors.text.primary,
+        fontStyle: '800',
+      })
+      .setOrigin(0.5)
+      .setResolution(this.options.textResolution);
+    this.elements.push(valueText);
+
+    if (value <= GameHud.MIN_STARTING_CARDS) {
+      this.applyButtonState(minus, false);
+    }
+    if (value >= GameHud.MAX_STARTING_CARDS) {
+      this.applyButtonState(plus, false);
+    }
+
+    return title.height + 8 + size;
+  }
+
   private addRoundedRect(
     x: number,
     y: number,

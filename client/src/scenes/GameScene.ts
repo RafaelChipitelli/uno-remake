@@ -66,6 +66,7 @@ export default class GameScene extends Phaser.Scene {
 
   private logLines: string[] = [];
   private opponentCardCounts: number[] = [];
+  private startingHandSize = 10;
   private statusMessage = getInitialStatusMessage();
   private lastPlayerListMessage = getEmptyPlayerListMessage();
 
@@ -165,6 +166,7 @@ export default class GameScene extends Phaser.Scene {
         onLeaveRequested: () => this.promptLeaveRoom(),
         onStartRequested: () => this.socket?.emit('game:start'),
         onDrawRequested: () => this.handleDrawCard(),
+        onStartingCardsChange: (count) => this.handleStartingCardsChange(count),
       },
     );
     this.hud.init(this.composeHudState());
@@ -355,6 +357,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.cardStage?.setOpponents(opponents);
     this.opponentCardCounts = opponents.map((opponent) => opponent.cardCount);
+    this.startingHandSize = room.startingHandSize ?? this.startingHandSize;
 
     const currentPlayer = room.players.find((player) => player.isTurn);
 
@@ -509,6 +512,16 @@ export default class GameScene extends Phaser.Scene {
     keyboard.on('keydown-P', this.handlePlayCardShortcut, this);
     keyboard.on('keydown-D', this.handleDrawCard, this);
     keyboard.on('keydown-U', this.handleUnoAction, this);
+  }
+
+  private handleStartingCardsChange(count: number): void {
+    const next = Math.max(2, Math.min(15, Math.floor(count)));
+    if (next === this.startingHandSize) {
+      return;
+    }
+    this.startingHandSize = next;
+    this.syncHudActions();
+    this.socket.emit('room:set-starting-cards', { count: next });
   }
 
   private handleUnoAction(): void {
@@ -838,6 +851,8 @@ export default class GameScene extends Phaser.Scene {
       startEnabled: this.canStartGame(),
       drawEnabled: this.canDrawCard(),
       roundInProgress: this.isRoundInProgress(),
+      startingCards: this.startingHandSize,
+      canConfigureStart: this.canStartGame(),
     });
   }
 
@@ -1070,6 +1085,8 @@ export default class GameScene extends Phaser.Scene {
       drawEnabled: this.canDrawCard(),
       roundInProgress: this.isRoundInProgress(),
       currentTurn: getInitialTurnMessage(),
+      startingCards: this.startingHandSize,
+      canConfigureStart: this.canStartGame(),
     };
   }
 

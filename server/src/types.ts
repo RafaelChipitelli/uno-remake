@@ -33,6 +33,7 @@ export interface Room {
   hostId: string;
   turnDirection: 1 | -1;
   gameStatus: GameStatus;
+  startingHandSize?: number;
   pendingDrawDecision?: {
     playerId: string;
     cardId: string;

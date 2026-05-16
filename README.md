@@ -20,6 +20,7 @@ Em resumo: já dá para criar sala, jogar rodada completa e encerrar com vencedo
 - Lobby e partida sincronizados em tempo real via Socket.IO.
 - Host da sala pode iniciar a partida.
 - Distribuição inicial de cartas e controle de turnos no servidor.
+- Cartas iniciais por jogador configuráveis pelo host no HUD (2 a 15, padrão 10).
 - Compra de carta (`card:draw`) apenas na vez do jogador.
 - Validação de jogada no cliente e no servidor (cor/valor/coringa).
 - Curingas com seleção obrigatória de cor.
