@@ -31,6 +31,9 @@ Em resumo: já dá para criar sala, jogar rodada completa e encerrar com vencedo
   - `+2`: próximo jogador compra 2 e perde a vez
   - `+4`: próximo jogador compra 4 e perde a vez
 - Condição de vitória: quando alguém zera a mão, a rodada termina e o vencedor é anunciado.
+- Reciclagem automática do descarte quando o monte de compra acaba (mantém o coringa jogável).
+- Regra do **UNO!**: declarar com a tecla `U`; quem fica com 1 carta sem declarar compra +2 de penalidade.
+- Lobby em HTML/CSS (Phaser carregado sob demanda só ao iniciar a partida).
 - Health-check REST: `GET /health`.
 - Login com Google e persistência de perfil/estatísticas em Firestore (**opcional**, no cliente).
 
@@ -38,8 +41,7 @@ Em resumo: já dá para criar sala, jogar rodada completa e encerrar com vencedo
 
 ## 🧩 Em evolução (prioridades atuais)
 
-- Regra de UNO (anúncio e penalidade).
-- Reciclagem automática do descarte quando o baralho acabar.
+- UX do "UNO!" no cliente: botão visível na HUD (hoje só via tecla `U`).
 - Polimento visual/animações, UX da mesa e refinamentos de responsividade.
 - Modos extras (pontuação por rodada, timer, bots, matchmaking etc.).
 
@@ -49,14 +51,16 @@ Em resumo: já dá para criar sala, jogar rodada completa e encerrar com vencedo
 
 ```text
 uno-remake/
-├── client/   # Phaser 3 + Vite + TypeScript
-│   ├── src/config/      # Network/Firebase/Phaser config
-│   ├── src/game/        # Regras e utilitários de domínio
-│   ├── src/scenes/      # Cenas (Title/Game) e UI
+├── client/   # Vite + TypeScript (lobby em DOM, partida em Phaser 3)
+│   ├── src/config/      # Network/Firebase config
+│   ├── src/game/        # Boot lazy do Phaser + utilitários de domínio
+│   ├── src/scenes/      # GameScene + BootScene/ReturnToTitleScene e UI
+│   ├── src/ui/          # Lobby DOM (titleScreen) e modais
 │   └── src/services/    # Integrações (conta/estatísticas do jogador)
 └── server/   # Express + Socket.IO + TypeScript
     ├── src/config/      # Variáveis de ambiente (PORT, CLIENT_ORIGIN)
-    ├── src/core/        # Regras de cartas/turno/código de sala
+    ├── src/core/        # Regras de cartas/turno/UNO/código de sala
+    ├── src/__tests__/   # Testes das regras (node:test)
     └── src/state/       # Estado em memória e emissão de estado seguro
 ```
 
@@ -136,6 +140,7 @@ Para testar multiplayer local, abra duas abas (ou dois navegadores) e entre na m
 - Clique em uma carta da mão para jogar.
 - `P`: joga uma carta válida (atalho).
 - `D`: compra uma carta (somente na sua vez).
+- `U`: declara **UNO!** (faça isso com 1 ou 2 cartas, senão compra +2).
 - Botão para sair da sala no HUD.
 
 ---
@@ -143,7 +148,9 @@ Para testar multiplayer local, abra duas abas (ou dois navegadores) e entre na m
 ## 🧪 Validação rápida (tipagem/build)
 
 ```bash
-npx --prefix server tsc -p server/tsconfig.json --noEmit
+npm --prefix server run typecheck
+npm --prefix server test
+npm --prefix client run typecheck
 npm --prefix client run build
 ```
 
@@ -216,12 +223,14 @@ Se quiser habilitar login Google e persistência de perfil/estatísticas:
 - Salas multiplayer e partida em tempo real.
 - Regras principais de turno, compra e cartas especiais.
 - Encerramento de rodada com vencedor.
+- Regra do UNO! (declaração + penalidade) e reaproveitamento do descarte.
+- Suite de testes das regras (`npm --prefix server test`).
 
 ### Próxima fase — Regras completas + robustez
 
-1. Regra de UNO (chamada + punição).
-2. Reaproveitamento do descarte quando o draw pile zerar.
-3. Ajustes adicionais de consistência de estado e UX de feedback.
+1. UX do "UNO!" no cliente (botão na HUD, hoje só tecla `U`).
+2. Ajustes adicionais de consistência de estado e UX de feedback.
+3. Persistência de salas (hoje o estado é só em memória).
 
 ### Fase seguinte — Expansão de produto
 
