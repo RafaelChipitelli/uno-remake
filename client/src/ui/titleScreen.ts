@@ -12,6 +12,7 @@ import { getLanguage, setLanguage, subscribeLanguageChange, t, type Language } f
 import { askTextInput } from './modal';
 import { mountSettingsScreen, type SettingsScreenHandle } from './settingsScreen';
 import { mountProfileScreen, type ProfileScreenHandle } from './profileScreen';
+import { mountStoreScreen, type StoreScreenHandle } from './storeScreen';
 import { renderAvatarContent } from './avatar';
 import type { SceneLaunchData } from '../scenes/game/constants';
 
@@ -35,6 +36,7 @@ export function mountTitleScreen(root: HTMLElement, onStart: StartHandler): Titl
   let isMenuOpen = false;
   let settings: SettingsScreenHandle | null = null;
   let profile: ProfileScreenHandle | null = null;
+  let store: StoreScreenHandle | null = null;
 
   const container = document.createElement('div');
   container.className = 'ts-root';
@@ -266,6 +268,7 @@ export function mountTitleScreen(root: HTMLElement, onStart: StartHandler): Titl
       }
 
       addMenuItem(menu, t('title.menu.profile'), () => showProfile());
+      addMenuItem(menu, t('title.menu.store'), () => showStore());
       addMenuItem(menu, t('title.menu.settings'), () => showSettings());
 
       if (isAuthenticationAvailable() && !authSession.isLoading) {
@@ -333,6 +336,21 @@ export function mountTitleScreen(root: HTMLElement, onStart: StartHandler): Titl
       onBack: () => {
         profile?.destroy();
         profile = null;
+        container.classList.remove('is-hidden');
+        avatarButton()?.focus();
+      },
+    });
+  };
+
+  const showStore = () => {
+    if (store) {
+      return;
+    }
+    container.classList.add('is-hidden');
+    store = mountStoreScreen(root, {
+      onBack: () => {
+        store?.destroy();
+        store = null;
         container.classList.remove('is-hidden');
         avatarButton()?.focus();
       },
@@ -463,6 +481,8 @@ export function mountTitleScreen(root: HTMLElement, onStart: StartHandler): Titl
       settings = null;
       profile?.destroy();
       profile = null;
+      store?.destroy();
+      store = null;
       container.remove();
     },
   };
