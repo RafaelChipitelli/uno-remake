@@ -399,3 +399,381 @@ canvas:focus-visible {
     transform: translateY(0) scale(1);
   }
 }
+
+/* ============================================================
+   DOM title screen (Richup-style lobby) — replaces the Phaser
+   TitleScene so hover/transitions are GPU-composited and the
+   page is idle while nothing changes.
+   ============================================================ */
+
+.ts-root {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--color-bg-canvas, #120d1c);
+  color: var(--color-text-primary, #fff);
+  font-family: 'Inter', system-ui, sans-serif;
+  animation: app-fade-in 240ms ease;
+}
+
+.ts-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.ts-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+}
+
+.ts-glow--left {
+  width: 46vw;
+  height: 46vw;
+  top: -8vw;
+  left: -6vw;
+  background: color-mix(in srgb, var(--color-action-secondary, #4c2c7a) 50%, transparent);
+  opacity: 0.5;
+}
+
+.ts-glow--right {
+  width: 50vw;
+  height: 50vw;
+  bottom: -12vw;
+  right: -8vw;
+  background: color-mix(in srgb, var(--color-action-primary, #7b42e8) 45%, transparent);
+  opacity: 0.45;
+}
+
+.ts-glyph {
+  position: absolute;
+  font-weight: 800;
+  color: var(--color-text-muted, #8f83b5);
+  opacity: 0.06;
+  user-select: none;
+  animation: ts-float 7s ease-in-out infinite;
+}
+
+.ts-glyph--0 { font-size: 76px; top: 16%; left: 9%; animation-delay: 0s; }
+.ts-glyph--1 { font-size: 70px; top: 17%; right: 9%; animation-delay: 0.8s; }
+.ts-glyph--2 { font-size: 58px; top: 50%; right: 14%; color: var(--color-action-danger, #b84a5a); animation-delay: 1.6s; }
+.ts-glyph--3 { font-size: 52px; top: 58%; left: 13%; color: var(--color-status-success, #8bffb0); animation-delay: 2.4s; }
+.ts-glyph--4 { font-size: 58px; top: 11%; left: 50%; animation-delay: 1.2s; }
+.ts-glyph--5 { font-size: 64px; bottom: 14%; right: 22%; animation-delay: 3s; }
+.ts-glyph--6 { font-size: 60px; bottom: 18%; left: 24%; color: var(--color-action-secondary, #4c2c7a); animation-delay: 2s; }
+
+@keyframes ts-float {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50% { transform: translateY(-16px) rotate(3deg); }
+}
+
+.ts-topright {
+  position: absolute;
+  top: 22px;
+  right: 28px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 3;
+}
+
+.ts-top-link {
+  background: none;
+  border: 0;
+  color: var(--color-text-muted, #8f83b5);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.16s ease;
+}
+
+.ts-top-link:hover {
+  color: var(--color-text-primary, #fff);
+}
+
+.ts-top-status {
+  cursor: default;
+}
+
+.ts-lang {
+  display: flex;
+  gap: 10px;
+}
+
+.ts-flag {
+  background: none;
+  border: 0;
+  font-size: 18px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.ts-flag:hover {
+  opacity: 0.9;
+}
+
+.ts-flag.is-active {
+  opacity: 1;
+}
+
+.ts-stage {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: min(92vw, 28rem);
+  padding: 24px;
+}
+
+.ts-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ts-card-icon {
+  position: relative;
+  width: 76px;
+  height: 100px;
+  border-radius: 16px;
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--color-action-primary, #7b42e8) 88%, white) 0%,
+    var(--color-action-primary, #7b42e8) 100%
+  );
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  display: grid;
+  place-items: center;
+  transform: rotate(-8deg);
+  box-shadow: 0 18px 40px color-mix(in srgb, var(--color-action-primary, #7b42e8) 36%, transparent);
+  animation: ts-icon-float 3s ease-in-out infinite;
+}
+
+.ts-card-icon b {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+
+.ts-sparkle {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-text-secondary, #b9aedb);
+  box-shadow: 0 0 10px 2px color-mix(in srgb, var(--color-text-secondary, #b9aedb) 70%, transparent);
+}
+
+@keyframes ts-icon-float {
+  0%, 100% { transform: rotate(-8deg) translateY(0); }
+  50% { transform: rotate(-8deg) translateY(-7px); }
+}
+
+.ts-title {
+  display: flex;
+  gap: 14px;
+  margin: 22px 0 0;
+  font-size: clamp(3.2rem, 8vw, 3.8rem);
+  font-weight: 800;
+  letter-spacing: 2px;
+  line-height: 1;
+}
+
+.ts-uno {
+  color: var(--color-text-primary, #fff);
+}
+
+.ts-rmk {
+  color: color-mix(in srgb, var(--color-action-primary, #7b42e8) 60%, #c4a8ff);
+}
+
+.ts-subtitle {
+  margin: 14px 0 0;
+  color: var(--color-text-secondary, #b9aedb);
+  font-size: 1rem;
+}
+
+.ts-field {
+  position: relative;
+  width: 100%;
+  margin: 36px 0 6px;
+}
+
+.ts-field input {
+  width: 100%;
+  display: block;
+  border: 0;
+  border-bottom: 2px solid #fff;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 18px;
+  outline: none;
+  padding: 14px 0;
+}
+
+.ts-field input:focus,
+.ts-field.is-filled input {
+  border-bottom-color: var(--color-action-primary, #7b42e8);
+}
+
+.ts-field label {
+  position: absolute;
+  top: 14px;
+  left: 0;
+  color: #fff;
+  font-size: 18px;
+  pointer-events: none;
+  transition: 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.ts-field input:focus + label,
+.ts-field.is-filled label {
+  color: var(--color-action-secondary, #4c2c7a);
+  transform: translateY(-30px);
+  font-size: 14px;
+}
+
+.ts-stats {
+  margin: 14px 0 0;
+  color: var(--color-text-muted, #8f83b5);
+  font-size: 0.8rem;
+}
+
+.ts-hint {
+  margin: 8px 0 0;
+  color: var(--color-text-muted, #8f83b5);
+  font-size: 0.85rem;
+  max-width: 26rem;
+}
+
+.ts-btn {
+  font: inherit;
+  font-weight: 700;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.13s ease, filter 0.13s ease, box-shadow 0.13s ease, background 0.13s ease;
+}
+
+.ts-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+  pointer-events: none;
+}
+
+.ts-btn--primary {
+  width: 100%;
+  margin: 28px 0 0;
+  padding: 18px;
+  font-size: 1.2rem;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-action-primary, #7b42e8) 80%, white) 0%,
+    var(--color-action-primary, #7b42e8) 100%
+  );
+  box-shadow:
+    0 12px 30px color-mix(in srgb, var(--color-action-primary, #7b42e8) 40%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.ts-btn--primary:hover {
+  transform: translateY(-3px) scale(1.02);
+  filter: brightness(1.07);
+}
+
+.ts-btn--primary:active {
+  transform: scale(0.98);
+}
+
+.ts-secondary {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  margin: 12px 0 0;
+}
+
+.ts-btn--secondary {
+  flex: 1;
+  padding: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text-secondary, #b9aedb);
+  background: color-mix(in srgb, var(--color-surface-card, #2b2140) 90%, transparent);
+}
+
+.ts-btn--secondary:hover {
+  transform: translateY(-2px);
+  color: #fff;
+  background: var(--color-surface-card-alt, #342753);
+}
+
+.ts-btn--secondary:active {
+  transform: scale(0.98);
+}
+
+.ts-info {
+  margin: 20px 0 0;
+  color: var(--color-text-muted, #8f83b5);
+  font-size: 0.9rem;
+  min-height: 1.2em;
+}
+
+.ts-info.ts-pulse {
+  animation: ts-pulse 0.32s ease;
+}
+
+@keyframes ts-pulse {
+  50% { opacity: 0.3; }
+}
+
+.ts-toast {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translate(-50%, -10px);
+  padding: 9px 20px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-status-success, #8bffb0) 22%, var(--color-bg-canvas, #120d1c));
+  border: 1px solid color-mix(in srgb, var(--color-status-success, #8bffb0) 60%, transparent);
+  color: var(--color-text-primary, #fff);
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 5;
+}
+
+.ts-toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 6px);
+}
+
+@media (max-width: 640px) {
+  .ts-secondary {
+    flex-direction: column;
+  }
+  .ts-topright {
+    top: 14px;
+    right: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ts-glyph,
+  .ts-card-icon {
+    animation: none;
+  }
+}
