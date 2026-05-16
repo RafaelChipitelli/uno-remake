@@ -786,7 +786,10 @@ export default class CardStage {
     const height = compact ? 40 : 46;
     const width = clamp(metrics.stageWidth * 0.42, 150, 240);
     const centerX = metrics.stageX;
-    const centerY = baseY - cardHeight * 0.72 - 12 - height / 2;
+    // Anchor strictly above the top edge of the hand (cards are centered at
+    // baseY and lift on hover), so the button never overlaps the cards.
+    const cardTop = baseY - cardHeight / 2 - CardStage.CARD_HOVER_OFFSET_Y;
+    const centerY = cardTop - 14 - height / 2;
     const palette = isDeclare
       ? phaserTheme.colors.action.primary
       : phaserTheme.colors.action.danger;
