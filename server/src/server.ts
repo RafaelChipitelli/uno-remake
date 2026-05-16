@@ -7,6 +7,7 @@ import { isCustomDrawReactionCard, isDrawMultiplierCard, isDrawShieldCard } from
 import { drawCardsForPlayer, refillDrawPileFromDiscard } from './core/draw';
 import { createActionEvent } from './core/events';
 import { getNextPlayer } from './core/players';
+import { clampStartingHandSize, DEFAULT_STARTING_HAND_SIZE } from './core/handSize';
 import { canDeclareUno, isUnoVulnerable, shouldClearUnoFlag, UNO_PENALTY_CARDS } from './core/uno';
 import { generateRoomCode, normalizeRoomCode } from './core/roomCode';
 import { passTurnToNextPlayer } from './core/turns';
@@ -36,7 +37,7 @@ const io = new Server(server, {
 });
 
 const store = createGameStore();
-const STARTING_HAND_SIZE = 10;
+const STARTING_HAND_SIZE = DEFAULT_STARTING_HAND_SIZE;
 
 function isStackDrawCardValue(value: string): value is '+2' | '+4' {
   return value === '+2' || value === '+4';
@@ -697,6 +698,29 @@ io.on('connection', (socket) => {
     resolvePlayedCard(actor, room, pendingCard, payload.selectedColor);
   });
 
+  socket.on('room:set-starting-cards', (payload: { count?: number } = {}) => {
+    const actor = store.players.get(socket.id);
+    if (!actor?.roomId) {
+      return;
+    }
+    const room = store.rooms.get(actor.roomId);
+    if (!room) {
+      return;
+    }
+    if (room.hostId !== actor.id) {
+      socket.emit('room:error', { message: 'Apenas o dono da sala pode mudar as cartas iniciais.' });
+      return;
+    }
+    if (room.gameStatus === 'in_progress') {
+      socket.emit('room:error', { message: 'Não dá para mudar as cartas iniciais com a partida em andamento.' });
+      return;
+    }
+
+    room.startingHandSize = clampStartingHandSize(Number(payload.count));
+    emitRoomState(io, store.rooms, room.id);
+    console.log(`[room:set-starting-cards] sala ${room.id} -> ${room.startingHandSize} cartas`);
+  });
+
   socket.on('game:start', () => {
     const actor = store.players.get(socket.id);
     if (!actor?.roomId) {
@@ -713,12 +737,13 @@ io.on('connection', (socket) => {
       return;
     }
 
+    const handSize = clampStartingHandSize(room.startingHandSize ?? STARTING_HAND_SIZE);
     const deck = shuffleDeck(createUnoDeck());
-    const requiredCards = room.players.length * STARTING_HAND_SIZE + 1;
+    const requiredCards = room.players.length * handSize + 1;
     if (deck.length < requiredCards) {
-      const maxSupportedPlayers = Math.floor((deck.length - 1) / STARTING_HAND_SIZE);
+      const maxSupportedPlayers = Math.floor((deck.length - 1) / handSize);
       socket.emit('room:error', {
-        message: `Não há cartas suficientes para distribuir ${STARTING_HAND_SIZE} cartas por jogador. Máximo suportado: ${maxSupportedPlayers} jogadores.`,
+        message: `Não há cartas suficientes para distribuir ${handSize} cartas por jogador. Máximo suportado: ${maxSupportedPlayers} jogadores.`,
       });
       return;
     }
@@ -742,7 +767,7 @@ io.on('connection', (socket) => {
 
     for (const roomPlayer of room.players) {
       roomPlayer.hand = [];
-      for (let index = 0; index < STARTING_HAND_SIZE; index += 1) {
+      for (let index = 0; index < handSize; index += 1) {
         const card = deck.pop();
         if (!card) {
           break;
