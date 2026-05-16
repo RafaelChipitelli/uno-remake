@@ -12,7 +12,6 @@ export type HudSnapshot = {
   drawEnabled: boolean;
   roundInProgress: boolean;
   currentTurn: string;
-  unoMode: 'declare' | 'challenge' | 'hidden';
 };
 
 type HudMode = 'sidebar' | 'overlay';
@@ -36,7 +35,6 @@ type HudCallbacks = {
   onLeaveRequested: () => void;
   onStartRequested: () => void;
   onDrawRequested: () => void;
-  onUnoRequested: () => void;
 };
 
 type HudButtonTone = 'primary' | 'secondary' | 'danger';
@@ -71,7 +69,6 @@ export default class GameHud {
   private drawButton?: ActionButton;
   private leaveButton?: ActionButton;
   private overlayStartButton?: ActionButton;
-  private unoButton?: ActionButton;
 
   constructor(scene: Phaser.Scene, options: HudOptions, callbacks: HudCallbacks) {
     this.scene = scene;
@@ -87,7 +84,6 @@ export default class GameHud {
       drawEnabled: false,
       roundInProgress: false,
       currentTurn: t('game.turn.waitingStart'),
-      unoMode: 'hidden',
     };
   }
 
@@ -111,8 +107,7 @@ export default class GameHud {
     const actionStateChanged =
       previousState.startEnabled !== this.currentState.startEnabled ||
       previousState.drawEnabled !== this.currentState.drawEnabled ||
-      previousState.roundInProgress !== this.currentState.roundInProgress ||
-      previousState.unoMode !== this.currentState.unoMode;
+      previousState.roundInProgress !== this.currentState.roundInProgress;
 
     if (!this.isBuilt || actionStateChanged) {
       this.build();
@@ -143,7 +138,6 @@ export default class GameHud {
     this.drawButton = undefined;
     this.leaveButton = undefined;
     this.overlayStartButton = undefined;
-    this.unoButton = undefined;
   }
 
   private getHudMode(): HudMode {
@@ -219,10 +213,6 @@ export default class GameHud {
     y += buttonHeight + spacing.s;
     this.drawButton = this.createActionButton(innerX + buttonWidth / 2, y + buttonHeight / 2, buttonWidth, buttonHeight, t('game.hud.draw'), 'secondary', () => this.callbacks.onDrawRequested());
     y += buttonHeight + spacing.s;
-    if (this.currentState.unoMode !== 'hidden') {
-      this.unoButton = this.createUnoButton(innerX + buttonWidth / 2, y + buttonHeight / 2, buttonWidth, buttonHeight);
-      y += buttonHeight + spacing.s;
-    }
     this.leaveButton = this.createActionButton(innerX + buttonWidth / 2, y + buttonHeight / 2, buttonWidth, buttonHeight, t('game.hud.leaveRoom'), 'danger', () => this.callbacks.onLeaveRequested());
     y += buttonHeight + spacing.m;
 
@@ -343,13 +333,6 @@ export default class GameHud {
 
     this.applyButtonState(this.drawButton, primaryIsStart ? this.currentState.startEnabled : this.currentState.drawEnabled);
     this.applyButtonState(this.leaveButton, this.currentState.leaveEnabled);
-
-    if (this.currentState.unoMode !== 'hidden') {
-      const unoWidth = Math.min(maxPrimary, primaryWidth);
-      this.unoButton = this.createUnoButton(width / 2, baseY - buttonHeight - 12, unoWidth, buttonHeight);
-      this.unoButton.container.setDepth(20);
-      this.unoButton.zone.setDepth(22);
-    }
 
     if (!this.overlayOpen) {
       return;
@@ -592,34 +575,6 @@ export default class GameHud {
   // "UNO!" button. Declare variant (purple) for the player holding one card;
   // challenge variant (red, struck through) for everyone else to catch a
   // player who forgot to declare.
-  private createUnoButton(
-    centerX: number,
-    centerY: number,
-    width: number,
-    height: number,
-  ): ActionButton {
-    const isDeclare = this.currentState.unoMode === 'declare';
-    const button = this.createActionButton(
-      centerX,
-      centerY,
-      width,
-      height,
-      'UNO!',
-      isDeclare ? 'primary' : 'danger',
-      () => this.callbacks.onUnoRequested(),
-    );
-
-    if (!isDeclare) {
-      const halfStrike = Math.min(width * 0.4, button.label.width / 2 + 8);
-      const strike = this.scene.add.graphics();
-      strike.lineStyle(3, phaserTheme.colors.status.danger, 1);
-      strike.lineBetween(-halfStrike, 0, halfStrike, 0);
-      button.container.add(strike);
-    }
-
-    return button;
-  }
-
   private addRoundedRect(
     x: number,
     y: number,

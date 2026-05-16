@@ -65,6 +65,7 @@ export default class GameScene extends Phaser.Scene {
   private roomGameStatus: GameStatus = 'waiting';
 
   private logLines: string[] = [];
+  private opponentCardCounts: number[] = [];
   private statusMessage = getInitialStatusMessage();
   private lastPlayerListMessage = getEmptyPlayerListMessage();
 
@@ -164,7 +165,6 @@ export default class GameScene extends Phaser.Scene {
         onLeaveRequested: () => this.promptLeaveRoom(),
         onStartRequested: () => this.socket?.emit('game:start'),
         onDrawRequested: () => this.handleDrawCard(),
-        onUnoRequested: () => this.handleUnoAction(),
       },
     );
     this.hud.init(this.composeHudState());
@@ -181,6 +181,7 @@ export default class GameScene extends Phaser.Scene {
       fontScale: this.responsiveLayout.fontScale,
       compact: this.responsiveLayout.compact,
       onCardSelected: (card, index) => this.handleCardClick(card, index),
+      onUnoRequested: () => this.handleUnoAction(),
     });
     this.cardStage.build();
 
@@ -353,13 +354,13 @@ export default class GameScene extends Phaser.Scene {
       }));
 
     this.cardStage?.setOpponents(opponents);
+    this.opponentCardCounts = opponents.map((opponent) => opponent.cardCount);
 
     const currentPlayer = room.players.find((player) => player.isTurn);
 
     if (me) {
       this.player = me;
       this.cardStage?.setHandCards(me.hand);
-      this.syncHudUnoMode();
 
       const pendingForMe = room.pendingDrawDecision?.playerId === me.id ? room.pendingDrawDecision.cardId : undefined;
       this.pendingDrawDecisionCardId = pendingForMe;
@@ -419,6 +420,7 @@ export default class GameScene extends Phaser.Scene {
         .join('\n') || t('game.players.roomEmpty');
 
     this.updateRoomDetails(playerList);
+    this.syncUnoButton();
   }
 
   private handleRoomError(payload: RoomErrorPayload): void {
@@ -510,19 +512,28 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private handleUnoAction(): void {
-    const handLength = this.player?.hand?.length ?? 0;
-    this.socket.emit(handLength === 1 ? 'uno:declare' : 'uno:challenge');
+    const mode = this.computeUnoMode();
+    if (mode === 'hidden') {
+      return;
+    }
+    this.socket.emit(mode === 'declare' ? 'uno:declare' : 'uno:challenge');
   }
 
-  private computeUnoMode(): HudSnapshot['unoMode'] {
+  private computeUnoMode(): 'declare' | 'challenge' | 'hidden' {
     if (!this.isRoundInProgress()) {
       return 'hidden';
     }
-    return (this.player?.hand?.length ?? 0) === 1 ? 'declare' : 'challenge';
+    if ((this.player?.hand?.length ?? 0) === 1) {
+      return 'declare';
+    }
+    if (this.opponentCardCounts.some((count) => count === 1)) {
+      return 'challenge';
+    }
+    return 'hidden';
   }
 
-  private syncHudUnoMode(): void {
-    this.hud?.update({ unoMode: this.computeUnoMode() });
+  private syncUnoButton(): void {
+    this.cardStage?.setUnoMode(this.computeUnoMode());
   }
 
   private unregisterKeyboardShortcuts(): void {
@@ -632,7 +643,7 @@ export default class GameScene extends Phaser.Scene {
     this.pushLog(t('game.log.playedCard', { color: card.color, value: card.value }));
     this.setStatus(t('game.status.playSent'));
     this.cardStage?.setHandCards(this.player.hand);
-    this.syncHudUnoMode();
+    this.syncUnoButton();
     this.cardStage?.setTableCard(card);
   }
 
@@ -697,7 +708,7 @@ export default class GameScene extends Phaser.Scene {
     this.pushLog(t('game.log.colorChosen', { color: getColorLabel(selectedColor) }));
     this.setStatus(t('game.status.colorChosen', { color: getColorLabel(selectedColor) }));
     this.cardStage?.setHandCards(this.player.hand);
-    this.syncHudUnoMode();
+    this.syncUnoButton();
     this.cardStage?.setTableCard(card, selectedColor);
   }
 
@@ -1059,7 +1070,6 @@ export default class GameScene extends Phaser.Scene {
       drawEnabled: this.canDrawCard(),
       roundInProgress: this.isRoundInProgress(),
       currentTurn: getInitialTurnMessage(),
-      unoMode: this.computeUnoMode(),
     };
   }
 

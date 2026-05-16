@@ -17,6 +17,7 @@ type CardStageOptions = {
   fontScale?: number;
   compact?: boolean;
   onCardSelected?: (card: Card, index: number) => void;
+  onUnoRequested?: () => void;
 };
 
 type OpponentHandSnapshot = {
@@ -159,6 +160,13 @@ export default class CardStage {
   private scene: Phaser.Scene;
   private options: CardStageOptions;
   private onCardSelected?: (card: Card, index: number) => void;
+  private onUnoRequested?: () => void;
+
+  private unoMode: 'declare' | 'challenge' | 'hidden' = 'hidden';
+  private unoButton?: {
+    container: Phaser.GameObjects.Container;
+    zone: Phaser.GameObjects.Zone;
+  };
 
   private handCards: Card[] = [];
   private opponents: OpponentHandSnapshot[] = [];
@@ -200,6 +208,7 @@ export default class CardStage {
     this.scene = scene;
     this.options = options;
     this.onCardSelected = options.onCardSelected;
+    this.onUnoRequested = options.onUnoRequested;
   }
 
   setLayoutMetrics(
@@ -746,6 +755,96 @@ export default class CardStage {
 
     this.visibleHandIds = cards.map((card) => card.id);
     this.syncHandNavigationUi(metrics, baseY, cardWidth, cardHeight, totalWidth, maxStart);
+    this.layoutUnoButton(metrics, baseY, cardHeight);
+  }
+
+  setUnoMode(mode: 'declare' | 'challenge' | 'hidden'): void {
+    if (this.unoMode === mode) {
+      return;
+    }
+    this.unoMode = mode;
+    const metrics = this.getMetrics();
+    const { baseY, cardHeight } = this.getHandLayout(metrics);
+    this.layoutUnoButton(metrics, baseY, cardHeight);
+  }
+
+  // "UNO!" button floating just above the hand (never over the cards),
+  // shown only when declaring or challenging is actually possible.
+  private layoutUnoButton(metrics: StageMetrics, baseY: number, cardHeight: number): void {
+    if (this.unoButton) {
+      this.scene.tweens.killTweensOf(this.unoButton.container);
+      this.unoButton.container.destroy();
+      this.unoButton.zone.destroy();
+      this.unoButton = undefined;
+    }
+    if (this.unoMode === 'hidden') {
+      return;
+    }
+
+    const isDeclare = this.unoMode === 'declare';
+    const compact = Boolean(this.options.compact) || this.options.hudMode === 'overlay';
+    const height = compact ? 40 : 46;
+    const width = clamp(metrics.stageWidth * 0.42, 150, 240);
+    const centerX = metrics.stageX;
+    const centerY = baseY - cardHeight * 0.72 - 12 - height / 2;
+    const palette = isDeclare
+      ? phaserTheme.colors.action.primary
+      : phaserTheme.colors.action.danger;
+
+    const container = this.scene.add.container(centerX, centerY).setDepth(30);
+    const surface = createRoundedSurface(this.scene, width, height, Math.min(18, height * 0.4), {
+      fill: palette.base,
+      fillAlpha: 0.96,
+      stroke: palette.border,
+      strokeAlpha: 0.85,
+      strokeWidth: 1.5,
+      sheen: 0.1,
+    });
+    const label = this.scene.add
+      .text(0, 0, 'UNO!', {
+        fontFamily: this.options.fontFamily,
+        fontSize: `${compact ? 16 : 18}px`,
+        color: theme.colors.text.inverse,
+        fontStyle: '800',
+      })
+      .setOrigin(0.5)
+      .setResolution(this.options.textResolution);
+    container.add([surface.gfx, label]);
+
+    if (!isDeclare) {
+      const half = Math.min(width * 0.4, label.width / 2 + 8);
+      const strike = this.scene.add.graphics();
+      strike.lineStyle(3, phaserTheme.colors.status.danger, 1);
+      strike.lineBetween(-half, 0, half, 0);
+      container.add(strike);
+    }
+
+    const zone = this.scene.add
+      .zone(centerX, centerY, width, height)
+      .setOrigin(0.5)
+      .setDepth(31)
+      .setInteractive({ useHandCursor: true });
+    zone.on('pointerover', () =>
+      this.scene.tweens.add({ targets: container, scaleX: 1.04, scaleY: 1.04, duration: 140, ease: 'Quad.easeOut' }),
+    );
+    zone.on('pointerout', () =>
+      this.scene.tweens.add({ targets: container, scaleX: 1, scaleY: 1, duration: 140, ease: 'Quad.easeOut' }),
+    );
+    zone.on('pointerup', () => this.onUnoRequested?.());
+
+    if (isDeclare) {
+      this.scene.tweens.add({
+        targets: container,
+        scaleX: 1.05,
+        scaleY: 1.05,
+        duration: 620,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+    }
+
+    this.unoButton = { container, zone };
   }
 
   private syncHandNavigationUi(
@@ -1178,6 +1277,13 @@ export default class CardStage {
       this.turnIndicatorPulseTween.stop();
       this.turnIndicatorPulseTween.remove();
       this.turnIndicatorPulseTween = undefined;
+    }
+
+    if (this.unoButton) {
+      this.scene.tweens.killTweensOf(this.unoButton.container);
+      this.unoButton.container.destroy();
+      this.unoButton.zone.destroy();
+      this.unoButton = undefined;
     }
 
     this.allObjects.forEach((obj) => obj.destroy());
