@@ -178,6 +178,8 @@ export const translations = {
     'game.stage.turn.finished': '🏁 Rodada encerrada',
     'game.stage.turn.of': '⏳ Vez de: {nickname}',
     'game.stage.hand.swipeHint': 'Deslize para ver mais cartas',
+    'game.stage.direction.clockwise': 'Sentido horário',
+    'game.stage.direction.counterClockwise': 'Sentido anti-horário',
 
     'game.wild.title': 'Escolha a cor do curinga',
 
@@ -424,6 +426,8 @@ export const translations = {
     'game.stage.turn.finished': '🏁 Round finished',
     'game.stage.turn.of': '⏳ Turn: {nickname}',
     'game.stage.hand.swipeHint': 'Swipe to see more cards',
+    'game.stage.direction.clockwise': 'Clockwise',
+    'game.stage.direction.counterClockwise': 'Counter-clockwise',
 
     'game.wild.title': 'Choose wild card color',
 

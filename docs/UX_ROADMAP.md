@@ -114,10 +114,12 @@ Idioma (já existe no lobby — mover/replicar aqui), reduzir animações
 
 ## 7. Polimento de jogo (mesa/HUD)
 
-- 🟡 Som + feedback visual em eventos (carta jogada, +2/+4, skip, reverse, UNO!).
-- 🟡 Animação de carta saindo da mão → descarte (hoje é instantâneo).
-- 🟢 Indicador de direção do jogo (horário/anti-horário) mais claro.
-- 🟢 Chat de partida (mensagens rápidas/emotes, leve).
+- ✅ Som (SFX sintetizado via Web Audio, sem assets) + feedback visual em
+  eventos (carta jogada, +2/+4, skip, reverse, UNO!, vitória), respeitando
+  volume/mute do Lote A — **RESOLVIDO (Lote E)**.
+- ✅ Animação de carta saindo da mão → descarte (ghost cosmético) — **RESOLVIDO**.
+- ✅ Indicador de direção (↻/↺ + rótulo) — **RESOLVIDO**.
+- ⏸️ Chat de partida — adiado p/ Lote F (feature de rede própria).
 
 ---
 
