@@ -312,34 +312,55 @@ function renderShell(): string {
   // Richup: many, small, very faint, mostly fanning out from a warm glow
   // near the bottom-center. Positions are curated (not random) so the
   // cluster reads as intentional.
-  const glyphs: Array<{ c: string; x: number; y: number; s: number }> = [
-    { c: '7', x: 50, y: 70, s: 46 },
-    { c: '+4', x: 43, y: 78, s: 40 },
-    { c: '⇆', x: 57, y: 80, s: 38 },
-    { c: '0', x: 36, y: 88, s: 34 },
-    { c: '+2', x: 64, y: 87, s: 34 },
-    { c: 'Ø', x: 50, y: 92, s: 36 },
-    { c: '9', x: 28, y: 80, s: 28 },
-    { c: '✦', x: 72, y: 78, s: 30 },
-    { c: '3', x: 22, y: 92, s: 24 },
-    { c: '5', x: 78, y: 90, s: 24 },
-    { c: '+4', x: 15, y: 84, s: 22 },
-    { c: '⇆', x: 85, y: 84, s: 22 },
-    { c: '1', x: 9, y: 74, s: 20 },
-    { c: 'Ø', x: 91, y: 73, s: 20 },
-    { c: '8', x: 12, y: 33, s: 30 },
-    { c: '+2', x: 88, y: 30, s: 30 },
-    { c: '✦', x: 7, y: 52, s: 22 },
-    { c: '6', x: 93, y: 50, s: 22 },
-    { c: '⇆', x: 50, y: 14, s: 26 },
-    { c: '4', x: 30, y: 20, s: 20 },
-    { c: '+4', x: 70, y: 18, s: 20 },
-    { c: '2', x: 60, y: 60, s: 18 },
+  // Faint grey UNO marks live ONLY in the lower half, densest near the
+  // bottom-center and thinning/fading as they fan upward and outward —
+  // the content area up top stays clean (like Richup). `o` = opacity.
+  const glyphs: Array<{ c: string; x: number; y: number; s: number; o: number }> = [
+    // outer ring (high, faint, small)
+    { c: '8', x: 10, y: 56, s: 24, o: 0.03 },
+    { c: '+4', x: 90, y: 55, s: 24, o: 0.03 },
+    { c: '✦', x: 6, y: 70, s: 22, o: 0.035 },
+    { c: '6', x: 94, y: 69, s: 22, o: 0.035 },
+    { c: '4', x: 18, y: 62, s: 22, o: 0.04 },
+    { c: '⇆', x: 82, y: 61, s: 22, o: 0.04 },
+    // mid ring
+    { c: '9', x: 24, y: 76, s: 28, o: 0.05 },
+    { c: '✦', x: 76, y: 75, s: 28, o: 0.05 },
+    { c: '1', x: 14, y: 84, s: 24, o: 0.045 },
+    { c: 'Ø', x: 86, y: 83, s: 24, o: 0.045 },
+    { c: '+2', x: 33, y: 70, s: 26, o: 0.055 },
+    { c: '3', x: 67, y: 69, s: 26, o: 0.055 },
+    // inner ring (lower, larger, a touch stronger)
+    { c: '7', x: 40, y: 80, s: 38, o: 0.07 },
+    { c: '⇆', x: 60, y: 80, s: 38, o: 0.07 },
+    { c: '+4', x: 30, y: 90, s: 32, o: 0.06 },
+    { c: '+2', x: 70, y: 89, s: 32, o: 0.06 },
+    { c: '0', x: 47, y: 94, s: 30, o: 0.06 },
+    { c: 'Ø', x: 55, y: 95, s: 30, o: 0.06 },
+    { c: '5', x: 22, y: 95, s: 24, o: 0.045 },
+    { c: '2', x: 78, y: 94, s: 24, o: 0.045 },
   ];
   const decor = glyphs
     .map(
       (g, i) =>
-        `<span class="ts-glyph" aria-hidden="true" style="left:${g.x}%;top:${g.y}%;font-size:${g.s}px;animation-delay:${(i % 7) * 0.6}s;animation-duration:${6 + (i % 5)}s">${g.c}</span>`,
+        `<span class="ts-glyph" aria-hidden="true" style="left:${g.x}%;top:${g.y}%;font-size:${g.s}px;opacity:${g.o};animation-delay:${(i % 7) * 0.6}s;animation-duration:${6 + (i % 5)}s">${g.c}</span>`,
+    )
+    .join('');
+
+  // Vibrant focal pile of UNO cards at the bottom-center — the bright,
+  // colorful anchor the faint marks fan out from (Richup's glowing heap).
+  const pileCards = [
+    { cls: 'r', label: '+4', rot: -26, x: -86 },
+    { cls: 'y', label: '7', rot: -12, x: -44 },
+    { cls: 'g', label: 'Ø', rot: 2, x: 0 },
+    { cls: 'b', label: '+2', rot: 15, x: 44 },
+    { cls: 'r', label: '⇆', rot: 28, x: 86 },
+    { cls: 'w', label: 'W', rot: -4, x: 16, lift: 22 },
+  ];
+  const pile = pileCards
+    .map(
+      (c) =>
+        `<span class="ts-pile-card ts-pile-card--${c.cls}" style="--rot:${c.rot}deg;--tx:${c.x}px;--lift:${c.lift ?? 0}px">${c.label}</span>`,
     )
     .join('');
 
@@ -349,6 +370,7 @@ function renderShell(): string {
       <span class="ts-glow ts-glow--right"></span>
       <span class="ts-glow ts-glow--bottom"></span>
       ${decor}
+      <div class="ts-pile">${pile}</div>
     </div>
     <div class="ts-topright"></div>
     <main class="ts-stage">
