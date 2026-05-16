@@ -56,16 +56,23 @@ export function createWildColorModal(
   const panelHeight = Math.max(isCompactLayout ? 280 : 220, Math.ceil(Math.max(halfHeightFromTitle, halfHeightFromButtons) * 2));
 
   const overlay = scene.add
-    .rectangle(panelX, panelY, width, height, phaserTheme.colors.decor.overlay, 0.55)
+    .rectangle(panelX, panelY, width, height, phaserTheme.colors.decor.overlay, 0.62)
     .setOrigin(0.5)
     .setDepth(2000)
     .setInteractive();
 
-  const panel = scene.add
-    .rectangle(panelX, panelY, panelWidth, panelHeight, phaserTheme.colors.bg.game, 0.96)
-    .setOrigin(0.5)
-    .setStrokeStyle(2, phaserTheme.colors.text.inverse, 0.35)
-    .setDepth(2001);
+  const panelRadius = 22;
+  const panelLeft = panelX - panelWidth / 2;
+  const panelTop = panelY - panelHeight / 2;
+  const panel = scene.add.graphics().setDepth(2001);
+  panel.fillStyle(phaserTheme.colors.decor.shadowDeep, 0.5);
+  panel.fillRoundedRect(panelLeft + 4, panelTop + 8, panelWidth, panelHeight, panelRadius);
+  panel.fillStyle(phaserTheme.colors.surface.panel, 0.97);
+  panel.fillRoundedRect(panelLeft, panelTop, panelWidth, panelHeight, panelRadius);
+  panel.lineStyle(1.5, phaserTheme.colors.surface.panelBorder, 0.9);
+  panel.strokeRoundedRect(panelLeft, panelTop, panelWidth, panelHeight, panelRadius);
+  panel.fillStyle(phaserTheme.colors.action.primary.base, 0.08);
+  panel.fillRoundedRect(panelLeft, panelTop, panelWidth, 56, panelRadius);
 
   const title = scene.add
     .text(panelX, panelY - titleOffsetY, t('game.wild.title'), {
@@ -89,38 +96,51 @@ export function createWildColorModal(
     const x = rowFirstX + columnIndex * buttonHorizontalStep;
     const y = firstRowY + rowIndex * buttonVerticalStep;
 
-    const button = scene.add
-      .rectangle(x, y, buttonSize, buttonSize, CARD_COLOR_HEX[color])
-      .setOrigin(0.5)
-      .setStrokeStyle(3, phaserTheme.colors.text.inverse)
-      .setDepth(2002)
-      .setInteractive({ useHandCursor: true });
+    const cardRadius = Math.round(buttonSize * 0.2);
+    const swatch = scene.add.container(x, y).setDepth(2002);
+    const swatchShadow = scene.add.graphics();
+    swatchShadow.fillStyle(phaserTheme.colors.decor.shadowDeep, 0.45);
+    swatchShadow.fillRoundedRect(-buttonSize / 2, -buttonSize / 2 + 5, buttonSize, buttonSize, cardRadius);
+    const swatchBody = scene.add.graphics();
+    swatchBody.fillStyle(CARD_COLOR_HEX[color], 1);
+    swatchBody.fillRoundedRect(-buttonSize / 2, -buttonSize / 2, buttonSize, buttonSize, cardRadius);
+    swatchBody.lineStyle(3, phaserTheme.colors.text.inverse, 0.9);
+    swatchBody.strokeRoundedRect(-buttonSize / 2, -buttonSize / 2, buttonSize, buttonSize, cardRadius);
+    swatchBody.fillStyle(phaserTheme.colors.text.inverse, 0.14);
+    swatchBody.fillRoundedRect(-buttonSize / 2 + 4, -buttonSize / 2 + 4, buttonSize - 8, buttonSize * 0.4, cardRadius * 0.7);
 
     const label = scene.add
-      .text(x, y, getColorLabel(color), {
+      .text(0, 0, getColorLabel(color), {
         fontFamily: options.fontFamily,
         fontSize: '14px',
         color: theme.colors.text.inverse,
         fontStyle: 'bold',
       })
       .setOrigin(0.5)
-      .setResolution(options.textResolution)
-      .setDepth(2003);
+      .setResolution(options.textResolution);
 
-    button.on('pointerover', () => {
-      button.setScale(1.06);
+    swatch.add([swatchShadow, swatchBody, label]);
+
+    const zone = scene.add
+      .zone(x, y, buttonSize, buttonSize)
+      .setOrigin(0.5)
+      .setDepth(2003)
+      .setInteractive({ useHandCursor: true });
+
+    zone.on('pointerover', () => {
+      scene.tweens.add({ targets: swatch, scaleX: 1.07, scaleY: 1.07, y: y - 3, duration: 160, ease: 'Quad.easeOut' });
     });
 
-    button.on('pointerout', () => {
-      button.setScale(1);
+    zone.on('pointerout', () => {
+      scene.tweens.add({ targets: swatch, scaleX: 1, scaleY: 1, y, duration: 160, ease: 'Quad.easeOut' });
     });
 
-    button.on('pointerdown', () => {
+    zone.on('pointerdown', () => {
       options.onColorSelected(color);
       close();
     });
 
-    elements.push(button, label);
+    elements.push(swatch, zone);
   });
 
   return {

@@ -36,7 +36,7 @@ type StageMetrics = {
 type HandCardView = {
   id: string;
   container: Phaser.GameObjects.Container;
-  base: Phaser.GameObjects.Rectangle;
+  surface: RoundedSurface;
   value: Phaser.GameObjects.Text;
   homeX: number;
   homeY: number;
@@ -45,7 +45,7 @@ type HandCardView = {
 
 type OpponentView = {
   container: Phaser.GameObjects.Container;
-  badge: Phaser.GameObjects.Rectangle;
+  badge: RoundedSurface;
   name: Phaser.GameObjects.Text;
   count: Phaser.GameObjects.Text;
 };
@@ -68,6 +68,82 @@ type HandSwipeState = {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+type RoundedSurfaceStyle = {
+  fill: number;
+  fillAlpha?: number;
+  stroke?: number;
+  strokeAlpha?: number;
+  strokeWidth?: number;
+  sheen?: number;
+};
+
+type RoundedSurface = {
+  gfx: Phaser.GameObjects.Graphics;
+  redraw: (next?: Partial<RoundedSurfaceStyle>) => void;
+  resize: (width: number, height: number) => void;
+};
+
+// Soft rounded panel/card drawn with Graphics (Phaser's rectangle GameObject
+// can't round corners). Keeps last style so resize() can redraw faithfully.
+function createRoundedSurface(
+  scene: Phaser.Scene,
+  width: number,
+  height: number,
+  radius: number,
+  initial: RoundedSurfaceStyle,
+): RoundedSurface {
+  const gfx = scene.add.graphics();
+  let w = width;
+  let h = height;
+  let style: RoundedSurfaceStyle = { fillAlpha: 1, strokeAlpha: 1, strokeWidth: 2, sheen: 0, ...initial };
+
+  const draw = () => {
+    const r = Math.min(radius, Math.min(w, h) / 2);
+    gfx.clear();
+    gfx.fillStyle(style.fill, style.fillAlpha ?? 1);
+    gfx.fillRoundedRect(-w / 2, -h / 2, w, h, r);
+    if (style.stroke !== undefined) {
+      gfx.lineStyle(style.strokeWidth ?? 2, style.stroke, style.strokeAlpha ?? 1);
+      gfx.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
+    }
+    if (style.sheen && style.sheen > 0) {
+      gfx.fillStyle(0xffffff, style.sheen);
+      gfx.fillRoundedRect(-w / 2 + 3, -h / 2 + 3, w - 6, h * 0.4, r * 0.7);
+    }
+  };
+
+  draw();
+
+  return {
+    gfx,
+    redraw: (next) => {
+      if (next) style = { ...style, ...next };
+      draw();
+    },
+    resize: (nextWidth, nextHeight) => {
+      w = nextWidth;
+      h = nextHeight;
+      draw();
+    },
+  };
+}
+
+function addRoundedShadow(
+  scene: Phaser.Scene,
+  width: number,
+  height: number,
+  offsetX: number,
+  offsetY: number,
+  color: number,
+  alpha: number,
+  radius: number,
+): Phaser.GameObjects.Graphics {
+  const g = scene.add.graphics();
+  g.fillStyle(color, alpha);
+  g.fillRoundedRect(-width / 2 + offsetX, -height / 2 + offsetY, width, height, radius);
+  return g;
 }
 
 export default class CardStage {
@@ -97,10 +173,10 @@ export default class CardStage {
   private tableGlow?: Phaser.GameObjects.Ellipse;
   private placeholderContainer?: Phaser.GameObjects.Container;
   private tableContainer?: Phaser.GameObjects.Container;
-  private tableCardRect?: Phaser.GameObjects.Rectangle;
+  private tableCardSurface?: RoundedSurface;
   private tableCardText?: Phaser.GameObjects.Text;
   private turnIndicatorContainer?: Phaser.GameObjects.Container;
-  private turnIndicatorBg?: Phaser.GameObjects.Rectangle;
+  private turnIndicatorBg?: RoundedSurface;
   private turnIndicatorText?: Phaser.GameObjects.Text;
   private turnIndicatorPulseTween?: Phaser.Tweens.Tween;
   private handNavLeftBg?: Phaser.GameObjects.Ellipse;
@@ -234,14 +310,17 @@ export default class CardStage {
     );
     this.allObjects.push(this.tableGlow);
 
+    const tableRadius = clamp(cardWidth * 0.13, 10, 20);
+
     this.placeholderContainer = this.scene.add.container(metrics.stageX, centerY);
-    const placeholderShadow = this.scene.add
-      .rectangle(4, 6, cardWidth, cardHeight, phaserTheme.colors.decor.overlay, 0.35)
-      .setOrigin(0.5);
-    const placeholderCard = this.scene.add
-      .rectangle(0, 0, cardWidth, cardHeight, phaserTheme.colors.card.wild, 0.96)
-      .setOrigin(0.5)
-      .setStrokeStyle(2, phaserTheme.colors.surface.disabled, 0.5);
+    const placeholderShadow = addRoundedShadow(this.scene, cardWidth, cardHeight, 4, 6, phaserTheme.colors.decor.overlay, 0.35, tableRadius);
+    const placeholderCard = createRoundedSurface(this.scene, cardWidth, cardHeight, tableRadius, {
+      fill: phaserTheme.colors.card.wild,
+      fillAlpha: 0.96,
+      stroke: phaserTheme.colors.surface.disabled,
+      strokeAlpha: 0.5,
+      strokeWidth: 2,
+    }).gfx;
     const placeholderText = this.scene.add
       .text(0, 0, 'UNO', {
         fontFamily: this.options.fontFamily,
@@ -255,21 +334,15 @@ export default class CardStage {
     this.allObjects.push(this.placeholderContainer);
 
     this.tableContainer = this.scene.add.container(metrics.stageX, centerY);
-    const tableShadow = this.scene.add
-      .rectangle(5, 7, cardWidth, cardHeight, phaserTheme.colors.decor.overlay, 0.38)
-      .setOrigin(0.5);
-    this.tableCardRect = this.scene.add
-      .rectangle(0, 0, cardWidth, cardHeight, phaserTheme.colors.surface.disabled)
-      .setOrigin(0.5)
-      .setStrokeStyle(3, phaserTheme.colors.text.inverse, 0.9);
-    const tableHighlight = this.scene.add.ellipse(
-      0,
-      -cardHeight * 0.2,
-      cardWidth * 0.74,
-      cardHeight * 0.28,
-      phaserTheme.colors.text.inverse,
-      0.15,
-    );
+    const tableShadow = addRoundedShadow(this.scene, cardWidth, cardHeight, 5, 7, phaserTheme.colors.decor.overlay, 0.38, tableRadius);
+    this.tableCardSurface = createRoundedSurface(this.scene, cardWidth, cardHeight, tableRadius, {
+      fill: phaserTheme.colors.surface.disabled,
+      fillAlpha: 1,
+      stroke: phaserTheme.colors.text.inverse,
+      strokeAlpha: 0.9,
+      strokeWidth: 3,
+      sheen: 0.15,
+    });
     this.tableCardText = this.scene.add
       .text(0, 0, '', {
         fontFamily: this.options.fontFamily,
@@ -280,7 +353,7 @@ export default class CardStage {
       })
       .setOrigin(0.5)
       .setResolution(this.options.textResolution);
-    this.tableContainer.add([tableShadow, this.tableCardRect, tableHighlight, this.tableCardText]);
+    this.tableContainer.add([tableShadow, this.tableCardSurface.gfx, this.tableCardText]);
     this.allObjects.push(this.tableContainer);
 
     const indicatorWidth = clamp(metrics.stageWidth * 0.42, 210, 360);
@@ -288,10 +361,13 @@ export default class CardStage {
     const indicatorY = centerY + cardHeight / 2 + (this.options.compact ? 54 : 62);
 
     this.turnIndicatorContainer = this.scene.add.container(metrics.stageX, indicatorY);
-    this.turnIndicatorBg = this.scene.add
-      .rectangle(0, 0, indicatorWidth, indicatorHeight, phaserTheme.colors.surface.card, 0.9)
-      .setOrigin(0.5)
-      .setStrokeStyle(1, phaserTheme.colors.surface.panelBorder, 0.9);
+    this.turnIndicatorBg = createRoundedSurface(this.scene, indicatorWidth, indicatorHeight, indicatorHeight / 2, {
+      fill: phaserTheme.colors.surface.card,
+      fillAlpha: 0.9,
+      stroke: phaserTheme.colors.surface.panelBorder,
+      strokeAlpha: 0.9,
+      strokeWidth: 1,
+    });
     this.turnIndicatorText = this.scene.add
       .text(0, 0, t('game.stage.turn.waiting'), {
         fontFamily: this.options.fontFamily,
@@ -301,7 +377,7 @@ export default class CardStage {
       })
       .setOrigin(0.5)
       .setResolution(this.options.textResolution);
-    this.turnIndicatorContainer.add([this.turnIndicatorBg, this.turnIndicatorText]);
+    this.turnIndicatorContainer.add([this.turnIndicatorBg.gfx, this.turnIndicatorText]);
     this.allObjects.push(this.turnIndicatorContainer);
     this.syncTurnIndicator();
 
@@ -408,10 +484,13 @@ export default class CardStage {
     const seats = this.getOpponentSeats();
     this.opponentViews = seats.map((seat) => {
       const container = this.scene.add.container(seat.x, seat.y);
-      const badge = this.scene.add
-        .rectangle(0, 0, 124, 58, phaserTheme.colors.surface.card, 0.9)
-        .setOrigin(0.5)
-        .setStrokeStyle(1, phaserTheme.colors.surface.panelBorder, 0.8);
+      const badge = createRoundedSurface(this.scene, 124, 58, 14, {
+        fill: phaserTheme.colors.surface.card,
+        fillAlpha: 0.9,
+        stroke: phaserTheme.colors.surface.panelBorder,
+        strokeAlpha: 0.8,
+        strokeWidth: 1,
+      });
       const name = this.scene.add
         .text(0, -10, '', {
           fontFamily: this.options.fontFamily,
@@ -430,7 +509,7 @@ export default class CardStage {
         .setOrigin(0.5)
         .setResolution(this.options.textResolution);
 
-      container.add([badge, name, count]);
+      container.add([badge.gfx, name, count]);
       container.setVisible(false);
       this.allObjects.push(container);
 
@@ -439,7 +518,7 @@ export default class CardStage {
   }
 
   private syncTableArea(withIntroAnimation = false): void {
-    if (!this.tableContainer || !this.placeholderContainer || !this.tableCardRect || !this.tableCardText) {
+    if (!this.tableContainer || !this.placeholderContainer || !this.tableCardSurface || !this.tableCardText) {
       return;
     }
 
@@ -455,7 +534,7 @@ export default class CardStage {
     const indicatorWidth = clamp(metrics.stageWidth * 0.42, 210, 360);
     const indicatorHeight = this.options.compact ? 38 : 44;
     this.turnIndicatorContainer?.setPosition(metrics.stageX, centerY + cardHeight / 2 + (this.options.compact ? 54 : 62));
-    this.turnIndicatorBg?.setSize(indicatorWidth, indicatorHeight);
+    this.turnIndicatorBg?.resize(indicatorWidth, indicatorHeight);
     this.syncTurnIndicator();
 
     if (!this.tableCard) {
@@ -471,7 +550,7 @@ export default class CardStage {
 
     this.placeholderContainer.setVisible(false);
     this.tableContainer.setVisible(true);
-    this.tableCardRect.setFillStyle(CARD_COLOR_HEX[resolvedColor] ?? phaserTheme.colors.surface.disabled);
+    this.tableCardSurface.redraw({ fill: CARD_COLOR_HEX[resolvedColor] ?? phaserTheme.colors.surface.disabled });
     const tableLabel = getCardDisplayValue(this.tableCard.value);
     const tableSymbol = getCardDisplayParts(this.tableCard.value).symbol;
     const tableLabelScale = getCardDisplayScale(this.tableCard.value);
@@ -503,9 +582,13 @@ export default class CardStage {
         .setText(t('game.stage.turn.myTurn'))
         .setColor(theme.colors.status.success)
         .setFontStyle('700');
-      this.turnIndicatorBg
-        .setFillStyle(phaserTheme.colors.status.success, 0.2)
-        .setStrokeStyle(2, phaserTheme.colors.status.success, 1);
+      this.turnIndicatorBg.redraw({
+        fill: phaserTheme.colors.status.success,
+        fillAlpha: 0.2,
+        stroke: phaserTheme.colors.status.success,
+        strokeAlpha: 1,
+        strokeWidth: 2,
+      });
 
       if (!this.turnIndicatorPulseTween) {
         this.turnIndicatorPulseTween = this.scene.tweens.add({
@@ -529,9 +612,13 @@ export default class CardStage {
         .setText(waitingText)
         .setColor(theme.colors.text.muted)
         .setFontStyle('600');
-      this.turnIndicatorBg
-        .setFillStyle(phaserTheme.colors.surface.card, 0.9)
-        .setStrokeStyle(1, phaserTheme.colors.surface.panelBorder, 0.9);
+      this.turnIndicatorBg.redraw({
+        fill: phaserTheme.colors.surface.card,
+        fillAlpha: 0.9,
+        stroke: phaserTheme.colors.surface.panelBorder,
+        strokeAlpha: 0.9,
+        strokeWidth: 1,
+      });
 
       if (this.turnIndicatorPulseTween) {
         this.turnIndicatorPulseTween.stop();
@@ -548,9 +635,13 @@ export default class CardStage {
         .setText(t('game.stage.turn.finished'))
         .setColor(theme.colors.text.muted)
         .setFontStyle('600');
-      this.turnIndicatorBg
-        .setFillStyle(phaserTheme.colors.surface.card, 0.9)
-        .setStrokeStyle(1, phaserTheme.colors.surface.panelBorder, 0.9);
+      this.turnIndicatorBg.redraw({
+        fill: phaserTheme.colors.surface.card,
+        fillAlpha: 0.9,
+        stroke: phaserTheme.colors.surface.panelBorder,
+        strokeAlpha: 0.9,
+        strokeWidth: 1,
+      });
 
       if (this.turnIndicatorPulseTween) {
         this.turnIndicatorPulseTween.stop();
@@ -569,9 +660,13 @@ export default class CardStage {
       .setText(waitingText)
       .setColor(theme.colors.text.muted)
       .setFontStyle('600');
-    this.turnIndicatorBg
-      .setFillStyle(phaserTheme.colors.surface.card, 0.9)
-      .setStrokeStyle(1, phaserTheme.colors.surface.panelBorder, 0.9);
+    this.turnIndicatorBg.redraw({
+      fill: phaserTheme.colors.surface.card,
+      fillAlpha: 0.9,
+      stroke: phaserTheme.colors.surface.panelBorder,
+      strokeAlpha: 0.9,
+      strokeWidth: 1,
+    });
 
     if (this.turnIndicatorPulseTween) {
       this.turnIndicatorPulseTween.stop();
@@ -612,7 +707,7 @@ export default class CardStage {
         this.allObjects.push(view.container);
       }
 
-      view.base.setFillStyle(CARD_COLOR_HEX[card.color] ?? phaserTheme.colors.surface.disabled);
+      view.surface.redraw({ fill: CARD_COLOR_HEX[card.color] ?? phaserTheme.colors.surface.disabled });
       const displayLabel = getCardDisplayValue(card.value);
       const displaySymbol = getCardDisplayParts(card.value).symbol;
       const labelScale = getCardDisplayScale(card.value);
@@ -929,21 +1024,16 @@ export default class CardStage {
 
   private createHandCardView(card: Card, cardWidth: number, cardHeight: number): HandCardView {
     const container = this.scene.add.container(0, 0);
-    const shadow = this.scene.add
-      .rectangle(2, 4, cardWidth, cardHeight, phaserTheme.colors.decor.overlay, 0.34)
-      .setOrigin(0.5);
-    const base = this.scene.add
-      .rectangle(0, 0, cardWidth, cardHeight, CARD_COLOR_HEX[card.color] ?? phaserTheme.colors.surface.disabled)
-      .setOrigin(0.5)
-      .setStrokeStyle(2, phaserTheme.colors.text.inverse, 0.9);
-    const highlight = this.scene.add.ellipse(
-      0,
-      -cardHeight * 0.24,
-      cardWidth * 0.7,
-      cardHeight * 0.28,
-      phaserTheme.colors.text.inverse,
-      0.14,
-    );
+    const cardRadius = clamp(cardWidth * 0.14, 6, 14);
+    const shadow = addRoundedShadow(this.scene, cardWidth, cardHeight, 2, 4, phaserTheme.colors.decor.overlay, 0.34, cardRadius);
+    const surface = createRoundedSurface(this.scene, cardWidth, cardHeight, cardRadius, {
+      fill: CARD_COLOR_HEX[card.color] ?? phaserTheme.colors.surface.disabled,
+      fillAlpha: 1,
+      stroke: phaserTheme.colors.text.inverse,
+      strokeAlpha: 0.9,
+      strokeWidth: 2,
+      sheen: 0.14,
+    });
     const cardDisplay = getCardDisplayParts(card.value);
     const value = this.scene.add
       .text(0, 0, cardDisplay.symbol ? `${cardDisplay.label}\n${cardDisplay.symbol}` : cardDisplay.label, {
@@ -957,11 +1047,11 @@ export default class CardStage {
       .setLineSpacing(cardDisplay.symbol ? -6 : 0)
       .setResolution(this.options.textResolution);
 
-    container.add([shadow, base, highlight, value]);
+    container.add([shadow, surface.gfx, value]);
     container.setSize(cardWidth, cardHeight);
     container.setInteractive({ useHandCursor: true });
 
-    const view: HandCardView = { id: card.id, container, base, value, homeX: 0, homeY: 0, isHovered: false };
+    const view: HandCardView = { id: card.id, container, surface, value, homeX: 0, homeY: 0, isHovered: false };
 
     container.on('pointerover', () => {
       view.isHovered = true;
@@ -974,7 +1064,7 @@ export default class CardStage {
         duration: 160,
         ease: 'Quad.easeOut',
       });
-      base.setStrokeStyle(3, phaserTheme.colors.text.inverse, 1);
+      view.surface.redraw({ strokeWidth: 3, strokeAlpha: 1 });
     });
 
     container.on('pointerout', () => {
@@ -989,7 +1079,7 @@ export default class CardStage {
         duration: 160,
         ease: 'Quad.easeOut',
       });
-      base.setStrokeStyle(2, phaserTheme.colors.text.inverse, 0.9);
+      view.surface.redraw({ strokeWidth: 2, strokeAlpha: 0.9 });
     });
 
     container.on('pointerdown', () => {
@@ -1029,11 +1119,11 @@ export default class CardStage {
       view.container.setVisible(true);
       view.name.setText(opponent.nickname);
       view.count.setText(`🃏 ${opponent.cardCount}`);
-      view.badge.setStrokeStyle(
-        1,
-        opponent.isTurn ? phaserTheme.colors.status.success : phaserTheme.colors.surface.panelBorder,
-        opponent.isTurn ? 1 : 0.8,
-      );
+      view.badge.redraw({
+        stroke: opponent.isTurn ? phaserTheme.colors.status.success : phaserTheme.colors.surface.panelBorder,
+        strokeAlpha: opponent.isTurn ? 1 : 0.8,
+        strokeWidth: 1,
+      });
       view.name.setColor(opponent.isTurn ? theme.colors.status.success : theme.colors.text.primary);
       view.name.setFontStyle(opponent.isTurn ? '700' : '500');
 
@@ -1098,7 +1188,7 @@ export default class CardStage {
     this.tableGlow = undefined;
     this.placeholderContainer = undefined;
     this.tableContainer = undefined;
-    this.tableCardRect = undefined;
+    this.tableCardSurface = undefined;
     this.tableCardText = undefined;
     this.turnIndicatorContainer = undefined;
     this.turnIndicatorBg = undefined;

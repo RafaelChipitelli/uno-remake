@@ -39,11 +39,14 @@ type HudCallbacks = {
 
 type HudButtonTone = 'primary' | 'secondary' | 'danger';
 
+type ButtonVisualState = 'base' | 'hover' | 'disabled';
+
 type ActionButton = {
-  bg: Phaser.GameObjects.Rectangle;
+  container: Phaser.GameObjects.Container;
   label: Phaser.GameObjects.Text;
   zone: Phaser.GameObjects.Zone;
   tone: HudButtonTone;
+  redraw: (state: ButtonVisualState) => void;
 };
 
 export default class GameHud {
@@ -163,16 +166,10 @@ export default class GameHud {
     const fontScale = this.options.fontScale ?? 1;
     const spacing = { s: 8, m: 16 };
 
-    const panelShadow = this.scene.add
-      .rectangle(panelX + 3, panelY + 6, this.options.width, panelHeight, phaserTheme.colors.decor.overlay, 0.3)
-      .setOrigin(0);
-    const panel = this.scene.add
-      .rectangle(panelX, panelY, this.options.width, panelHeight, this.options.panelColor, 0.94)
-      .setOrigin(0)
-      .setStrokeStyle(1, this.options.panelBorder, 0.9);
-    const panelTopGlow = this.scene.add
-      .rectangle(panelX, panelY, this.options.width, 52, phaserTheme.colors.action.primary.base, 0.08)
-      .setOrigin(0);
+    const panelRadius = 18;
+    const panelShadow = this.addRoundedRect(panelX + 3, panelY + 6, this.options.width, panelHeight, phaserTheme.colors.decor.overlay, 0.3, panelRadius);
+    const panel = this.addRoundedRect(panelX, panelY, this.options.width, panelHeight, this.options.panelColor, 0.94, panelRadius, this.options.panelBorder, 0.9);
+    const panelTopGlow = this.addRoundedRect(panelX, panelY, this.options.width, 52, phaserTheme.colors.action.primary.base, 0.08, panelRadius);
 
     this.elements.push(panelShadow, panel, panelTopGlow);
 
@@ -252,10 +249,17 @@ export default class GameHud {
     this.elements.push(this.logsHeaderText);
     y += this.logsHeaderText.height + spacing.s;
 
-    const logsBackground = this.scene.add
-      .rectangle(innerX, y, innerWidth, Math.max(compact ? 140 : 180, panelY + panelHeight - y - spacing.m), phaserTheme.colors.bg.game, 0.72)
-      .setOrigin(0)
-      .setStrokeStyle(1, phaserTheme.colors.surface.panelBorder, 0.7);
+    const logsBackground = this.addRoundedRect(
+      innerX,
+      y,
+      innerWidth,
+      Math.max(compact ? 140 : 180, panelY + panelHeight - y - spacing.m),
+      phaserTheme.colors.bg.game,
+      0.72,
+      12,
+      phaserTheme.colors.surface.panelBorder,
+      0.7,
+    );
     this.elements.push(logsBackground);
 
     this.logsText = this.scene.add
@@ -347,10 +351,17 @@ export default class GameHud {
     const panelHeight = Math.min(360, Math.max(250, height * 0.62));
     const panelX = width / 2;
     const panelY = margin + 70;
-    const panel = this.scene.add
-      .rectangle(panelX, panelY, panelWidth, panelHeight, this.options.panelColor, 0.96)
-      .setOrigin(0.5, 0)
-      .setStrokeStyle(1, this.options.panelBorder, 0.95);
+    const panel = this.addRoundedRect(
+      panelX - panelWidth / 2,
+      panelY,
+      panelWidth,
+      panelHeight,
+      this.options.panelColor,
+      0.96,
+      18,
+      this.options.panelBorder,
+      0.95,
+    );
 
     const innerX = panelX - panelWidth / 2 + 16;
     const innerW = panelWidth - 32;
@@ -421,10 +432,17 @@ export default class GameHud {
     y += this.logsHeaderText.height + 4;
 
     const logsBgHeight = Math.max(84, panelY + panelHeight - y - 16);
-    const logsBg = this.scene.add
-      .rectangle(innerX, y, innerW, logsBgHeight, phaserTheme.colors.bg.game, 0.72)
-      .setOrigin(0)
-      .setStrokeStyle(1, phaserTheme.colors.surface.panelBorder, 0.7);
+    const logsBg = this.addRoundedRect(
+      innerX,
+      y,
+      innerW,
+      logsBgHeight,
+      phaserTheme.colors.bg.game,
+      0.72,
+      12,
+      phaserTheme.colors.surface.panelBorder,
+      0.7,
+    );
 
     this.logsText = this.scene.add
       .text(innerX + 8, y + 8, this.getVisibleLogText(), {
@@ -439,17 +457,13 @@ export default class GameHud {
     this.elements.push(overlayBg, panel, title, this.roomLabelText, this.playersHeaderText, this.playerText, this.logsHeaderText, logsBg, this.logsText);
 
     // mantém menu acima do overlay
-    infoButton.bg.setDepth(20);
-    infoButton.label.setDepth(21);
+    infoButton.container.setDepth(20);
     infoButton.zone.setDepth(22);
-    this.drawButton.bg.setDepth(20);
-    this.drawButton.label.setDepth(21);
+    this.drawButton.container.setDepth(20);
     this.drawButton.zone.setDepth(22);
-    this.leaveButton.bg.setDepth(20);
-    this.leaveButton.label.setDepth(21);
+    this.leaveButton.container.setDepth(20);
     this.leaveButton.zone.setDepth(22);
-    this.overlayStartButton?.bg.setDepth(12);
-    this.overlayStartButton?.label.setDepth(13);
+    this.overlayStartButton?.container.setDepth(12);
     this.overlayStartButton?.zone.setDepth(14);
   }
 
@@ -485,13 +499,34 @@ export default class GameHud {
     onClick: () => void,
   ): ActionButton {
     const palette = this.getButtonPalette(tone);
-    const shadow = this.scene.add.rectangle(centerX, centerY + 3, width, height, palette.shadow, 0.45).setOrigin(0.5);
-    const bg = this.scene.add
-      .rectangle(centerX, centerY, width, height, palette.base, 0.95)
-      .setOrigin(0.5)
-      .setStrokeStyle(1, palette.border, 0.9);
+    const radius = Math.min(16, Math.round(height * 0.32));
+    const container = this.scene.add.container(centerX, centerY);
+
+    const shadow = this.scene.add.graphics();
+    shadow.fillStyle(palette.shadow, 0.45);
+    shadow.fillRoundedRect(-width / 2, -height / 2 + 4, width, height, radius);
+
+    const body = this.scene.add.graphics();
+    const redraw = (state: ButtonVisualState) => {
+      body.clear();
+      const fill =
+        state === 'disabled'
+          ? phaserTheme.colors.surface.disabled
+          : state === 'hover'
+            ? palette.hover
+            : palette.base;
+      const fillAlpha = state === 'disabled' ? 0.7 : state === 'hover' ? 1 : 0.95;
+      body.fillStyle(fill, fillAlpha);
+      body.fillRoundedRect(-width / 2, -height / 2, width, height, radius);
+      body.lineStyle(1, palette.border, state === 'disabled' ? 0.3 : 0.85);
+      body.strokeRoundedRect(-width / 2, -height / 2, width, height, radius);
+      body.fillStyle(phaserTheme.colors.text.inverse, state === 'disabled' ? 0.03 : 0.09);
+      body.fillRoundedRect(-width / 2 + 2, -height / 2 + 2, width - 4, height * 0.42, radius * 0.7);
+    };
+    redraw('base');
+
     const label = this.scene.add
-      .text(centerX, centerY, labelText, {
+      .text(0, 0, labelText, {
         fontFamily: this.options.fontFamily,
         fontSize: `${Math.max(12, Math.round((this.options.compact ? 12 : 13) * (this.options.fontScale ?? 1)))}px`,
         color: theme.colors.text.inverse,
@@ -500,6 +535,8 @@ export default class GameHud {
       .setOrigin(0.5)
       .setResolution(this.options.textResolution);
 
+    container.add([shadow, body, label]);
+
     const zone = this.scene.add
       .zone(centerX, centerY, width, height)
       .setOrigin(0.5)
@@ -507,28 +544,49 @@ export default class GameHud {
 
     zone.on('pointerover', () => {
       if (!zone.input?.enabled) return;
-      bg.setFillStyle(palette.hover, 1);
-      this.scene.tweens.add({ targets: [bg, label, shadow], scaleX: 1.03, scaleY: 1.03, duration: 180, ease: 'Quad.easeOut' });
+      redraw('hover');
+      this.scene.tweens.add({ targets: container, scaleX: 1.03, scaleY: 1.03, duration: 180, ease: 'Quad.easeOut' });
     });
 
     zone.on('pointerout', () => {
-      bg.setFillStyle(palette.base, 0.95);
-      this.scene.tweens.add({ targets: [bg, label, shadow], scaleX: 1, scaleY: 1, duration: 180, ease: 'Quad.easeOut' });
+      redraw('base');
+      this.scene.tweens.add({ targets: container, scaleX: 1, scaleY: 1, duration: 180, ease: 'Quad.easeOut' });
     });
 
     zone.on('pointerdown', () => {
       if (!zone.input?.enabled) return;
-      this.scene.tweens.add({ targets: [bg, label, shadow], scaleX: 0.97, scaleY: 0.97, duration: 120, ease: 'Quad.easeInOut' });
+      this.scene.tweens.add({ targets: container, scaleX: 0.97, scaleY: 0.97, duration: 120, ease: 'Quad.easeInOut' });
     });
 
     zone.on('pointerup', () => {
       if (!zone.input?.enabled) return;
-      this.scene.tweens.add({ targets: [bg, label, shadow], scaleX: 1, scaleY: 1, duration: 120, ease: 'Quad.easeOut' });
+      this.scene.tweens.add({ targets: container, scaleX: 1, scaleY: 1, duration: 120, ease: 'Quad.easeOut' });
       onClick();
     });
 
-    this.elements.push(shadow, bg, label, zone);
-    return { bg, label, zone, tone };
+    this.elements.push(container, zone);
+    return { container, label, zone, tone, redraw };
+  }
+
+  private addRoundedRect(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    fill: number,
+    fillAlpha: number,
+    radius: number,
+    strokeColor?: number,
+    strokeAlpha = 0.9,
+  ): Phaser.GameObjects.Graphics {
+    const g = this.scene.add.graphics();
+    g.fillStyle(fill, fillAlpha);
+    g.fillRoundedRect(x, y, w, h, radius);
+    if (strokeColor !== undefined) {
+      g.lineStyle(1, strokeColor, strokeAlpha);
+      g.strokeRoundedRect(x, y, w, h, radius);
+    }
+    return g;
   }
 
   private getButtonPalette(tone: HudButtonTone): { base: number; hover: number; border: number; shadow: number } {
@@ -541,14 +599,15 @@ export default class GameHud {
     if (!button) return;
 
     if (enabled) {
-      const palette = this.getButtonPalette(button.tone);
-      button.bg.setFillStyle(palette.base, 0.95).setAlpha(1);
+      button.redraw('base');
+      button.container.setAlpha(1);
       button.label.setAlpha(1);
       button.zone.setInteractive({ useHandCursor: true });
       return;
     }
 
-    button.bg.setFillStyle(phaserTheme.colors.surface.disabled, 0.7).setAlpha(0.6);
+    button.redraw('disabled');
+    button.container.setAlpha(0.85);
     button.label.setAlpha(0.55);
     button.zone.disableInteractive();
   }
