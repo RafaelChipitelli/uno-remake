@@ -756,7 +756,7 @@ export default class CardStage {
         strokeWidth: 2,
       });
 
-      if (!this.turnIndicatorPulseTween) {
+      if (!this.turnIndicatorPulseTween && !prefersReducedMotion()) {
         this.turnIndicatorPulseTween = this.scene.tweens.add({
           targets: this.turnIndicatorContainer,
           alpha: { from: 0.86, to: 1 },
@@ -992,7 +992,7 @@ export default class CardStage {
     );
     zone.on('pointerup', () => this.onUnoRequested?.());
 
-    if (isDeclare) {
+    if (isDeclare && !prefersReducedMotion()) {
       this.scene.tweens.add({
         targets: container,
         scaleX: 1.05,

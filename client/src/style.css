@@ -558,6 +558,10 @@ canvas:focus-visible {
   font-size: 18px;
   cursor: pointer;
   opacity: 0.6;
+  min-width: 44px;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
   transition: opacity 0.16s ease, transform 0.16s ease;
 }
 
@@ -692,6 +696,33 @@ canvas:focus-visible {
   font-size: 14px;
 }
 
+.ts-account-name {
+  width: 100%;
+  margin: 36px 0 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  border-bottom: 2px solid var(--color-action-primary, #7b42e8);
+  padding: 8px 0 14px;
+}
+
+.ts-account-name-label {
+  color: var(--color-text-secondary, #b9aedb);
+  font-size: 14px;
+}
+
+.ts-account-name-value {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.ts-account-name-hint {
+  color: var(--color-text-muted, #8f83b5);
+  font-size: 0.78rem;
+}
+
 .ts-stats {
   margin: 14px 0 0;
   color: var(--color-text-muted, #8f83b5);
@@ -820,8 +851,14 @@ canvas:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
   .ts-glyph,
-  .ts-card-icon {
+  .ts-card-icon,
+  .ts-pile {
     animation: none;
+  }
+
+  .ts-toast {
+    transition: opacity 0.2s ease;
+    transform: translate(-50%, 6px);
   }
 }
 
@@ -1020,6 +1057,23 @@ canvas:focus-visible {
   overflow-wrap: anywhere;
 }
 
+.st-nickname-input {
+  width: 100%;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary, #fff);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid var(--color-action-primary, #7b42e8);
+  padding: 4px 0;
+  outline: none;
+}
+
+.st-nickname-input:focus-visible {
+  border-bottom-color: var(--color-text-primary, #fff);
+}
+
 .st-badge {
   display: inline-flex;
   align-items: center;
@@ -1063,9 +1117,17 @@ canvas:focus-visible {
   text-align: right;
 }
 
+.st-mute-label {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+}
+
 .st-mute-toggle {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
+  margin: 10px;
   accent-color: var(--color-action-primary, #7b42e8);
   cursor: pointer;
 }

@@ -4,7 +4,6 @@ import {
   signInWithGoogle,
   signOutCurrentUser,
   subscribeAuthSession,
-  updateCurrentUserNickname,
   type AuthSession,
 } from '../services/playerAccount';
 import { levelForKarma } from '../services/karma';
@@ -45,6 +44,11 @@ export function mountTitleScreen(root: HTMLElement, onStart: StartHandler): Titl
 
   const nicknameInput = container.querySelector<HTMLInputElement>('.ts-field input')!;
   const nicknameField = container.querySelector<HTMLElement>('.ts-field')!;
+  const nicknameLabel = container.querySelector<HTMLLabelElement>('.ts-field label')!;
+  const accountName = container.querySelector<HTMLElement>('.ts-account-name')!;
+  const accountNameLabel = container.querySelector<HTMLElement>('.ts-account-name-label')!;
+  const accountNameValue = container.querySelector<HTMLElement>('.ts-account-name-value')!;
+  const accountNameHint = container.querySelector<HTMLElement>('.ts-account-name-hint')!;
   const statsLine = container.querySelector<HTMLElement>('.ts-stats')!;
   const hintLine = container.querySelector<HTMLElement>('.ts-hint')!;
   const infoLine = container.querySelector<HTMLElement>('.ts-info')!;
@@ -61,6 +65,30 @@ export function mountTitleScreen(root: HTMLElement, onStart: StartHandler): Titl
 
   const syncFieldFilled = () => {
     nicknameField.classList.toggle('is-filled', sanitize(nicknameInput.value).length > 0);
+  };
+
+  const isSignedIn = (): boolean => Boolean(authSession.user);
+  // For signed-in users the account nickname is the single source of truth;
+  // the lobby never edits it (Settings/Profile is the canonical edit path).
+  const accountNickname = (): string =>
+    sanitize(
+      authSession.profile?.nickname || authSession.user?.displayName || '',
+    );
+
+  // Signed in → read-only account name (canonical, edited in Settings).
+  // Guest / Firebase unavailable → keep the editable free-text field.
+  const renderNicknameField = () => {
+    if (isSignedIn()) {
+      nicknameField.hidden = true;
+      accountName.hidden = false;
+      accountNameLabel.textContent = t('title.nickname.fieldLabel');
+      accountNameValue.textContent = accountNickname() || '—';
+      accountNameHint.textContent = t('title.nickname.accountHint');
+    } else {
+      accountName.hidden = true;
+      nicknameField.hidden = false;
+      syncFieldFilled();
+    }
   };
 
   const getNickname = (): string => sanitize(nicknameInput.value || lastNickname);
@@ -142,7 +170,8 @@ export function mountTitleScreen(root: HTMLElement, onStart: StartHandler): Titl
     playBtn.textContent = t('title.primary.play');
     createBtn.textContent = t('title.secondary.createPrivate');
     joinBtn.textContent = t('title.secondary.joinCode');
-    nicknameInput.setAttribute('aria-label', t('title.nickname.title'));
+    nicknameLabel.textContent = t('title.nickname.fieldLabel');
+    renderNicknameField();
     if (!infoLine.textContent || infoLine.dataset.default === 'true') {
       infoLine.dataset.default = 'true';
       infoLine.textContent = t('title.info.chooseOption');
@@ -378,6 +407,13 @@ export function mountTitleScreen(root: HTMLElement, onStart: StartHandler): Titl
   }
 
   const ensureNicknameForPlay = async (): Promise<string | undefined> => {
+    // Signed-in: account nickname is canonical. Never auto-generate a
+    // throwaway name and never write back — that would silently overwrite
+    // the saved Firestore nickname. Editing happens in Settings/Profile.
+    if (isSignedIn()) {
+      return accountNickname() || undefined;
+    }
+
     let nickname = sanitize(nicknameInput.value || lastNickname);
     if (!nickname) {
       nickname = `Player-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -385,15 +421,6 @@ export function mountTitleScreen(root: HTMLElement, onStart: StartHandler): Titl
       syncFieldFilled();
     }
     lastNickname = nickname;
-
-    if (authSession.user && nickname !== authSession.profile?.nickname) {
-      try {
-        await updateCurrentUserNickname(nickname);
-      } catch (error) {
-        console.error('[auth] Falha ao atualizar nickname no Firestore', error);
-        showInfo(t('title.nickname.cloudSaveFailed'));
-      }
-    }
     return nickname;
   };
 
@@ -561,8 +588,13 @@ function renderShell(): string {
         <p class="ts-subtitle"></p>
       </div>
       <div class="ts-field">
-        <input type="text" maxlength="${MAX_NICKNAME_LENGTH}" required autocomplete="off" />
-        <label aria-hidden="true">Username</label>
+        <input type="text" id="ts-nickname" maxlength="${MAX_NICKNAME_LENGTH}" required autocomplete="off" />
+        <label for="ts-nickname"></label>
+      </div>
+      <div class="ts-account-name" hidden>
+        <span class="ts-account-name-label"></span>
+        <span class="ts-account-name-value"></span>
+        <span class="ts-account-name-hint"></span>
       </div>
       <p class="ts-stats"></p>
       <p class="ts-hint" hidden></p>

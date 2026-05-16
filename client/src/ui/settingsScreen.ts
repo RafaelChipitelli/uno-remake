@@ -14,7 +14,6 @@ import {
   type AudioSettings,
 } from '../services/audio';
 import { subscribeLanguageChange, t } from '../i18n';
-import { askTextInput } from './modal';
 
 const MAX_NICKNAME_LENGTH = 20;
 
@@ -70,6 +69,9 @@ export function mountSettingsScreen(
   const currentNickname = (): string => authSession.profile?.nickname ?? getNickname();
 
   const renderAccount = () => {
+    if (isEditing) {
+      return;
+    }
     nicknameValue.textContent = currentNickname() || t('settings.account.noNickname');
   };
 
@@ -112,7 +114,9 @@ export function mountSettingsScreen(
     backBtn.textContent = t('settings.back');
     accountCardTitle.textContent = t('settings.account.title');
     nicknameLabel.textContent = t('settings.account.nickname');
-    editNicknameBtn.textContent = t('settings.account.edit');
+    editNicknameBtn.textContent = isEditing
+      ? t('settings.account.save')
+      : t('settings.account.edit');
     linkedCardTitle.textContent = t('settings.linked.title');
     googleRowLabel.textContent = t('settings.linked.google');
     audioCardTitle.textContent = t('settings.audio.title');
@@ -132,17 +136,22 @@ export function mountSettingsScreen(
     }
   }
 
-  async function handleEditNickname(): Promise<void> {
-    const next = await askTextInput({
-      title: t('settings.account.editTitle'),
-      message: t('settings.account.editMessage'),
-      placeholder: t('settings.account.nickname'),
-      initialValue: currentNickname(),
-      confirmLabel: t('settings.account.edit'),
-      cancelLabel: t('settings.back'),
-    });
-    const nickname = next?.trim().slice(0, MAX_NICKNAME_LENGTH);
+  let isEditing = false;
+
+  const sanitizeNickname = (raw: string): string =>
+    raw.trim().slice(0, MAX_NICKNAME_LENGTH);
+
+  const stopEditing = () => {
+    isEditing = false;
+    renderAccount();
+    editNicknameBtn.textContent = t('settings.account.edit');
+    editNicknameBtn.focus();
+  };
+
+  async function commitNickname(raw: string): Promise<void> {
+    const nickname = sanitizeNickname(raw);
     if (!nickname) {
+      stopEditing();
       return;
     }
     if (authSession.user) {
@@ -154,18 +163,62 @@ export function mountSettingsScreen(
     } else {
       setNickname(nickname);
     }
-    renderAccount();
+    stopEditing();
+  }
+
+  const startEditing = () => {
+    if (isEditing) {
+      return;
+    }
+    isEditing = true;
+    editNicknameBtn.textContent = t('settings.account.save');
+
+    nicknameValue.textContent = '';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'st-nickname-input';
+    input.maxLength = MAX_NICKNAME_LENGTH;
+    input.value = currentNickname();
+    input.setAttribute('aria-label', t('settings.account.nickname'));
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        void commitNickname(input.value);
+      } else if (event.key === 'Escape') {
+        // Cancel the edit without bubbling to the screen's Esc-to-back.
+        event.stopPropagation();
+        event.preventDefault();
+        stopEditing();
+      }
+    });
+    nicknameValue.appendChild(input);
+    input.focus();
+    input.select();
+  };
+
+  function handleEditNickname(): void {
+    if (isEditing) {
+      const input = nicknameValue.querySelector<HTMLInputElement>('.st-nickname-input');
+      void commitNickname(input?.value ?? '');
+    } else {
+      startEditing();
+    }
   }
 
   const handleKeydown = (event: KeyboardEvent) => {
     if (event.key === 'Escape') {
+      if (isEditing) {
+        event.stopPropagation();
+        stopEditing();
+        return;
+      }
       event.stopPropagation();
       onBack();
     }
   };
 
   backBtn.addEventListener('click', () => onBack());
-  editNicknameBtn.addEventListener('click', () => void handleEditNickname());
+  editNicknameBtn.addEventListener('click', () => handleEditNickname());
   volumeSlider.addEventListener('input', () => {
     setVolume(Number(volumeSlider.value) / 100);
   });
@@ -209,7 +262,7 @@ function renderShell(): string {
     <main class="st-stage">
       <header class="st-header">
         <h1 class="st-title"></h1>
-        <button type="button" class="st-btn st-btn--primary st-back" data-action="back"></button>
+        <button type="button" class="st-btn st-btn--ghost st-back" data-action="back"></button>
       </header>
       <section class="st-card">
         <h2 class="st-card-title" data-i18n="accountTitle"></h2>
