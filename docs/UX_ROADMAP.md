@@ -11,14 +11,12 @@ Cada item: **o que é**, **por que**, **escopo inicial**. Prioridade: 🔴 alta 
 
 ## 1. Correções / dívida técnica
 
-### 1.1 🔴 HUD re-renderiza inteiro a cada clique
-`GameHud.update()` reconstrói **todo** o HUD (`build()` → destrói e recria
-tudo) sempre que um flag de ação muda (`startEnabled`, `drawEnabled`,
-`roundInProgress`, `unoMode`, etc.). Isso causa flicker e perde estado de
-hover/foco a cada jogada.
-**Alvo:** atualização granular — botões guardam referência e só mudam
-label/estado/visibilidade via método dedicado; `build()` só no resize/troca de
-modo. Reduz custo e elimina o "pisca".
+### 1.1 ✅ HUD re-renderiza inteiro a cada clique — RESOLVIDO
+`GameHud.update()` reconstruía **todo** o HUD a cada flag de ação.
+**Feito:** rebuild só em mudança *estrutural* (`roundInProgress`,
+`canConfigureStart`); enable/disable, status, listas e o valor do stepper são
+aplicados granularmente (`refreshDynamicContent` + `applyButtonState` +
+`refreshStartingCardsStepper`). Sem flicker / sem perder hover por jogada.
 
 ### 1.2 🟡 Reconexão de socket
 Hoje cair a conexão = sair da partida. Adicionar reconnect com re-sync de
@@ -122,7 +120,7 @@ Idioma (já existe no lobby — mover/replicar aqui), reduzir animações
 
 ## Ordem sugerida
 
-1. **1.1** (bug do HUD) — barato e visível em toda partida.
+1. ~~**1.1** (bug do HUD)~~ — ✅ feito.
 2. **2.1** + **6.1/6.2** — menu de conta, configurações e áudio (base do resto).
 3. **3.1** — perfil com win rate + últimos jogos (precisa histórico no server).
 4. **5.1** — pontos/níveis (alimenta store/inventário).
