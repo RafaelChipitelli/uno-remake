@@ -1,7 +1,3 @@
-import { initializeApp, type FirebaseApp } from 'firebase/app';
-import { getAuth, type Auth } from 'firebase/auth';
-import { getFirestore, type Firestore } from 'firebase/firestore';
-
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -23,6 +19,9 @@ const requiredFirebaseConfigKeys: Array<keyof typeof firebaseConfig> = [
 
 const missingKeys = requiredFirebaseConfigKeys.filter((key) => !firebaseConfig[key]);
 
+// Whether Firebase *could* run is knowable from env alone — no SDK needed.
+// Keeping this SDK-free is what lets the auth/store/profile screens probe
+// availability without pulling firebase/* into the initial bundle.
 export const isFirebaseConfigured = missingKeys.length === 0;
 
 if (!isFirebaseConfigured) {
@@ -32,32 +31,12 @@ if (!isFirebaseConfigured) {
   );
 }
 
-let firebaseApp: FirebaseApp | null = null;
-let firebaseAuth: Auth | null = null;
-let firestoreDb: Firestore | null = null;
-
-if (isFirebaseConfigured) {
-  firebaseApp = initializeApp(firebaseConfig);
-  firebaseAuth = getAuth(firebaseApp);
-  firestoreDb = getFirestore(firebaseApp);
-}
-
-function assertFirebaseConfigured(): void {
-  if (!firebaseAuth || !firestoreDb) {
-    throw new Error('Firebase não está configurado. Preencha as variáveis VITE_FIREBASE_* no client/.env.local.');
-  }
-}
-
-export function getFirebaseAuth(): Auth {
-  assertFirebaseConfigured();
-  return firebaseAuth!;
-}
-
-export function getFirestoreDb(): Firestore {
-  assertFirebaseConfigured();
-  return firestoreDb!;
-}
-
 export function getFirebaseProjectId(): string | null {
   return firebaseConfig.projectId || null;
+}
+
+export type FirebaseClientConfig = typeof firebaseConfig;
+
+export function getFirebaseConfig(): FirebaseClientConfig {
+  return firebaseConfig;
 }

@@ -1,67 +1,16 @@
-import {
-  GoogleAuthProvider,
-  onAuthStateChanged,
-  signInWithPopup,
-  signOut,
-  type User,
-} from 'firebase/auth';
-import {
-  addDoc,
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  increment,
-  limit as limitTo,
-  orderBy,
-  query,
-  serverTimestamp,
-  setDoc,
-  Timestamp,
-  updateDoc,
-} from 'firebase/firestore';
-import {
-  getFirebaseAuth,
-  getFirebaseProjectId,
-  getFirestoreDb,
-  isFirebaseConfigured,
-} from '../config/firebase';
-import { karmaForMatch } from './karma';
-import { getDefaultCosmeticId } from './cosmetics';
+import { isFirebaseConfigured } from '../config/firebase';
+import type {
+  AuthSession,
+  MatchSummary,
+  UserProfile,
+} from './playerAccountTypes';
 
-export type UserStats = {
-  gamesPlayed: number;
-  gamesWon: number;
-  gamesLost: number;
-  karma: number;
-};
-
-export type UserProfile = {
-  uid: string;
-  nickname: string;
-  displayName: string | null;
-  email: string | null;
-  emailVerified: boolean;
-  photoURL: string | null;
-  stats: UserStats;
-  equippedCosmetic: string;
-};
-
-export type MatchSummary = {
-  playedAt: number | null;
-  didWin: boolean;
-  opponents: string[];
-  durationMs: number;
-  turns: number;
-  playerCount: number;
-};
-
-export type AuthSession = {
-  firebaseReady: boolean;
-  isLoading: boolean;
-  user: User | null;
-  profile: UserProfile | null;
-};
+export type {
+  AuthSession,
+  MatchSummary,
+  UserProfile,
+  UserStats,
+} from './playerAccountTypes';
 
 type SessionListener = (session: AuthSession) => void;
 
@@ -70,80 +19,16 @@ type FirebaseLikeError = {
   message?: string;
 };
 
-const DEFAULT_STATS: UserStats = {
-  gamesPlayed: 0,
-  gamesWon: 0,
-  gamesLost: 0,
-  karma: 0,
-};
+type FirebaseGateway = typeof import('./playerAccountFirebase');
 
 const listeners = new Set<SessionListener>();
 
-let hasStartedAuthObserver = false;
 let currentSession: AuthSession = {
   firebaseReady: isFirebaseConfigured,
   isLoading: isFirebaseConfigured,
   user: null,
   profile: null,
 };
-
-function sanitizeNickname(rawNickname: string | null | undefined): string {
-  const nickname = rawNickname?.trim();
-  if (!nickname) {
-    return '';
-  }
-
-  return nickname.slice(0, 20);
-}
-
-function getDefaultNickname(user: User): string {
-  return sanitizeNickname(user.displayName) || `Player-${user.uid.slice(0, 4)}`;
-}
-
-function getAuthProviderIds(user: User): string[] {
-  const providers = user.providerData
-    .map((provider) => provider.providerId)
-    .filter((providerId): providerId is string => Boolean(providerId));
-
-  return providers.length > 0 ? providers : ['unknown'];
-}
-
-function getPrimaryAuthProvider(user: User): string {
-  const providerIds = getAuthProviderIds(user);
-
-  if (providerIds.includes('google.com')) {
-    return 'google.com';
-  }
-
-  return providerIds[0] ?? 'unknown';
-}
-
-function normalizeStats(rawStats: unknown): UserStats {
-  if (!rawStats || typeof rawStats !== 'object') {
-    return { ...DEFAULT_STATS };
-  }
-
-  const statsRecord = rawStats as Record<string, unknown>;
-  const gamesPlayed = Number(statsRecord.gamesPlayed);
-  const gamesWon = Number(statsRecord.gamesWon);
-  const gamesLost = Number(statsRecord.gamesLost);
-  // Old users predate the karma field; missing/garbage normalizes to 0.
-  const karma = Number(statsRecord.karma);
-
-  return {
-    gamesPlayed: Number.isFinite(gamesPlayed) && gamesPlayed >= 0 ? gamesPlayed : 0,
-    gamesWon: Number.isFinite(gamesWon) && gamesWon >= 0 ? gamesWon : 0,
-    gamesLost: Number.isFinite(gamesLost) && gamesLost >= 0 ? gamesLost : 0,
-    karma: Number.isFinite(karma) && karma >= 0 ? Math.floor(karma) : 0,
-  };
-}
-
-// Older profiles predate cosmetics; missing/garbage normalizes to the
-// default skin id. Validity against the catalog (and unlock gating) is the
-// cosmetics layer's job — this only guarantees a non-empty string.
-function normalizeEquippedCosmetic(raw: unknown): string {
-  return typeof raw === 'string' && raw.length > 0 ? raw : getDefaultCosmeticId();
-}
 
 function emitSession(): void {
   listeners.forEach((listener) => listener(currentSession));
@@ -157,138 +42,48 @@ function setSession(next: Partial<AuthSession>): void {
   emitSession();
 }
 
-function getFirebaseErrorCode(error: unknown): string | null {
-  const firebaseError = error as FirebaseLikeError | null;
-  return firebaseError?.code ?? null;
+function getSession(): AuthSession {
+  return currentSession;
 }
 
-function getFirebaseErrorMessage(error: unknown): string {
-  const firebaseError = error as FirebaseLikeError | null;
-  return firebaseError?.message || 'Erro Firebase desconhecido.';
-}
+const sessionAccess = { setSession, getSession };
 
-function buildFirebaseDebugContext(user?: User): Record<string, unknown> {
-  return {
-    projectId: getFirebaseProjectId(),
-    uid: user?.uid ?? null,
-    email: user?.email ?? null,
-    authConfigured: isFirebaseConfigured,
-  };
-}
+// The lazy Firebase boundary: firebase/* + the SDK init + all Firestore/Auth
+// logic live behind this dynamic import(), so Rollup emits them as a separate
+// chunk that the initial bundle never loads. Nothing here imports the SDK
+// statically — availability is derived from env (isFirebaseConfigured), and
+// the chunk is fetched on first auth/profile/store/stats use. The promise is
+// memoized so concurrent callers share one load + one auth observer.
+let gatewayPromise: Promise<FirebaseGateway> | null = null;
+let hasStartedAuthObserver = false;
 
-async function ensureUserProfile(user: User): Promise<UserProfile> {
-  const db = getFirestoreDb();
-  const userRef = doc(db, 'users', user.uid);
-  const snapshot = await getDoc(userRef);
-
-  const existingData = snapshot.exists() ? snapshot.data() : undefined;
-  const existingStats = normalizeStats(existingData?.stats);
-  const equippedCosmetic = normalizeEquippedCosmetic(existingData?.equippedCosmetic);
-  const nickname = sanitizeNickname(existingData?.nickname as string | undefined) || getDefaultNickname(user);
-
-  const profile: UserProfile = {
-    uid: user.uid,
-    nickname,
-    displayName: user.displayName ?? null,
-    email: user.email ?? null,
-    emailVerified: user.emailVerified,
-    photoURL: user.photoURL ?? null,
-    stats: existingStats,
-    equippedCosmetic,
-  };
-
-  const providerIds = getAuthProviderIds(user);
-
-  const userDocument: Record<string, unknown> = {
-    uid: profile.uid,
-    nickname: profile.nickname,
-    displayName: profile.displayName,
-    email: profile.email,
-    emailVerified: profile.emailVerified,
-    photoURL: profile.photoURL,
-    authProvider: getPrimaryAuthProvider(user),
-    providerIds,
-    stats: profile.stats,
-    equippedCosmetic: profile.equippedCosmetic,
-    updatedAt: serverTimestamp(),
-    lastLoginAt: serverTimestamp(),
-    lastSeenAt: serverTimestamp(),
-  };
-
-  if (snapshot.exists()) {
-    userDocument.createdAt = existingData?.createdAt ?? serverTimestamp();
-  } else {
-    userDocument.createdAt = serverTimestamp();
+function loadGateway(): Promise<FirebaseGateway> {
+  if (!gatewayPromise) {
+    gatewayPromise = import('./playerAccountFirebase');
   }
-
-  await setDoc(
-    userRef,
-    userDocument,
-    { merge: true },
-  );
-
-  return profile;
+  return gatewayPromise;
 }
 
+// Synchronous-looking subscribe contract preserved: callers get the current
+// session immediately and an unsubscribe. Behind the scenes the first
+// subscriber/probe kicks off the lazy Firebase load; once the SDK chunk is in
+// and the auth observer fires, the real session is pushed through setSession.
 function startAuthObserverIfNeeded(): void {
   if (!isFirebaseConfigured || hasStartedAuthObserver) {
     return;
   }
 
   hasStartedAuthObserver = true;
-  const auth = getFirebaseAuth();
-
-  onAuthStateChanged(
-    auth,
-    async (user) => {
-      if (!user) {
-        setSession({ user: null, profile: null, isLoading: false });
-        return;
-      }
-
-      setSession({ user, profile: null, isLoading: false });
-      const expectedUid = user.uid;
-
-      try {
-        const profile = await ensureUserProfile(user);
-        if (currentSession.user?.uid !== expectedUid) {
-          return;
-        }
-
-        setSession({ profile, isLoading: false });
-      } catch (error) {
-        console.error(
-          '[firebase] Falha ao sincronizar perfil no Firestore.',
-          {
-            code: getFirebaseErrorCode(error),
-            message: getFirebaseErrorMessage(error),
-            context: buildFirebaseDebugContext(user),
-          },
-        );
-        if (currentSession.user?.uid !== expectedUid) {
-          return;
-        }
-
-        setSession({
-          profile: {
-            uid: user.uid,
-            nickname: getDefaultNickname(user),
-            displayName: user.displayName ?? null,
-            email: user.email ?? null,
-            emailVerified: user.emailVerified,
-            photoURL: user.photoURL ?? null,
-            stats: { ...DEFAULT_STATS },
-            equippedCosmetic: getDefaultCosmeticId(),
-          },
-          isLoading: false,
-        });
-      }
-    },
-    (error) => {
-      console.error('[firebase] Falha no listener de autenticação.', error);
+  loadGateway()
+    .then((gateway) => {
+      gateway.startAuthObserver(sessionAccess);
+    })
+    .catch((error) => {
+      console.error('[firebase] Falha ao carregar módulo de autenticação.', error);
+      // Without the SDK there is no session to wait for; stop the spinner so
+      // the UI degrades to the guest/offline state instead of hanging.
       setSession({ user: null, profile: null, isLoading: false });
-    },
-  );
+    });
 }
 
 export function isAuthenticationAvailable(): boolean {
@@ -315,16 +110,8 @@ export async function signInWithGoogle(): Promise<void> {
     throw new Error('Firebase não configurado. Defina as variáveis VITE_FIREBASE_* para habilitar login.');
   }
 
-  const auth = getFirebaseAuth();
-  const provider = new GoogleAuthProvider();
-  const credential = await signInWithPopup(auth, provider);
-
-  const profile = await ensureUserProfile(credential.user);
-  setSession({
-    user: credential.user,
-    profile,
-    isLoading: false,
-  });
+  const gateway = await loadGateway();
+  await gateway.signInWithGoogle(sessionAccess);
 }
 
 export async function signOutCurrentUser(): Promise<void> {
@@ -332,7 +119,8 @@ export async function signOutCurrentUser(): Promise<void> {
     return;
   }
 
-  await signOut(getFirebaseAuth());
+  const gateway = await loadGateway();
+  await gateway.signOutCurrentUser();
 }
 
 export async function updateCurrentUserNickname(rawNickname: string): Promise<UserProfile | null> {
@@ -340,88 +128,17 @@ export async function updateCurrentUserNickname(rawNickname: string): Promise<Us
     return null;
   }
 
-  const nickname = sanitizeNickname(rawNickname);
-  if (!nickname) {
-    throw new Error('Nickname inválido.');
-  }
-
-  const user = currentSession.user;
-  const db = getFirestoreDb();
-  const userRef = doc(db, 'users', user.uid);
-
-  const userDocument: Record<string, unknown> = {
-    uid: user.uid,
-    nickname,
-    displayName: user.displayName ?? null,
-    email: user.email ?? null,
-    emailVerified: user.emailVerified,
-    photoURL: user.photoURL ?? null,
-    authProvider: getPrimaryAuthProvider(user),
-    providerIds: getAuthProviderIds(user),
-    stats: currentSession.profile?.stats ?? { ...DEFAULT_STATS },
-    equippedCosmetic: currentSession.profile?.equippedCosmetic ?? getDefaultCosmeticId(),
-    updatedAt: serverTimestamp(),
-    lastLoginAt: serverTimestamp(),
-    lastSeenAt: serverTimestamp(),
-  };
-
-  if (!currentSession.profile) {
-    userDocument.createdAt = serverTimestamp();
-  }
-
-  await setDoc(
-    userRef,
-    userDocument,
-    { merge: true },
-  );
-
-  const updatedProfile: UserProfile = {
-    uid: user.uid,
-    nickname,
-    displayName: user.displayName ?? null,
-    email: user.email ?? null,
-    emailVerified: user.emailVerified,
-    photoURL: user.photoURL ?? null,
-    stats: currentSession.profile?.stats ?? { ...DEFAULT_STATS },
-    equippedCosmetic: currentSession.profile?.equippedCosmetic ?? getDefaultCosmeticId(),
-  };
-
-  setSession({ profile: updatedProfile });
-  return updatedProfile;
+  const gateway = await loadGateway();
+  return gateway.updateCurrentUserNickname(sessionAccess, rawNickname);
 }
 
-/**
- * Persists the equipped card-back skin on the user's Firestore profile.
- * Guarded like the other writers (no-op when unauth / Firebase unavailable)
- * and never throws into the UI — equipping must always succeed locally even
- * if the cloud write fails. Validity/unlock gating is the cosmetics layer's
- * job; this only stores the chosen id and mirrors it into the session.
- */
 export async function setEquippedCosmetic(id: string): Promise<void> {
   if (!isFirebaseConfigured || !currentSession.user || !id) {
     return;
   }
 
-  const user = currentSession.user;
-
-  if (currentSession.profile) {
-    setSession({ profile: { ...currentSession.profile, equippedCosmetic: id } });
-  }
-
-  try {
-    const db = getFirestoreDb();
-    const userRef = doc(db, 'users', user.uid);
-    await updateDoc(userRef, {
-      equippedCosmetic: id,
-      updatedAt: serverTimestamp(),
-    });
-  } catch (error) {
-    console.error('[firebase] Falha ao salvar cosmético equipado.', {
-      code: getFirebaseErrorCode(error),
-      message: getFirebaseErrorMessage(error),
-      context: buildFirebaseDebugContext(user),
-    });
-  }
+  const gateway = await loadGateway();
+  await gateway.setEquippedCosmetic(sessionAccess, id);
 }
 
 export async function recordCurrentUserMatchResult(didWin: boolean): Promise<UserProfile | null> {
@@ -429,73 +146,8 @@ export async function recordCurrentUserMatchResult(didWin: boolean): Promise<Use
     return null;
   }
 
-  const user = currentSession.user;
-  let profile = currentSession.profile;
-
-  if (!profile) {
-    profile = await ensureUserProfile(user);
-    setSession({ profile });
-  }
-
-  const db = getFirestoreDb();
-  const userRef = doc(db, 'users', user.uid);
-  const nickname = profile.nickname ?? getDefaultNickname(user);
-  const existingStats = profile.stats ?? { ...DEFAULT_STATS };
-
-  const userDocument: Record<string, unknown> = {
-    uid: user.uid,
-    nickname,
-    displayName: user.displayName ?? null,
-    email: user.email ?? null,
-    emailVerified: user.emailVerified,
-    photoURL: user.photoURL ?? null,
-    authProvider: getPrimaryAuthProvider(user),
-    providerIds: getAuthProviderIds(user),
-    stats: existingStats,
-    equippedCosmetic: profile.equippedCosmetic ?? getDefaultCosmeticId(),
-    updatedAt: serverTimestamp(),
-    lastLoginAt: serverTimestamp(),
-    lastSeenAt: serverTimestamp(),
-  };
-
-  if (!currentSession.profile) {
-    userDocument.createdAt = serverTimestamp();
-  }
-
-  await setDoc(
-    userRef,
-    userDocument,
-    { merge: true },
-  );
-
-  const earnedKarma = karmaForMatch(didWin);
-
-  await updateDoc(userRef, {
-    'stats.gamesPlayed': increment(1),
-    'stats.gamesWon': increment(didWin ? 1 : 0),
-    'stats.gamesLost': increment(didWin ? 0 : 1),
-    'stats.karma': increment(earnedKarma),
-    updatedAt: serverTimestamp(),
-  });
-
-  const updatedProfile: UserProfile = {
-    uid: user.uid,
-    nickname,
-    displayName: user.displayName ?? null,
-    email: user.email ?? null,
-    emailVerified: user.emailVerified,
-    photoURL: user.photoURL ?? null,
-    stats: {
-      gamesPlayed: existingStats.gamesPlayed + 1,
-      gamesWon: existingStats.gamesWon + (didWin ? 1 : 0),
-      gamesLost: existingStats.gamesLost + (didWin ? 0 : 1),
-      karma: existingStats.karma + earnedKarma,
-    },
-    equippedCosmetic: profile.equippedCosmetic ?? getDefaultCosmeticId(),
-  };
-
-  setSession({ profile: updatedProfile });
-  return updatedProfile;
+  const gateway = await loadGateway();
+  return gateway.recordCurrentUserMatchResult(sessionAccess, didWin);
 }
 
 export async function recordCurrentUserMatchSummary(
@@ -505,54 +157,8 @@ export async function recordCurrentUserMatchSummary(
     return;
   }
 
-  const user = currentSession.user;
-  const db = getFirestoreDb();
-  const matchesRef = collection(db, 'users', user.uid, 'matches');
-
-  await addDoc(matchesRef, {
-    playedAt: serverTimestamp(),
-    didWin: summary.didWin,
-    opponents: summary.opponents,
-    durationMs: Math.max(0, Math.round(summary.durationMs)),
-    turns: Math.max(0, Math.round(summary.turns)),
-    playerCount: Math.max(0, Math.round(summary.playerCount)),
-  });
-}
-
-function toEpochMs(rawPlayedAt: unknown): number | null {
-  // serverTimestamp() reads back null until the server resolves it; tolerate
-  // that plus already-resolved Timestamp / Date / epoch shapes.
-  if (rawPlayedAt instanceof Timestamp) {
-    return rawPlayedAt.toMillis();
-  }
-  if (rawPlayedAt instanceof Date) {
-    return rawPlayedAt.getTime();
-  }
-  if (typeof rawPlayedAt === 'number' && Number.isFinite(rawPlayedAt)) {
-    return rawPlayedAt;
-  }
-  return null;
-}
-
-function toMatchSummary(data: Record<string, unknown>): MatchSummary {
-  const rawOpponents = Array.isArray(data.opponents) ? data.opponents : [];
-  const opponents = rawOpponents
-    .filter((entry): entry is string => typeof entry === 'string')
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-
-  const durationMs = Number(data.durationMs);
-  const turns = Number(data.turns);
-  const playerCount = Number(data.playerCount);
-
-  return {
-    playedAt: toEpochMs(data.playedAt),
-    didWin: data.didWin === true,
-    opponents,
-    durationMs: Number.isFinite(durationMs) && durationMs >= 0 ? durationMs : 0,
-    turns: Number.isFinite(turns) && turns >= 0 ? turns : 0,
-    playerCount: Number.isFinite(playerCount) && playerCount >= 0 ? playerCount : 0,
-  };
+  const gateway = await loadGateway();
+  await gateway.recordCurrentUserMatchSummary(sessionAccess, summary);
 }
 
 export async function fetchRecentMatches(max = 20): Promise<MatchSummary[]> {
@@ -560,18 +166,8 @@ export async function fetchRecentMatches(max = 20): Promise<MatchSummary[]> {
     return [];
   }
 
-  try {
-    const user = currentSession.user;
-    const db = getFirestoreDb();
-    const matchesRef = collection(db, 'users', user.uid, 'matches');
-    const recentQuery = query(matchesRef, orderBy('playedAt', 'desc'), limitTo(max));
-    const snapshot = await getDocs(recentQuery);
-
-    return snapshot.docs.map((matchDoc) => toMatchSummary(matchDoc.data()));
-  } catch (error) {
-    console.error('[firebase] Falha ao carregar histórico de partidas.', error);
-    return [];
-  }
+  const gateway = await loadGateway();
+  return gateway.fetchRecentMatches(sessionAccess, max);
 }
 
 export function describeFirebasePersistenceError(error: unknown): string {
@@ -592,4 +188,9 @@ export function describeFirebasePersistenceError(error: unknown): string {
     default:
       return `Falha Firebase ao persistir estatísticas (${code}): ${getFirebaseErrorMessage(error)}`;
   }
+}
+
+function getFirebaseErrorMessage(error: unknown): string {
+  const firebaseError = error as FirebaseLikeError | null;
+  return firebaseError?.message || 'Erro Firebase desconhecido.';
 }

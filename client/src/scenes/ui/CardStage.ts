@@ -946,7 +946,26 @@ export default class CardStage {
     // Anchor strictly above the top edge of the hand (cards are centered at
     // baseY and lift on hover), so the button never overlaps the cards.
     const cardTop = baseY - cardHeight / 2 - CardStage.CARD_HOVER_OFFSET_Y;
-    const centerY = cardTop - 14 - height / 2;
+    let centerY = cardTop - 14 - height / 2;
+
+    // The turn pill + direction label are positioned independently of the
+    // hand, so on short overlay viewports the floating UNO! button can land
+    // on top of them or the table card. Clamp it into the free band between
+    // those obstacles and the hand; if that band is too thin, dock it inline
+    // beside the bottom of the hand instead of floating over the indicator.
+    // Cosmetic-safe: any unusable measurement falls back to the anchor above.
+    const obstacleBottom = compact ? this.getUnoButtonObstacleBottom() : Number.NaN;
+    if (Number.isFinite(obstacleBottom)) {
+      const minCenterY = obstacleBottom + 12 + height / 2;
+      const maxCenterY = cardTop - 14 - height / 2;
+      if (minCenterY <= maxCenterY) {
+        centerY = clamp(centerY, minCenterY, maxCenterY);
+      } else {
+        // No safe band: dock just above the hand's bottom edge so it stays
+        // reachable and clear of the indicator rather than overlapping it.
+        centerY = baseY + cardHeight / 2 + 10 + height / 2;
+      }
+    }
     const palette = isDeclare
       ? phaserTheme.colors.action.primary
       : phaserTheme.colors.action.danger;
@@ -1005,6 +1024,39 @@ export default class CardStage {
     }
 
     this.unoButton = { container, zone };
+  }
+
+  // Lowest screen Y occupied by the turn pill (incl. the direction label when
+  // shown) and the table card — the obstacles the floating UNO! button must
+  // clear. Returns NaN when nothing is laid out yet so the caller keeps its
+  // default anchor. Never throws (cosmetic UI must always render).
+  private getUnoButtonObstacleBottom(): number {
+    try {
+      let bottom = Number.NEGATIVE_INFINITY;
+
+      const indicator = this.turnIndicatorContainer;
+      if (indicator && indicator.visible) {
+        const indicatorHeight = this.options.compact ? 38 : 44;
+        let indicatorBottom = indicator.y + indicatorHeight / 2;
+        if (this.directionLabel && this.directionLabel.visible) {
+          indicatorBottom =
+            indicator.y + this.directionLabel.y + this.directionLabel.height / 2;
+        }
+        bottom = Math.max(bottom, indicatorBottom);
+      }
+
+      const table = this.tableContainer;
+      if (table && table.visible) {
+        // Mirrors the table-card sizing used at build/relayout.
+        const tableCardWidth = clamp(146 * (this.options.tableCardScale ?? 1), 104, 152);
+        const tableCardHeight = tableCardWidth * 1.44;
+        bottom = Math.max(bottom, table.y + tableCardHeight / 2);
+      }
+
+      return Number.isFinite(bottom) ? bottom : Number.NaN;
+    } catch {
+      return Number.NaN;
+    }
   }
 
   private syncHandNavigationUi(

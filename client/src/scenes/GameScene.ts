@@ -71,6 +71,7 @@ export default class GameScene extends Phaser.Scene {
   private hud?: GameHud;
   private cardStage?: CardStage;
   private responsiveLayout!: ResponsiveGameLayout;
+  private pendingResize?: Phaser.Time.TimerEvent;
 
   private player?: Player;
   private roomId?: string;
@@ -219,6 +220,8 @@ export default class GameScene extends Phaser.Scene {
       this.clearColorSelectionModal();
       this.unregisterKeyboardShortcuts();
       this.scale.off('resize', this.handleResize, this);
+      this.pendingResize?.remove(false);
+      this.pendingResize = undefined;
 
       if (this.socket.connected) {
         this.socket.disconnect();
@@ -464,8 +467,6 @@ export default class GameScene extends Phaser.Scene {
       } else {
         this.statusMessage = t('game.status.running');
       }
-      this.setStatus(this.statusMessage, currentPlayer?.nickname ?? getInitialTurnMessage());
-      this.syncHudActions();
     }
 
     this.cardStage?.setTurnIndicator({
@@ -489,7 +490,22 @@ export default class GameScene extends Phaser.Scene {
         })
         .join('\n') || t('game.players.roomEmpty');
 
-    this.updateRoomDetails(playerList);
+    // server pushes room:state after every play/draw by anyone; collapse the
+    // status + actions + room-detail writes into one hud.update so each push
+    // triggers a single refresh pass instead of 3+.
+    this.lastPlayerListMessage = playerList;
+    this.hud?.update({
+      status: this.statusMessage,
+      ...(me ? { currentTurn: currentPlayer?.nickname ?? getInitialTurnMessage() } : {}),
+      roomLabel: this.getRoomLabel(),
+      playerList: this.lastPlayerListMessage,
+      leaveEnabled: this.canLeaveRoom(),
+      startEnabled: this.canStartGame(),
+      drawEnabled: this.canDrawCard(),
+      roundInProgress: this.isRoundInProgress(),
+      startingCards: this.startingHandSize,
+      canConfigureStart: this.canStartGame(),
+    });
     this.syncUnoButton();
   }
 
@@ -1114,7 +1130,20 @@ export default class GameScene extends Phaser.Scene {
     this.scene.start(SCENE_KEYS.title);
   }
 
-  private handleResize(size: Phaser.Structs.Size): void {
+  // Scale.RESIZE fires continuously during a window drag or a mobile URL-bar
+  // show/hide, and each rebuild fully destroys+recreates every canvas object.
+  // Debounce so a burst collapses into one trailing rebuild against the final
+  // size. The timer is cancelled on every new resize and on shutdown so it
+  // never fires on a torn-down scene.
+  private handleResize(): void {
+    this.pendingResize?.remove(false);
+    this.pendingResize = this.time.delayedCall(110, () => {
+      this.pendingResize = undefined;
+      this.rebuildLayout(this.scale.gameSize);
+    });
+  }
+
+  private rebuildLayout(size: Phaser.Structs.Size): void {
     this.responsiveLayout = getResponsiveGameLayout(size.width, size.height);
     this.cameras.resize(size.width, size.height);
     this.drawBackdrop();
