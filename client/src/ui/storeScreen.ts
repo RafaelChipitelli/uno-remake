@@ -52,6 +52,18 @@ export function mountStoreScreen(
   const guestNoteEl = container.querySelector<HTMLElement>('.sc-guest-note')!;
   const liveEl = container.querySelector<HTMLElement>('.sc-live')!;
 
+  const showToast = (message: string) => {
+    const toast = document.createElement('div');
+    toast.className = 'ts-toast';
+    toast.textContent = message;
+    container.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('is-visible'));
+    window.setTimeout(() => {
+      toast.classList.remove('is-visible');
+      window.setTimeout(() => toast.remove(), 220);
+    }, 1900);
+  };
+
   const currentLevel = (): number =>
     levelForKarma(authSession.profile?.stats?.karma ?? 0).level;
 
@@ -107,7 +119,9 @@ export function mountStoreScreen(
       action.setAttribute('aria-label', `${t('store.state.equip')}: ${name}`);
       action.addEventListener('click', () => {
         const effective = equipCosmetic(item.id);
-        liveEl.textContent = t('store.equippedToast', { name: t(effective.nameKey) });
+        const message = t('store.equippedToast', { name: t(effective.nameKey) });
+        liveEl.textContent = message;
+        showToast(message);
       });
     }
 
@@ -187,7 +201,7 @@ function renderShell(): string {
     <main class="st-stage">
       <header class="st-header">
         <h1 class="st-title"></h1>
-        <button type="button" class="st-btn st-btn--primary st-back" data-action="back"></button>
+        <button type="button" class="st-btn st-btn--ghost st-back" data-action="back"></button>
       </header>
       <section class="st-card sc-intro">
         <p class="sc-subtitle"></p>

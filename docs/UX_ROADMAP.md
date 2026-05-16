@@ -25,6 +25,18 @@ estado da sala (o servidor já é autoritativo; falta o cliente reentrar).
 ### 1.3 🟡 Foco/teclado e acessibilidade no lobby DOM
 Estados de foco visíveis, navegação por Tab, `aria-label` nos botões do lobby.
 
+### 1.4 ✅ Nickname do usuário logado (perda de dado) — RESOLVIDO (Lote G)
+Logado: campo livre do lobby removido (nick da conta, read-only + dica
+"editável em Configurações"); `ensureNicknameForPlay` nunca mais gera
+`Player-XXXX` nem sobrescreve o nick salvo. Convidado: inalterado.
+
+### 1.5 ✅ Editar→Salvar + a11y/touch — RESOLVIDO (Lote G)
+Configurações: edição inline de nickname (Editar→Salvar, Enter/Esc). Quick-wins:
+alvos ≥44px (bandeiras, mute), botão Voltar como ghost, toast visível ao
+equipar skin, lacunas de `prefers-reduced-motion` cobertas, header de convidado
+no perfil. **Pendente p/ Lote H:** lazy Firebase, debounce resize, lobby scroll
+em tela curta, dropdown overflow, colisão do botão UNO! no overlay mobile.
+
 ---
 
 ## 2. Menu / navegação (topo, estilo Richup)

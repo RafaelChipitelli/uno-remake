@@ -108,13 +108,15 @@ export function mountProfileScreen(
     '—';
 
   const renderHeader = () => {
+    const signedIn = isSignedIn();
+    const headerName = signedIn ? statName() : t('profile.guest.name');
     renderAvatarContent(avatarEl, {
       photoURL: authSession.user?.photoURL,
-      name: statName(),
+      name: headerName,
     });
-    nameEl.textContent = statName();
-    memberEl.textContent = isSignedIn() ? formatMemberSince() : '';
-    memberEl.hidden = !isSignedIn();
+    nameEl.textContent = headerName;
+    memberEl.textContent = signedIn ? formatMemberSince() : t('profile.guest.subtitle');
+    memberEl.hidden = false;
   };
 
   const statTile = (label: string, value: string): HTMLElement => {
@@ -357,7 +359,7 @@ function renderShell(): string {
     <main class="st-stage">
       <header class="st-header">
         <h1 class="st-title"></h1>
-        <button type="button" class="st-btn st-btn--primary st-back" data-action="back"></button>
+        <button type="button" class="st-btn st-btn--ghost st-back" data-action="back"></button>
       </header>
       <section class="st-card pf-header-card">
         <div class="pf-avatar" aria-hidden="true"></div>
