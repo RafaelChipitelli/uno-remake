@@ -68,6 +68,7 @@ Readmes específicos:
 
 - `client/README.md`
 - `server/README.md`
+- `docs/UX_ROADMAP.md` — backlog de UI/UX (menu, perfil, store, áudio, níveis, etc.)
 
 ---
 
