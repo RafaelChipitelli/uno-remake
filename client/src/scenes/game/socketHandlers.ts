@@ -23,7 +23,7 @@ export type GameSceneSocketCallbacks = {
   onRoomLeft: () => void;
   onConnectError: (err: Error) => void;
   onUnoCalled: (payload: { playerId: string; nickname: string }) => void;
-  onUnoPenalty: (payload: { playerId: string; nickname: string; cards: number }) => void;
+  onUnoPenalty: (payload: { playerId: string; nickname: string; cards: number; byNickname?: string }) => void;
 };
 
 export function registerGameSceneSocketHandlers(

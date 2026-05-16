@@ -5,7 +5,7 @@ import { createUnoDeck, isValidCardPlay, shuffleDeck } from '../core/cards';
 import { createCustomCards } from '../core/customCards';
 import { drawCardsForPlayer, refillDrawPileFromDiscard } from '../core/draw';
 import { getNextPlayerIndex, passTurnToNextPlayer } from '../core/turns';
-import { canDeclareUno, resolveUnoAfterPlay, UNO_PENALTY_CARDS } from '../core/uno';
+import { canDeclareUno, isUnoVulnerable, shouldClearUnoFlag, UNO_PENALTY_CARDS } from '../core/uno';
 import type { Card, Player, Room } from '../types';
 
 let cardSeq = 0;
@@ -175,20 +175,24 @@ test('canDeclareUno only allows declaring at one or two cards', () => {
   assert.equal(canDeclareUno(3), false);
 });
 
-test('resolveUnoAfterPlay penalizes a silent player left with one card', () => {
-  const outcome = resolveUnoAfterPlay(1, false);
-  assert.equal(outcome.penalty, UNO_PENALTY_CARDS);
-  assert.equal(outcome.cleared, true);
+test('isUnoVulnerable: one undeclared card can be challenged', () => {
+  assert.equal(isUnoVulnerable(1, false), true);
 });
 
-test('resolveUnoAfterPlay does not penalize a player who declared UNO', () => {
-  const outcome = resolveUnoAfterPlay(1, true);
-  assert.equal(outcome.penalty, 0);
-  assert.equal(outcome.cleared, false);
+test('isUnoVulnerable: a declared single card is safe', () => {
+  assert.equal(isUnoVulnerable(1, true), false);
 });
 
-test('resolveUnoAfterPlay clears the declaration when not at one card', () => {
-  const outcome = resolveUnoAfterPlay(5, true);
-  assert.equal(outcome.penalty, 0);
-  assert.equal(outcome.cleared, true);
+test('isUnoVulnerable: more than one card is never vulnerable', () => {
+  assert.equal(isUnoVulnerable(3, false), false);
+});
+
+test('shouldClearUnoFlag resets the declaration unless still at one card', () => {
+  assert.equal(shouldClearUnoFlag(1), false);
+  assert.equal(shouldClearUnoFlag(2), true);
+  assert.equal(shouldClearUnoFlag(0), true);
+});
+
+test('UNO penalty is two cards', () => {
+  assert.equal(UNO_PENALTY_CARDS, 2);
 });
