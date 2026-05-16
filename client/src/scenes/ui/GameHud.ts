@@ -545,22 +545,26 @@ export default class GameHud {
     zone.on('pointerover', () => {
       if (!zone.input?.enabled) return;
       redraw('hover');
-      this.scene.tweens.add({ targets: container, scaleX: 1.03, scaleY: 1.03, duration: 180, ease: 'Quad.easeOut' });
+      this.scene.tweens.killTweensOf(container);
+      this.scene.tweens.add({ targets: container, scaleX: 1.03, scaleY: 1.03, duration: 120, ease: 'Quad.easeOut' });
     });
 
     zone.on('pointerout', () => {
       redraw('base');
-      this.scene.tweens.add({ targets: container, scaleX: 1, scaleY: 1, duration: 180, ease: 'Quad.easeOut' });
+      this.scene.tweens.killTweensOf(container);
+      this.scene.tweens.add({ targets: container, scaleX: 1, scaleY: 1, duration: 120, ease: 'Quad.easeOut' });
     });
 
     zone.on('pointerdown', () => {
       if (!zone.input?.enabled) return;
-      this.scene.tweens.add({ targets: container, scaleX: 0.97, scaleY: 0.97, duration: 120, ease: 'Quad.easeInOut' });
+      this.scene.tweens.killTweensOf(container);
+      this.scene.tweens.add({ targets: container, scaleX: 0.97, scaleY: 0.97, duration: 90, ease: 'Quad.easeInOut' });
     });
 
     zone.on('pointerup', () => {
       if (!zone.input?.enabled) return;
-      this.scene.tweens.add({ targets: container, scaleX: 1, scaleY: 1, duration: 120, ease: 'Quad.easeOut' });
+      this.scene.tweens.killTweensOf(container);
+      this.scene.tweens.add({ targets: container, scaleX: 1, scaleY: 1, duration: 90, ease: 'Quad.easeOut' });
       onClick();
     });
 

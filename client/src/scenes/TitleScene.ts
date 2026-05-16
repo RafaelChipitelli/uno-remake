@@ -699,16 +699,20 @@ export default class TitleScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
 
+    const idleGlow = variant === 'primary' ? 0.26 : 0.16;
+    const hoverGlow = variant === 'primary' ? 0.42 : 0.28;
     const lift = (active: boolean) => {
+      this.tweens.killTweensOf(container);
+      this.tweens.killTweensOf(glow);
       this.tweens.add({
         targets: container,
         y: active ? y - 3 : y,
         scaleX: active ? 1.025 : 1,
         scaleY: active ? 1.025 : 1,
-        duration: 200,
+        duration: 120,
         ease: 'Quad.easeOut',
       });
-      this.tweens.add({ targets: glow, alpha: active ? (variant === 'primary' ? 0.42 : 0.28) : (variant === 'primary' ? 0.26 : 0.16), duration: 200 });
+      this.tweens.add({ targets: glow, alpha: active ? hoverGlow : idleGlow, duration: 120 });
     };
 
     zone.on('pointerover', () => {
@@ -720,10 +724,12 @@ export default class TitleScene extends Phaser.Scene {
       lift(false);
     });
     zone.on('pointerdown', () => {
-      this.tweens.add({ targets: container, scaleX: 0.97, scaleY: 0.97, duration: 110, ease: 'Quad.easeInOut' });
+      this.tweens.killTweensOf(container);
+      this.tweens.add({ targets: container, scaleX: 0.97, scaleY: 0.97, duration: 90, ease: 'Quad.easeInOut' });
     });
     zone.on('pointerup', () => {
-      this.tweens.add({ targets: container, scaleX: 1.025, scaleY: 1.025, duration: 110, ease: 'Quad.easeOut' });
+      this.tweens.killTweensOf(container);
+      this.tweens.add({ targets: container, scaleX: 1.025, scaleY: 1.025, duration: 90, ease: 'Quad.easeOut' });
       void config.onClick();
     });
 
