@@ -449,20 +449,21 @@ canvas:focus-visible {
   opacity: 0.45;
 }
 
-/* Warm glow under the symbol cluster, like Richup's lower-center light. */
+/* Warm glow under the card pile, like Richup's lower-center light. */
 .ts-glow--bottom {
-  width: 60vw;
-  height: 40vw;
-  bottom: -16vw;
+  width: 42vw;
+  height: 30vw;
+  bottom: -10vw;
   left: 50%;
   transform: translateX(-50%);
   background: radial-gradient(
     ellipse at center,
-    color-mix(in srgb, #f4b740 50%, transparent) 0%,
-    transparent 70%
+    color-mix(in srgb, #f4a73a 70%, transparent) 0%,
+    color-mix(in srgb, var(--color-action-primary, #7b42e8) 40%, transparent) 45%,
+    transparent 72%
   );
-  opacity: 0.16;
-  filter: blur(70px);
+  opacity: 0.4;
+  filter: blur(55px);
 }
 
 .ts-glyph {
@@ -478,6 +479,43 @@ canvas:focus-visible {
 @keyframes ts-float {
   0%, 100% { transform: translate(-50%, -50%) rotate(-4deg); }
   50% { transform: translate(-50%, calc(-50% - 14px)) rotate(3deg); }
+}
+
+/* Vibrant fanned pile of UNO cards anchored at the bottom-center. */
+.ts-pile {
+  position: absolute;
+  left: 50%;
+  bottom: -34px;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  animation: ts-icon-float 4s ease-in-out infinite;
+}
+
+.ts-pile-card {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 62px;
+  height: 88px;
+  margin-left: -31px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  transform: translateX(var(--tx)) translateY(calc(var(--lift) * -1)) rotate(var(--rot));
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
+}
+
+.ts-pile-card--r { background: var(--color-card-red, #e84a5f); }
+.ts-pile-card--g { background: var(--color-card-green, #36c47a); }
+.ts-pile-card--b { background: var(--color-card-blue, #4c8dff); }
+.ts-pile-card--y { background: var(--color-card-yellow, #ffc84a); color: #2b2140; }
+.ts-pile-card--w {
+  background: linear-gradient(135deg, #e84a5f 0 25%, #ffc84a 25% 50%, #36c47a 50% 75%, #4c8dff 75% 100%);
 }
 
 .ts-topright {
