@@ -75,6 +75,9 @@ export default class GameHud {
   private startButton?: ActionButton;
   private drawButton?: ActionButton;
   private leaveButton?: ActionButton;
+  private startingCardsValueText?: Phaser.GameObjects.Text;
+  private startingMinusButton?: ActionButton;
+  private startingPlusButton?: ActionButton;
   private overlayStartButton?: ActionButton;
 
   constructor(scene: Phaser.Scene, options: HudOptions, callbacks: HudCallbacks) {
@@ -113,14 +116,15 @@ export default class GameHud {
   update(partial: Partial<HudSnapshot>) {
     const previousState = this.currentState;
     this.currentState = { ...this.currentState, ...partial };
-    const actionStateChanged =
-      previousState.startEnabled !== this.currentState.startEnabled ||
-      previousState.drawEnabled !== this.currentState.drawEnabled ||
+    // Only changes that alter the HUD's *structure* (which buttons/sections
+    // exist or their layout) need a full rebuild. Per-turn enable/disable,
+    // status, lists and the stepper value are applied granularly so the HUD
+    // doesn't flicker / lose hover on every click.
+    const structuralChange =
       previousState.roundInProgress !== this.currentState.roundInProgress ||
-      previousState.startingCards !== this.currentState.startingCards ||
       previousState.canConfigureStart !== this.currentState.canConfigureStart;
 
-    if (!this.isBuilt || actionStateChanged) {
+    if (!this.isBuilt || structuralChange) {
       this.build();
       this.refreshDynamicContent();
       return;
@@ -149,6 +153,9 @@ export default class GameHud {
     this.drawButton = undefined;
     this.leaveButton = undefined;
     this.overlayStartButton = undefined;
+    this.startingCardsValueText = undefined;
+    this.startingMinusButton = undefined;
+    this.startingPlusButton = undefined;
   }
 
   private getHudMode(): HudMode {
@@ -486,7 +493,22 @@ export default class GameHud {
     this.roomLabelText?.setText(`🏷 ${this.currentState.roomLabel}`);
     this.playerText?.setText(this.getVisiblePlayerList());
     this.logsText?.setText(this.getVisibleLogText());
+    this.refreshStartingCardsStepper();
     this.applyInteractiveStates();
+  }
+
+  private refreshStartingCardsStepper(): void {
+    if (!this.startingCardsValueText) {
+      return;
+    }
+    const value = this.currentState.startingCards;
+    this.startingCardsValueText.setText(`${value}`);
+    if (this.startingMinusButton) {
+      this.applyButtonState(this.startingMinusButton, value > GameHud.MIN_STARTING_CARDS);
+    }
+    if (this.startingPlusButton) {
+      this.applyButtonState(this.startingPlusButton, value < GameHud.MAX_STARTING_CARDS);
+    }
   }
 
   private applyInteractiveStates() {
@@ -618,7 +640,7 @@ export default class GameHud {
       size,
       '−',
       'secondary',
-      () => this.callbacks.onStartingCardsChange(clampValue(value - 1)),
+      () => this.callbacks.onStartingCardsChange(clampValue(this.currentState.startingCards - 1)),
     );
     const plus = this.createActionButton(
       innerX + innerWidth - size / 2,
@@ -627,7 +649,7 @@ export default class GameHud {
       size,
       '+',
       'secondary',
-      () => this.callbacks.onStartingCardsChange(clampValue(value + 1)),
+      () => this.callbacks.onStartingCardsChange(clampValue(this.currentState.startingCards + 1)),
     );
 
     const valueText = this.scene.add
@@ -641,12 +663,11 @@ export default class GameHud {
       .setResolution(this.options.textResolution);
     this.elements.push(valueText);
 
-    if (value <= GameHud.MIN_STARTING_CARDS) {
-      this.applyButtonState(minus, false);
-    }
-    if (value >= GameHud.MAX_STARTING_CARDS) {
-      this.applyButtonState(plus, false);
-    }
+    this.startingCardsValueText = valueText;
+    this.startingMinusButton = minus;
+    this.startingPlusButton = plus;
+    this.applyButtonState(minus, value > GameHud.MIN_STARTING_CARDS);
+    this.applyButtonState(plus, value < GameHud.MAX_STARTING_CARDS);
 
     return title.height + 8 + size;
   }
