@@ -32,7 +32,7 @@ Em resumo: já dá para criar sala, jogar rodada completa e encerrar com vencedo
   - `+4`: próximo jogador compra 4 e perde a vez
 - Condição de vitória: quando alguém zera a mão, a rodada termina e o vencedor é anunciado.
 - Reciclagem automática do descarte quando o monte de compra acaba (mantém o coringa jogável).
-- Regra do **UNO!**: declarar com a tecla `U`; quem fica com 1 carta sem declarar compra +2 de penalidade.
+- Regra do **UNO!** por desafio: botão no HUD (ou tecla `U`) — quem está com 1 carta declara; adversários veem o botão riscado e podem desafiar quem esqueceu, forçando +2.
 - Lobby em HTML/CSS (Phaser carregado sob demanda só ao iniciar a partida).
 - Health-check REST: `GET /health`.
 - Login com Google e persistência de perfil/estatísticas em Firestore (**opcional**, no cliente).
@@ -41,7 +41,6 @@ Em resumo: já dá para criar sala, jogar rodada completa e encerrar com vencedo
 
 ## 🧩 Em evolução (prioridades atuais)
 
-- UX do "UNO!" no cliente: botão visível na HUD (hoje só via tecla `U`).
 - Polimento visual/animações, UX da mesa e refinamentos de responsividade.
 - Modos extras (pontuação por rodada, timer, bots, matchmaking etc.).
 
@@ -228,9 +227,8 @@ Se quiser habilitar login Google e persistência de perfil/estatísticas:
 
 ### Próxima fase — Regras completas + robustez
 
-1. UX do "UNO!" no cliente (botão na HUD, hoje só tecla `U`).
-2. Ajustes adicionais de consistência de estado e UX de feedback.
-3. Persistência de salas (hoje o estado é só em memória).
+1. Ajustes adicionais de consistência de estado e UX de feedback.
+2. Persistência de salas (hoje o estado é só em memória).
 
 ### Fase seguinte — Expansão de produto
 

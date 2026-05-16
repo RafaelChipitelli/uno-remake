@@ -1,6 +1,7 @@
-// "UNO!" rule. A player must declare UNO when a play leaves them with a
-// single card. If they did not declare, they take a draw penalty. Kept as a
-// pure function so the rule is unit-tested independently of sockets/state.
+// "UNO!" rule, challenge-based. A player reduced to a single card must
+// declare UNO. They are "vulnerable" until they declare; any opponent may
+// challenge a vulnerable player, who then draws a penalty. Pure helpers so
+// the rule is unit-tested independently of sockets/state.
 
 export const UNO_PENALTY_CARDS = 2;
 
@@ -9,20 +10,12 @@ export function canDeclareUno(handLength: number): boolean {
   return handLength <= 2;
 }
 
-/**
- * Decides the outcome right after a card was played.
- * `handLengthAfterPlay` is the player's hand size once the card left it.
- */
-export function resolveUnoAfterPlay(
-  handLengthAfterPlay: number,
-  hasDeclaredUno: boolean,
-): { penalty: number; cleared: boolean } {
-  if (handLengthAfterPlay !== 1) {
-    // No longer in the UNO state — any previous declaration is cleared.
-    return { penalty: 0, cleared: true };
-  }
-  if (hasDeclaredUno) {
-    return { penalty: 0, cleared: false };
-  }
-  return { penalty: UNO_PENALTY_CARDS, cleared: true };
+/** A player with exactly one undeclared card can be caught by a challenge. */
+export function isUnoVulnerable(handLength: number, hasDeclaredUno: boolean): boolean {
+  return handLength === 1 && !hasDeclaredUno;
+}
+
+/** The UNO declaration only persists while the player still holds one card. */
+export function shouldClearUnoFlag(handLength: number): boolean {
+  return handLength !== 1;
 }

@@ -7,7 +7,7 @@ import { isCustomDrawReactionCard, isDrawMultiplierCard, isDrawShieldCard } from
 import { drawCardsForPlayer, refillDrawPileFromDiscard } from './core/draw';
 import { createActionEvent } from './core/events';
 import { getNextPlayer } from './core/players';
-import { canDeclareUno, resolveUnoAfterPlay } from './core/uno';
+import { canDeclareUno, isUnoVulnerable, shouldClearUnoFlag, UNO_PENALTY_CARDS } from './core/uno';
 import { generateRoomCode, normalizeRoomCode } from './core/roomCode';
 import { passTurnToNextPlayer } from './core/turns';
 import { emitRoomState, removePlayerFromRoom } from './state/roomState';
@@ -108,17 +108,9 @@ io.on('connection', (socket) => {
       return { gameEnded: true };
     }
 
-    const unoOutcome = resolveUnoAfterPlay(actor.hand.length, Boolean(actor.calledUno));
-    if (unoOutcome.penalty > 0 && actor.roomId) {
-      drawCardsForPlayer(store.serverDecks, actor.roomId, room, actor, unoOutcome.penalty);
-      io.to(actor.roomId).emit('uno:penalty', {
-        playerId: actor.id,
-        nickname: actor.nickname,
-        cards: unoOutcome.penalty,
-      });
-      console.log(`[uno:penalty] ${actor.nickname} esqueceu o UNO (+${unoOutcome.penalty}) na sala ${actor.roomId}`);
-    }
-    if (unoOutcome.cleared) {
+    // No auto-penalty: a player left with one undeclared card stays
+    // vulnerable until an opponent challenges (uno:challenge).
+    if (shouldClearUnoFlag(actor.hand.length)) {
       actor.calledUno = false;
     }
 
@@ -380,6 +372,38 @@ io.on('connection', (socket) => {
       nickname: player.nickname,
     });
     console.log(`[uno:declare] ${player.nickname} chamou UNO na sala ${player.roomId}`);
+  });
+
+  socket.on('uno:challenge', () => {
+    const challenger = store.players.get(socket.id);
+    if (!challenger?.roomId) {
+      return;
+    }
+    const room = store.rooms.get(challenger.roomId);
+    if (!room || room.gameStatus !== 'in_progress') {
+      return;
+    }
+
+    const target = room.players.find(
+      (candidate) =>
+        candidate.id !== challenger.id && isUnoVulnerable(candidate.hand.length, Boolean(candidate.calledUno)),
+    );
+    if (!target) {
+      socket.emit('room:error', { message: 'Ninguém para desafiar: nenhum jogador esqueceu o UNO.' });
+      return;
+    }
+
+    drawCardsForPlayer(store.serverDecks, challenger.roomId, room, target, UNO_PENALTY_CARDS);
+    io.to(challenger.roomId).emit('uno:penalty', {
+      playerId: target.id,
+      nickname: target.nickname,
+      cards: UNO_PENALTY_CARDS,
+      byNickname: challenger.nickname,
+    });
+    emitRoomState(io, store.rooms, challenger.roomId);
+    console.log(
+      `[uno:challenge] ${challenger.nickname} pegou ${target.nickname} sem UNO (+${UNO_PENALTY_CARDS}) na sala ${challenger.roomId}`,
+    );
   });
 
   socket.on('room:leave', () => {

@@ -131,7 +131,12 @@ export default class GameScene extends Phaser.Scene {
             ? t('game.uno.youDeclared')
             : t('game.uno.declared', { nickname }),
         ),
-      onUnoPenalty: ({ nickname, cards }) => this.pushLog(t('game.uno.penalty', { nickname, cards })),
+      onUnoPenalty: ({ nickname, cards, byNickname }) =>
+        this.pushLog(
+          byNickname
+            ? t('game.uno.caught', { nickname, by: byNickname, cards })
+            : t('game.uno.penalty', { nickname, cards }),
+        ),
     });
   }
 
@@ -159,6 +164,7 @@ export default class GameScene extends Phaser.Scene {
         onLeaveRequested: () => this.promptLeaveRoom(),
         onStartRequested: () => this.socket?.emit('game:start'),
         onDrawRequested: () => this.handleDrawCard(),
+        onUnoRequested: () => this.handleUnoAction(),
       },
     );
     this.hud.init(this.composeHudState());
@@ -353,6 +359,7 @@ export default class GameScene extends Phaser.Scene {
     if (me) {
       this.player = me;
       this.cardStage?.setHandCards(me.hand);
+      this.syncHudUnoMode();
 
       const pendingForMe = room.pendingDrawDecision?.playerId === me.id ? room.pendingDrawDecision.cardId : undefined;
       this.pendingDrawDecisionCardId = pendingForMe;
@@ -499,11 +506,23 @@ export default class GameScene extends Phaser.Scene {
 
     keyboard.on('keydown-P', this.handlePlayCardShortcut, this);
     keyboard.on('keydown-D', this.handleDrawCard, this);
-    keyboard.on('keydown-U', this.handleDeclareUno, this);
+    keyboard.on('keydown-U', this.handleUnoAction, this);
   }
 
-  private handleDeclareUno(): void {
-    this.socket.emit('uno:declare');
+  private handleUnoAction(): void {
+    const handLength = this.player?.hand?.length ?? 0;
+    this.socket.emit(handLength === 1 ? 'uno:declare' : 'uno:challenge');
+  }
+
+  private computeUnoMode(): HudSnapshot['unoMode'] {
+    if (!this.isRoundInProgress()) {
+      return 'hidden';
+    }
+    return (this.player?.hand?.length ?? 0) === 1 ? 'declare' : 'challenge';
+  }
+
+  private syncHudUnoMode(): void {
+    this.hud?.update({ unoMode: this.computeUnoMode() });
   }
 
   private unregisterKeyboardShortcuts(): void {
@@ -514,7 +533,7 @@ export default class GameScene extends Phaser.Scene {
 
     keyboard.off('keydown-P', this.handlePlayCardShortcut, this);
     keyboard.off('keydown-D', this.handleDrawCard, this);
-    keyboard.off('keydown-U', this.handleDeclareUno, this);
+    keyboard.off('keydown-U', this.handleUnoAction, this);
   }
 
   private tryAutoAction(): void {
@@ -613,6 +632,7 @@ export default class GameScene extends Phaser.Scene {
     this.pushLog(t('game.log.playedCard', { color: card.color, value: card.value }));
     this.setStatus(t('game.status.playSent'));
     this.cardStage?.setHandCards(this.player.hand);
+    this.syncHudUnoMode();
     this.cardStage?.setTableCard(card);
   }
 
@@ -677,6 +697,7 @@ export default class GameScene extends Phaser.Scene {
     this.pushLog(t('game.log.colorChosen', { color: getColorLabel(selectedColor) }));
     this.setStatus(t('game.status.colorChosen', { color: getColorLabel(selectedColor) }));
     this.cardStage?.setHandCards(this.player.hand);
+    this.syncHudUnoMode();
     this.cardStage?.setTableCard(card, selectedColor);
   }
 
@@ -1038,6 +1059,7 @@ export default class GameScene extends Phaser.Scene {
       drawEnabled: this.canDrawCard(),
       roundInProgress: this.isRoundInProgress(),
       currentTurn: getInitialTurnMessage(),
+      unoMode: this.computeUnoMode(),
     };
   }
 
