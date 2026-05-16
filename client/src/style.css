@@ -449,26 +449,35 @@ canvas:focus-visible {
   opacity: 0.45;
 }
 
+/* Warm glow under the symbol cluster, like Richup's lower-center light. */
+.ts-glow--bottom {
+  width: 60vw;
+  height: 40vw;
+  bottom: -16vw;
+  left: 50%;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, #f4b740 50%, transparent) 0%,
+    transparent 70%
+  );
+  opacity: 0.16;
+  filter: blur(70px);
+}
+
 .ts-glyph {
   position: absolute;
   font-weight: 800;
   color: var(--color-text-muted, #8f83b5);
-  opacity: 0.06;
+  opacity: 0.05;
   user-select: none;
+  transform: translate(-50%, -50%);
   animation: ts-float 7s ease-in-out infinite;
 }
 
-.ts-glyph--0 { font-size: 76px; top: 16%; left: 9%; animation-delay: 0s; }
-.ts-glyph--1 { font-size: 70px; top: 17%; right: 9%; animation-delay: 0.8s; }
-.ts-glyph--2 { font-size: 58px; top: 50%; right: 14%; color: var(--color-action-danger, #b84a5a); animation-delay: 1.6s; }
-.ts-glyph--3 { font-size: 52px; top: 58%; left: 13%; color: var(--color-status-success, #8bffb0); animation-delay: 2.4s; }
-.ts-glyph--4 { font-size: 58px; top: 11%; left: 50%; animation-delay: 1.2s; }
-.ts-glyph--5 { font-size: 64px; bottom: 14%; right: 22%; animation-delay: 3s; }
-.ts-glyph--6 { font-size: 60px; bottom: 18%; left: 24%; color: var(--color-action-secondary, #4c2c7a); animation-delay: 2s; }
-
 @keyframes ts-float {
-  0%, 100% { transform: translateY(0) rotate(-4deg); }
-  50% { transform: translateY(-16px) rotate(3deg); }
+  0%, 100% { transform: translate(-50%, -50%) rotate(-4deg); }
+  50% { transform: translate(-50%, calc(-50% - 14px)) rotate(3deg); }
 }
 
 .ts-topright {
