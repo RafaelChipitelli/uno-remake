@@ -10,6 +10,8 @@ import {
 import { getLanguage, setLanguage, subscribeLanguageChange, t, type Language } from '../i18n';
 import { askTextInput } from './modal';
 import { mountSettingsScreen, type SettingsScreenHandle } from './settingsScreen';
+import { mountProfileScreen, type ProfileScreenHandle } from './profileScreen';
+import { renderAvatarContent } from './avatar';
 import type { SceneLaunchData } from '../scenes/game/constants';
 
 const MAX_NICKNAME_LENGTH = 20;
@@ -31,6 +33,7 @@ export function mountTitleScreen(root: HTMLElement, onStart: StartHandler): Titl
   let isStarting = false;
   let isMenuOpen = false;
   let settings: SettingsScreenHandle | null = null;
+  let profile: ProfileScreenHandle | null = null;
 
   const container = document.createElement('div');
   container.className = 'ts-root';
@@ -154,17 +157,11 @@ export function mountTitleScreen(root: HTMLElement, onStart: StartHandler): Titl
     renderTopRight();
   };
 
-  const initialsFromNickname = (): string => {
-    const source =
-      authSession.profile?.nickname ||
-      authSession.user?.displayName ||
-      sanitize(nicknameInput.value || lastNickname) ||
-      '?';
-    const parts = source.trim().split(/\s+/).filter(Boolean);
-    const letters =
-      parts.length >= 2 ? parts[0][0] + parts[1][0] : source.trim().slice(0, 2);
-    return letters.toUpperCase() || '?';
-  };
+  const avatarNameSource = (): string =>
+    authSession.profile?.nickname ||
+    authSession.user?.displayName ||
+    sanitize(nicknameInput.value || lastNickname) ||
+    '?';
 
   const closeMenu = () => {
     if (!isMenuOpen) {
@@ -235,29 +232,10 @@ export function mountTitleScreen(root: HTMLElement, onStart: StartHandler): Titl
     avatar.setAttribute('aria-expanded', String(isMenuOpen));
     avatar.setAttribute('aria-label', t('title.menu.open'));
 
-    const renderInitialsAvatar = () => {
-      const initials = document.createElement('span');
-      initials.className = 'ts-avatar-initials';
-      initials.setAttribute('aria-hidden', 'true');
-      initials.textContent = initialsFromNickname();
-      return initials;
-    };
-
-    const photo = authSession.user?.photoURL;
-    if (photo) {
-      const img = document.createElement('img');
-      img.className = 'ts-avatar-img';
-      img.src = photo;
-      img.alt = '';
-      img.referrerPolicy = 'no-referrer';
-      // A dead/throttled Google photo URL must not render a broken image.
-      img.addEventListener('error', () => {
-        img.replaceWith(renderInitialsAvatar());
-      });
-      avatar.appendChild(img);
-    } else {
-      avatar.appendChild(renderInitialsAvatar());
-    }
+    renderAvatarContent(avatar, {
+      photoURL: authSession.user?.photoURL,
+      name: avatarNameSource(),
+    });
     avatar.addEventListener('click', () => {
       if (isMenuOpen) {
         closeMenu();
@@ -272,9 +250,7 @@ export function mountTitleScreen(root: HTMLElement, onStart: StartHandler): Titl
       menu.className = 'ts-menu';
       menu.setAttribute('role', 'menu');
 
-      addMenuItem(menu, t('title.menu.profile'), () => {
-        showToast(t('title.menu.profileSoon'));
-      });
+      addMenuItem(menu, t('title.menu.profile'), () => showProfile());
       addMenuItem(menu, t('title.menu.settings'), () => showSettings());
 
       if (isAuthenticationAvailable() && !authSession.isLoading) {
@@ -327,6 +303,21 @@ export function mountTitleScreen(root: HTMLElement, onStart: StartHandler): Titl
       onBack: () => {
         settings?.destroy();
         settings = null;
+        container.classList.remove('is-hidden');
+        avatarButton()?.focus();
+      },
+    });
+  };
+
+  const showProfile = () => {
+    if (profile) {
+      return;
+    }
+    container.classList.add('is-hidden');
+    profile = mountProfileScreen(root, {
+      onBack: () => {
+        profile?.destroy();
+        profile = null;
         container.classList.remove('is-hidden');
         avatarButton()?.focus();
       },
@@ -455,6 +446,8 @@ export function mountTitleScreen(root: HTMLElement, onStart: StartHandler): Titl
       document.removeEventListener('keydown', onDocumentKeydown);
       settings?.destroy();
       settings = null;
+      profile?.destroy();
+      profile = null;
       container.remove();
     },
   };

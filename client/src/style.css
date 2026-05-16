@@ -1125,8 +1125,169 @@ canvas:focus-visible {
   .ts-menu,
   .st-root,
   .ts-avatar,
-  .st-btn {
+  .st-btn,
+  .pf-match {
     animation: none;
     transition: none;
+  }
+}
+
+/* ===== Lote B — Player profile + match history ===== */
+
+.pf-header-card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.pf-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-action-primary, #7b42e8) 70%, white) 0%,
+    var(--color-action-primary, #7b42e8) 100%
+  );
+}
+
+.pf-avatar .ts-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pf-avatar .ts-avatar-initials {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text-inverse, #fff);
+}
+
+.pf-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pf-name {
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+
+.pf-member {
+  font-size: 13px;
+}
+
+.pf-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.pf-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  border-radius: 14px;
+  background: rgba(156, 163, 175, 0.12);
+  border: 1px solid var(--color-surface-panel-border, rgba(156, 163, 175, 0.18));
+}
+
+.pf-stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text-primary, #fff);
+}
+
+.pf-stat-label {
+  font-size: 13px;
+  color: var(--color-text-secondary, #b9aedb);
+}
+
+.pf-history-body {
+  min-height: 48px;
+}
+
+.pf-history-state {
+  margin: 0;
+  padding: 14px 0;
+  font-size: 14px;
+  color: var(--color-text-secondary, #b9aedb);
+}
+
+.pf-match-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pf-match {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(156, 163, 175, 0.1);
+  border: 1px solid var(--color-surface-panel-border, rgba(156, 163, 175, 0.18));
+}
+
+.pf-match-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pf-result {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.pf-result--win {
+  color: var(--color-status-success, #8bffb0);
+}
+
+.pf-result--loss {
+  color: var(--color-status-danger, #ff8b95);
+}
+
+.pf-match-date {
+  font-size: 13px;
+  color: var(--color-text-secondary, #b9aedb);
+}
+
+.pf-match-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pf-match-opponents {
+  font-size: 13px;
+  color: var(--color-text-primary, #fff);
+  overflow-wrap: anywhere;
+}
+
+.pf-match-stats {
+  font-size: 13px;
+  color: var(--color-text-secondary, #b9aedb);
+}
+
+.pf-auth-message {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text-secondary, #b9aedb);
+}
+
+@media (max-width: 480px) {
+  .pf-stats-grid {
+    grid-template-columns: 1fr;
   }
 }
