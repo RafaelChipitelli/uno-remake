@@ -1291,3 +1291,76 @@ canvas:focus-visible {
     grid-template-columns: 1fr;
   }
 }
+
+/* Lote C — Karma points + level (profile card + account dropdown badge) */
+.pf-karma {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pf-karma-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pf-karma-level {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text-primary, #fff);
+}
+
+.pf-karma-points {
+  font-size: 13px;
+  color: var(--color-text-secondary, #b9aedb);
+}
+
+.pf-karma-track {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(156, 163, 175, 0.18);
+  border: 1px solid var(--color-surface-panel-border, rgba(156, 163, 175, 0.18));
+  overflow: hidden;
+}
+
+.pf-karma-bar {
+  width: var(--pf-karma-fill, 0%);
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-status-success, #8bffb0);
+  transition: width 0.4s ease;
+}
+
+.pf-karma-progress {
+  font-size: 13px;
+  color: var(--color-text-secondary, #b9aedb);
+}
+
+.ts-menu-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 14px 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--color-surface-panel-border, rgba(156, 163, 175, 0.2));
+}
+
+.ts-menu-header-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-primary, #fff);
+  overflow-wrap: anywhere;
+}
+
+.ts-menu-header-level {
+  font-size: 12px;
+  color: var(--color-text-secondary, #b9aedb);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-karma-bar {
+    transition: none;
+  }
+}

@@ -7,6 +7,7 @@ import {
   updateCurrentUserNickname,
   type AuthSession,
 } from '../services/playerAccount';
+import { levelForKarma } from '../services/karma';
 import { getLanguage, setLanguage, subscribeLanguageChange, t, type Language } from '../i18n';
 import { askTextInput } from './modal';
 import { mountSettingsScreen, type SettingsScreenHandle } from './settingsScreen';
@@ -249,6 +250,20 @@ export function mountTitleScreen(root: HTMLElement, onStart: StartHandler): Titl
       const menu = document.createElement('div');
       menu.className = 'ts-menu';
       menu.setAttribute('role', 'menu');
+
+      if (authSession.user) {
+        const header = document.createElement('div');
+        header.className = 'ts-menu-header';
+        const headerName = document.createElement('span');
+        headerName.className = 'ts-menu-header-name';
+        headerName.textContent = avatarNameSource();
+        const headerLevel = document.createElement('span');
+        headerLevel.className = 'ts-menu-header-level';
+        const { level } = levelForKarma(authSession.profile?.stats?.karma ?? 0);
+        headerLevel.textContent = t('title.menu.level', { level });
+        header.append(headerName, headerLevel);
+        menu.appendChild(header);
+      }
 
       addMenuItem(menu, t('title.menu.profile'), () => showProfile());
       addMenuItem(menu, t('title.menu.settings'), () => showSettings());

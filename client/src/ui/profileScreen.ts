@@ -7,6 +7,7 @@ import {
   type AuthSession,
   type MatchSummary,
 } from '../services/playerAccount';
+import { levelForKarma } from '../services/karma';
 import { getLanguage, subscribeLanguageChange, t } from '../i18n';
 import { renderAvatarContent } from './avatar';
 
@@ -52,6 +53,12 @@ export function mountProfileScreen(
   const statsCard = container.querySelector<HTMLElement>('.st-card--stats')!;
   const statsTitle = container.querySelector<HTMLElement>('[data-i18n="statsTitle"]')!;
   const statsGrid = container.querySelector<HTMLElement>('.pf-stats-grid')!;
+  const karmaCard = container.querySelector<HTMLElement>('.st-card--karma')!;
+  const karmaTitle = container.querySelector<HTMLElement>('[data-i18n="karmaTitle"]')!;
+  const karmaLevelEl = container.querySelector<HTMLElement>('.pf-karma-level')!;
+  const karmaPointsEl = container.querySelector<HTMLElement>('.pf-karma-points')!;
+  const karmaBarEl = container.querySelector<HTMLElement>('.pf-karma-bar')!;
+  const karmaProgressEl = container.querySelector<HTMLElement>('.pf-karma-progress')!;
   const historyCard = container.querySelector<HTMLElement>('.st-card--history')!;
   const historyTitle = container.querySelector<HTMLElement>('[data-i18n="historyTitle"]')!;
   const historyBody = container.querySelector<HTMLElement>('.pf-history-body')!;
@@ -136,6 +143,30 @@ export function mountProfileScreen(
       statTile(t('profile.stats.gamesWon'), String(stats.gamesWon)),
       statTile(t('profile.stats.gamesLost'), String(stats.gamesLost)),
       statTile(t('profile.stats.winRate'), winRate),
+    );
+  };
+
+  const renderKarma = () => {
+    const total = authSession.profile?.stats?.karma ?? 0;
+    const { level, currentLevelKarma, nextLevelKarma, progress } = levelForKarma(total);
+    const percent = Math.round(progress * 100);
+    const remaining = Math.max(0, nextLevelKarma - currentLevelKarma);
+
+    karmaLevelEl.textContent = t('profile.karma.level', { level });
+    karmaPointsEl.textContent = t('profile.karma.points', { points: total });
+    karmaProgressEl.textContent = t('profile.karma.progress', {
+      remaining,
+      next: level + 1,
+    });
+    karmaBarEl.style.setProperty('--pf-karma-fill', `${percent}%`);
+    karmaBarEl.setAttribute('aria-valuenow', String(percent));
+    karmaBarEl.setAttribute(
+      'aria-valuetext',
+      t('profile.karma.progressLabel', {
+        level,
+        current: currentLevelKarma,
+        total: nextLevelKarma,
+      }),
     );
   };
 
@@ -251,10 +282,13 @@ export function mountProfileScreen(
     titleEl.textContent = t('profile.title');
     backBtn.textContent = t('profile.back');
     statsTitle.textContent = t('profile.stats.title');
+    karmaTitle.textContent = t('profile.karma.title');
     historyTitle.textContent = t('profile.history.title');
     statsCard.hidden = !isSignedIn();
+    karmaCard.hidden = !isSignedIn();
     renderHeader();
     renderStats();
+    renderKarma();
     renderHistory();
     renderAuthCard();
   };
@@ -335,6 +369,19 @@ function renderShell(): string {
       <section class="st-card st-card--stats">
         <h2 class="st-card-title" data-i18n="statsTitle"></h2>
         <div class="pf-stats-grid"></div>
+      </section>
+      <section class="st-card st-card--karma">
+        <h2 class="st-card-title" data-i18n="karmaTitle"></h2>
+        <div class="pf-karma">
+          <div class="pf-karma-head">
+            <span class="pf-karma-level"></span>
+            <span class="pf-karma-points"></span>
+          </div>
+          <div class="pf-karma-track">
+            <div class="pf-karma-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"></div>
+          </div>
+          <span class="pf-karma-progress"></span>
+        </div>
       </section>
       <section class="st-card st-card--history">
         <h2 class="st-card-title" data-i18n="historyTitle"></h2>
