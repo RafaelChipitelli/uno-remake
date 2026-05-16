@@ -19,6 +19,7 @@ export interface Player {
   hand: Card[];
   handCount?: number;
   isTurn: boolean;
+  calledUno?: boolean;
   roomId?: string | undefined;
 }
 

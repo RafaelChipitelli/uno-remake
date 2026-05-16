@@ -5,6 +5,7 @@ import { createUnoDeck, isValidCardPlay, shuffleDeck } from '../core/cards';
 import { createCustomCards } from '../core/customCards';
 import { drawCardsForPlayer, refillDrawPileFromDiscard } from '../core/draw';
 import { getNextPlayerIndex, passTurnToNextPlayer } from '../core/turns';
+import { canDeclareUno, resolveUnoAfterPlay, UNO_PENALTY_CARDS } from '../core/uno';
 import type { Card, Player, Room } from '../types';
 
 let cardSeq = 0;
@@ -166,4 +167,28 @@ test('drawCardsForPlayer returns nothing when the room has no deck', () => {
   const room = makeRoom(['a']);
   const drawn = drawCardsForPlayer(new Map(), 'room', room, room.players[0]!, 3);
   assert.equal(drawn.length, 0);
+});
+
+test('canDeclareUno only allows declaring at one or two cards', () => {
+  assert.equal(canDeclareUno(1), true);
+  assert.equal(canDeclareUno(2), true);
+  assert.equal(canDeclareUno(3), false);
+});
+
+test('resolveUnoAfterPlay penalizes a silent player left with one card', () => {
+  const outcome = resolveUnoAfterPlay(1, false);
+  assert.equal(outcome.penalty, UNO_PENALTY_CARDS);
+  assert.equal(outcome.cleared, true);
+});
+
+test('resolveUnoAfterPlay does not penalize a player who declared UNO', () => {
+  const outcome = resolveUnoAfterPlay(1, true);
+  assert.equal(outcome.penalty, 0);
+  assert.equal(outcome.cleared, false);
+});
+
+test('resolveUnoAfterPlay clears the declaration when not at one card', () => {
+  const outcome = resolveUnoAfterPlay(5, true);
+  assert.equal(outcome.penalty, 0);
+  assert.equal(outcome.cleared, true);
 });

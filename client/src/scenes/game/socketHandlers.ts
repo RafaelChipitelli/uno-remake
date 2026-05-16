@@ -22,6 +22,8 @@ export type GameSceneSocketCallbacks = {
   onRoomError: (payload: RoomErrorPayload) => void;
   onRoomLeft: () => void;
   onConnectError: (err: Error) => void;
+  onUnoCalled: (payload: { playerId: string; nickname: string }) => void;
+  onUnoPenalty: (payload: { playerId: string; nickname: string; cards: number }) => void;
 };
 
 export function registerGameSceneSocketHandlers(
@@ -39,6 +41,8 @@ export function registerGameSceneSocketHandlers(
   socket.on('room:error', callbacks.onRoomError);
   socket.on('room:left', callbacks.onRoomLeft);
   socket.on('connect_error', callbacks.onConnectError);
+  socket.on('uno:called', callbacks.onUnoCalled);
+  socket.on('uno:penalty', callbacks.onUnoPenalty);
 }
 
 export function describeCardActionEvent(
