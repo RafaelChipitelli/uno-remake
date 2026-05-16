@@ -5,7 +5,21 @@ import {
   signOut,
   type User,
 } from 'firebase/auth';
-import { doc, getDoc, increment, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  increment,
+  limit as limitTo,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  Timestamp,
+  updateDoc,
+} from 'firebase/firestore';
 import {
   getFirebaseAuth,
   getFirebaseProjectId,
@@ -27,6 +41,15 @@ export type UserProfile = {
   emailVerified: boolean;
   photoURL: string | null;
   stats: UserStats;
+};
+
+export type MatchSummary = {
+  playedAt: number | null;
+  didWin: boolean;
+  opponents: string[];
+  durationMs: number;
+  turns: number;
+  playerCount: number;
 };
 
 export type AuthSession = {
@@ -412,6 +435,82 @@ export async function recordCurrentUserMatchResult(didWin: boolean): Promise<Use
 
   setSession({ profile: updatedProfile });
   return updatedProfile;
+}
+
+export async function recordCurrentUserMatchSummary(
+  summary: Omit<MatchSummary, 'playedAt'>,
+): Promise<void> {
+  if (!isFirebaseConfigured || !currentSession.user) {
+    return;
+  }
+
+  const user = currentSession.user;
+  const db = getFirestoreDb();
+  const matchesRef = collection(db, 'users', user.uid, 'matches');
+
+  await addDoc(matchesRef, {
+    playedAt: serverTimestamp(),
+    didWin: summary.didWin,
+    opponents: summary.opponents,
+    durationMs: Math.max(0, Math.round(summary.durationMs)),
+    turns: Math.max(0, Math.round(summary.turns)),
+    playerCount: Math.max(0, Math.round(summary.playerCount)),
+  });
+}
+
+function toEpochMs(rawPlayedAt: unknown): number | null {
+  // serverTimestamp() reads back null until the server resolves it; tolerate
+  // that plus already-resolved Timestamp / Date / epoch shapes.
+  if (rawPlayedAt instanceof Timestamp) {
+    return rawPlayedAt.toMillis();
+  }
+  if (rawPlayedAt instanceof Date) {
+    return rawPlayedAt.getTime();
+  }
+  if (typeof rawPlayedAt === 'number' && Number.isFinite(rawPlayedAt)) {
+    return rawPlayedAt;
+  }
+  return null;
+}
+
+function toMatchSummary(data: Record<string, unknown>): MatchSummary {
+  const rawOpponents = Array.isArray(data.opponents) ? data.opponents : [];
+  const opponents = rawOpponents
+    .filter((entry): entry is string => typeof entry === 'string')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  const durationMs = Number(data.durationMs);
+  const turns = Number(data.turns);
+  const playerCount = Number(data.playerCount);
+
+  return {
+    playedAt: toEpochMs(data.playedAt),
+    didWin: data.didWin === true,
+    opponents,
+    durationMs: Number.isFinite(durationMs) && durationMs >= 0 ? durationMs : 0,
+    turns: Number.isFinite(turns) && turns >= 0 ? turns : 0,
+    playerCount: Number.isFinite(playerCount) && playerCount >= 0 ? playerCount : 0,
+  };
+}
+
+export async function fetchRecentMatches(max = 20): Promise<MatchSummary[]> {
+  if (!isFirebaseConfigured || !currentSession.user) {
+    return [];
+  }
+
+  try {
+    const user = currentSession.user;
+    const db = getFirestoreDb();
+    const matchesRef = collection(db, 'users', user.uid, 'matches');
+    const recentQuery = query(matchesRef, orderBy('playedAt', 'desc'), limitTo(max));
+    const snapshot = await getDocs(recentQuery);
+
+    return snapshot.docs.map((matchDoc) => toMatchSummary(matchDoc.data()));
+  } catch (error) {
+    console.error('[firebase] Falha ao carregar histórico de partidas.', error);
+    return [];
+  }
 }
 
 export function describeFirebasePersistenceError(error: unknown): string {

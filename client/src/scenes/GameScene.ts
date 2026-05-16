@@ -47,6 +47,7 @@ import GameHud, { type HudSnapshot } from './ui/GameHud';
 import {
   describeFirebasePersistenceError,
   recordCurrentUserMatchResult,
+  recordCurrentUserMatchSummary,
 } from '../services/playerAccount';
 import { phaserTheme } from '../theme/tokens';
 import { askChoice, askConfirmation } from '../ui/modal';
@@ -87,6 +88,10 @@ export default class GameScene extends Phaser.Scene {
   private wildColorModal?: WildColorModalHandle;
   private hasRecordedCurrentRoundResult = false;
   private isRecordingCurrentRoundResult = false;
+  private matchStartedAt?: number;
+  private playedCardCount = 0;
+  private lastOpponentNicknames: string[] = [];
+  private lastPlayerCount = 0;
 
   constructor() {
     super(SCENE_KEYS.game);
@@ -107,6 +112,10 @@ export default class GameScene extends Phaser.Scene {
     this.hasReturnedToLobby = false;
     this.hasRecordedCurrentRoundResult = false;
     this.isRecordingCurrentRoundResult = false;
+    this.matchStartedAt = undefined;
+    this.playedCardCount = 0;
+    this.lastOpponentNicknames = [];
+    this.lastPlayerCount = 0;
     this.clearPendingDrawDecisionState();
     this.clearPendingStackDrawState();
     this.clearColorSelectionModal();
@@ -215,6 +224,10 @@ export default class GameScene extends Phaser.Scene {
     this.roomGameStatus = 'in_progress';
     this.hasRecordedCurrentRoundResult = false;
     this.isRecordingCurrentRoundResult = false;
+    this.matchStartedAt = Date.now();
+    this.playedCardCount = 0;
+    this.lastOpponentNicknames = [];
+    this.lastPlayerCount = 0;
     this.clearPendingDrawDecisionState();
     this.clearPendingStackDrawState();
     this.pushLog(payload.message);
@@ -266,6 +279,7 @@ export default class GameScene extends Phaser.Scene {
       }
 
       this.hasRecordedCurrentRoundResult = true;
+      void this.recordMatchSummary(didWin);
       this.pushLog(
         t('game.log.statsUpdated', {
           gamesPlayed: profile.stats.gamesPlayed,
@@ -280,6 +294,24 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
+  private async recordMatchSummary(didWin: boolean): Promise<void> {
+    // Best-effort: a failed history write must never disrupt game-end UX, and
+    // aggregate stats are already persisted separately above.
+    try {
+      // NOTE: server doesn't emit a turn count, so we approximate "turns" by
+      // the number of cards played this match (counted in handleCardPlayed).
+      await recordCurrentUserMatchSummary({
+        didWin,
+        opponents: this.lastOpponentNicknames,
+        durationMs: this.matchStartedAt ? Date.now() - this.matchStartedAt : 0,
+        turns: this.playedCardCount,
+        playerCount: this.lastPlayerCount,
+      });
+    } catch (error) {
+      console.error('[firebase] Falha ao salvar resumo da partida.', error);
+    }
+  }
+
   private handleCardPlayed(event: CardActionEvent): void {
     this.clearColorSelectionModal();
 
@@ -287,6 +319,7 @@ export default class GameScene extends Phaser.Scene {
       this.clearPendingDrawDecisionState();
     }
 
+    this.playedCardCount += 1;
     this.pushLog(this.describeEvent(event));
 
     if (event.card) {
@@ -356,6 +389,10 @@ export default class GameScene extends Phaser.Scene {
       }));
 
     this.cardStage?.setOpponents(opponents);
+    this.lastPlayerCount = room.players.length;
+    this.lastOpponentNicknames = room.players
+      .filter((player) => player.id !== this.player?.id)
+      .map((player) => player.nickname);
     this.anyOpponentVulnerable = room.players.some(
       (player) =>
         player.id !== this.player?.id &&

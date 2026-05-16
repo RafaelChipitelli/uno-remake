@@ -45,14 +45,11 @@ O servidor já tem salas públicas (quick-play); falta a listagem.
 
 ## 3. Perfil do jogador (ref.: print "Profile")
 
-### 3.1 🔴 Página de perfil
-Avatar + nickname (editável), e blocos:
-- **Estatísticas:** jogos jogados, vitórias, "entrou há X", nº de amigos.
-- **Win rate:** % de vitórias (já temos `gamesPlayed`/`gamesWon` no Firestore).
-- **Últimos jogos:** data, com quem jogou (avatars), duração, resultado
-  (vitória/derrota), nº de turnos. Precisa o servidor persistir histórico de
-  partidas (hoje só agrega stats).
-- **Inventário** (ver §5) e **Amigos** (ver §4).
+### 3.1 ✅ Página de perfil — RESOLVIDO
+Overlay DOM: avatar (foto/iniciais compartilhado), nickname, "membro desde",
+stats (jogados/vitórias/derrotas), **win rate**, e **últimos jogos**
+(`users/{uid}/matches` no Firestore: data, resultado, adversários, duração,
+turnos). Estados loading/empty/sem-login. Inventário/Amigos virão (§4/§5).
 
 ### 3.2 🟡 Editar perfil
 Trocar nickname e foto de perfil. Nickname já existe; foto = upload/galeria de
