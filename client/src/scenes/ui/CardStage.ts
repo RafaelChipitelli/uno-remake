@@ -60,6 +60,7 @@ type TurnIndicatorState = {
   phase: TurnIndicatorPhase;
   isMyTurn?: boolean;
   currentTurnNickname?: string;
+  turnDirection?: 1 | -1;
 };
 
 type HandSwipeState = {
@@ -72,6 +73,14 @@ type HandSwipeState = {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function prefersReducedMotion(): boolean {
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
 }
 
 type RoundedSurfaceStyle = {
@@ -190,6 +199,7 @@ export default class CardStage {
   private turnIndicatorBg?: RoundedSurface;
   private turnIndicatorText?: Phaser.GameObjects.Text;
   private turnIndicatorPulseTween?: Phaser.Tweens.Tween;
+  private flyGhost?: Phaser.GameObjects.Container;
   private handNavLeftBg?: Phaser.GameObjects.Ellipse;
   private handNavRightBg?: Phaser.GameObjects.Ellipse;
   private handNavLeft?: Phaser.GameObjects.Text;
@@ -206,6 +216,9 @@ export default class CardStage {
   private turnIndicatorPhase: TurnIndicatorPhase = 'waiting';
   private isMyTurn = false;
   private currentTurnNickname?: string;
+  private turnDirection: 1 | -1 = 1;
+  private directionGlyph?: Phaser.GameObjects.Text;
+  private directionLabel?: Phaser.GameObjects.Text;
 
   constructor(scene: Phaser.Scene, options: CardStageOptions) {
     this.scene = scene;
@@ -248,7 +261,27 @@ export default class CardStage {
     this.turnIndicatorPhase = state.phase;
     this.isMyTurn = Boolean(state.isMyTurn);
     this.currentTurnNickname = state.currentTurnNickname;
+    if (state.turnDirection) {
+      this.turnDirection = state.turnDirection;
+    }
     this.syncTurnIndicator();
+  }
+
+  // Brief emphasis when a special card lands on the table. GPU-only transform,
+  // no-op when reduced motion is requested or the table view isn't ready.
+  pulseTableCard() {
+    if (!this.tableContainer || !this.tableContainer.visible) return;
+    if (prefersReducedMotion()) return;
+    this.scene.tweens.killTweensOf(this.tableContainer);
+    this.tableContainer.setScale(1);
+    this.scene.tweens.add({
+      targets: this.tableContainer,
+      scaleX: 1.12,
+      scaleY: 1.12,
+      duration: 130,
+      yoyo: true,
+      ease: 'Quad.easeOut',
+    });
   }
 
   pulsePlaceholder() {
@@ -296,6 +329,81 @@ export default class CardStage {
     this.tableCard = card;
     this.currentColor = currentColor ?? card.color;
     this.syncTableArea();
+  }
+
+  // Visual-only card→discard travel for a local play. The authoritative table
+  // update still happens via setTableCard (called by the caller right after
+  // this), so state never desyncs even if events arrive fast or out of order:
+  // the flying object is a throwaway ghost that always destroys itself, and
+  // the real table card is whatever setTableCard last received. Falls back to
+  // doing nothing extra (caller's instant setTableCard wins) when the played
+  // hand view is gone or reduced motion is requested. Never throws.
+  flyHandCardToTable(cardId: string): void {
+    try {
+      if (prefersReducedMotion()) {
+        return;
+      }
+
+      const view = this.handViews.get(cardId);
+      if (!view || !this.tableContainer) {
+        return;
+      }
+
+      const fromX = view.container.x;
+      const fromY = view.container.y;
+      const metrics = this.getMetrics();
+      const centerY = this.scene.scale.height * 0.42;
+      const toX = metrics.stageX;
+      const toY = centerY;
+
+      const cardWidth = clamp(74 * (this.options.tableCardScale ?? 1), this.options.compact ? 48 : 54, 90);
+      const cardHeight = cardWidth * 1.42;
+      const cardRadius = clamp(cardWidth * 0.14, 6, 14);
+
+      const ghostColor = this.handCards.find((handCard) => handCard.id === cardId)?.color ?? 'wild';
+      const ghost = this.scene.add.container(fromX, fromY).setDepth(40);
+      const surface = createRoundedSurface(this.scene, cardWidth, cardHeight, cardRadius, {
+        fill: CARD_COLOR_HEX[ghostColor] ?? phaserTheme.colors.surface.disabled,
+        fillAlpha: 1,
+        stroke: phaserTheme.colors.text.inverse,
+        strokeAlpha: 0.9,
+        strokeWidth: 2,
+        sheen: 0.14,
+      });
+      const label = this.scene.add
+        .text(0, 0, view.value.text, {
+          fontFamily: this.options.fontFamily,
+          fontSize: `${Math.round(clamp(cardWidth * 0.32, 10, 24))}px`,
+          color: theme.colors.text.inverse,
+          fontStyle: '800',
+          align: 'center',
+        })
+        .setOrigin(0.5)
+        .setResolution(this.options.textResolution);
+      ghost.add([surface.gfx, label]);
+      this.flyGhost = ghost;
+
+      const targetScale = clamp(146 * (this.options.tableCardScale ?? 1), 104, 152) / cardWidth;
+
+      this.scene.tweens.add({
+        targets: ghost,
+        x: toX,
+        y: toY,
+        scaleX: targetScale,
+        scaleY: targetScale,
+        angle: { from: -6, to: 4 },
+        duration: 220,
+        ease: 'Sine.easeInOut',
+        onComplete: () => {
+          if (this.flyGhost === ghost) {
+            this.flyGhost = undefined;
+          }
+          ghost.destroy();
+        },
+      });
+    } catch {
+      // Purely cosmetic; the authoritative table update is independent.
+    }
   }
 
   getTableCard(): Card | undefined {
@@ -394,7 +502,33 @@ export default class CardStage {
       })
       .setOrigin(0.5)
       .setResolution(this.options.textResolution);
-    this.turnIndicatorContainer.add([this.turnIndicatorBg.gfx, this.turnIndicatorText]);
+    // Direction glyph (↻ clockwise / ↺ counter-clockwise). Sits at the right
+    // edge of the turn pill; the glyph itself (not color) conveys direction,
+    // and an aria-style label is mirrored into the indicator text for a11y.
+    this.directionGlyph = this.scene.add
+      .text(0, 0, '↻', {
+        fontFamily: this.options.fontFamily,
+        fontSize: `${Math.round(clamp((this.options.compact ? 17 : 19) * (this.options.fontScale ?? 1), 14, 22))}px`,
+        color: theme.colors.text.muted,
+        fontStyle: '700',
+      })
+      .setOrigin(0.5)
+      .setResolution(this.options.textResolution);
+    this.directionLabel = this.scene.add
+      .text(0, indicatorHeight / 2 + 12, '', {
+        fontFamily: this.options.fontFamily,
+        fontSize: `${Math.round(clamp(12 * (this.options.fontScale ?? 1), 10, 14))}px`,
+        color: theme.colors.text.muted,
+        fontStyle: '600',
+      })
+      .setOrigin(0.5)
+      .setResolution(this.options.textResolution);
+    this.turnIndicatorContainer.add([
+      this.turnIndicatorBg.gfx,
+      this.turnIndicatorText,
+      this.directionGlyph,
+      this.directionLabel,
+    ]);
     this.allObjects.push(this.turnIndicatorContainer);
     this.syncTurnIndicator();
 
@@ -592,6 +726,21 @@ export default class CardStage {
   private syncTurnIndicator(): void {
     if (!this.turnIndicatorContainer || !this.turnIndicatorBg || !this.turnIndicatorText) {
       return;
+    }
+
+    if (this.directionGlyph && this.directionLabel) {
+      const metrics = this.getMetrics();
+      const indicatorWidth = clamp(metrics.stageWidth * 0.42, 210, 360);
+      const showDirection = this.turnIndicatorPhase === 'in_progress';
+      const isClockwise = this.turnDirection === 1;
+      const directionText = isClockwise
+        ? t('game.stage.direction.clockwise')
+        : t('game.stage.direction.counterClockwise');
+      this.directionGlyph
+        .setText(isClockwise ? '↻' : '↺')
+        .setPosition(indicatorWidth / 2 - 22, 0)
+        .setVisible(showDirection);
+      this.directionLabel.setText(directionText).setVisible(showDirection);
     }
 
     if (this.turnIndicatorPhase === 'in_progress' && this.isMyTurn) {
@@ -1297,6 +1446,12 @@ export default class CardStage {
       this.unoButton = undefined;
     }
 
+    if (this.flyGhost) {
+      this.scene.tweens.killTweensOf(this.flyGhost);
+      this.flyGhost.destroy();
+      this.flyGhost = undefined;
+    }
+
     this.allObjects.forEach((obj) => obj.destroy());
     this.allObjects = [];
     this.handViews.clear();
@@ -1310,6 +1465,8 @@ export default class CardStage {
     this.turnIndicatorContainer = undefined;
     this.turnIndicatorBg = undefined;
     this.turnIndicatorText = undefined;
+    this.directionGlyph = undefined;
+    this.directionLabel = undefined;
     this.handNavLeft = undefined;
     this.handNavRight = undefined;
     this.handNavLeftBg = undefined;

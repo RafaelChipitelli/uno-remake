@@ -50,8 +50,20 @@ import {
   recordCurrentUserMatchSummary,
 } from '../services/playerAccount';
 import { phaserTheme } from '../theme/tokens';
+import { playSfx, type SfxName } from '../services/sfx';
 import { askChoice, askConfirmation } from '../ui/modal';
 import { t } from '../i18n';
+
+// Maps a played card to an accent SFX layered over the base `cardPlay`.
+// Reuses the canonical card values (see game/rules.ts) so detection stays
+// in sync with play validation instead of re-deriving it fragilely.
+function getCardPlayAccentSfx(value: string): SfxName | undefined {
+  if (value === 'skip') return 'skip';
+  if (value === 'reverse') return 'reverse';
+  if (value === '+2' || value === 'x2') return 'drawTwo';
+  if (value === '+4') return 'drawFour';
+  return undefined;
+}
 
 export default class GameScene extends Phaser.Scene {
   private socket!: Socket;
@@ -136,18 +148,22 @@ export default class GameScene extends Phaser.Scene {
       onRoomError: (payload) => this.handleRoomError(payload),
       onRoomLeft: () => this.handleRoomLeft(),
       onConnectError: (err) => this.handleConnectError(err),
-      onUnoCalled: ({ playerId, nickname }) =>
+      onUnoCalled: ({ playerId, nickname }) => {
+        playSfx('unoCall');
         this.pushLog(
           playerId === this.player?.id
             ? t('game.uno.youDeclared')
             : t('game.uno.declared', { nickname }),
-        ),
-      onUnoPenalty: ({ nickname, cards, byNickname }) =>
+        );
+      },
+      onUnoPenalty: ({ nickname, cards, byNickname }) => {
+        playSfx('unoPenalty');
         this.pushLog(
           byNickname
             ? t('game.uno.caught', { nickname, by: byNickname, cards })
             : t('game.uno.penalty', { nickname, cards }),
-        ),
+        );
+      },
     });
   }
 
@@ -256,6 +272,7 @@ export default class GameScene extends Phaser.Scene {
     this.clearPendingStackDrawState();
     this.clearColorSelectionModal();
 
+    playSfx('win');
     this.pushLog(payload.message);
     this.pushLog(t('game.log.waitingNextRound'));
     this.setStatus(payload.message, t('game.status.ended'));
@@ -324,11 +341,18 @@ export default class GameScene extends Phaser.Scene {
 
     if (event.card) {
       this.cardStage?.setTableCard(event.card, event.currentColor);
+      playSfx('cardPlay');
+      const accent = getCardPlayAccentSfx(event.card.value);
+      if (accent) {
+        playSfx(accent);
+        this.cardStage?.pulseTableCard();
+      }
     }
   }
 
   private handleCardDrawn(event: CardActionEvent): void {
     this.pushLog(this.describeEvent(event));
+    playSfx('cardDraw');
 
     if (!this.player || event.playerId !== this.player.id) {
       return;
@@ -448,6 +472,7 @@ export default class GameScene extends Phaser.Scene {
       phase: room.gameStatus,
       isMyTurn: Boolean(me?.isTurn),
       currentTurnNickname: currentPlayer?.nickname,
+      turnDirection: room.turnDirection,
     });
 
     const topCard = room.discardPile[room.discardPile.length - 1];
@@ -688,6 +713,7 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
+    this.cardStage?.flyHandCardToTable(card.id);
     this.removeCardFromHand(card, index);
 
     this.socket.emit('card:play', {
@@ -752,6 +778,7 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
+    this.cardStage?.flyHandCardToTable(card.id);
     this.removeCardFromHand(card, index);
 
     this.socket.emit('card:play', {
