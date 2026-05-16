@@ -65,7 +65,7 @@ export default class GameScene extends Phaser.Scene {
   private roomGameStatus: GameStatus = 'waiting';
 
   private logLines: string[] = [];
-  private opponentCardCounts: number[] = [];
+  private anyOpponentVulnerable = false;
   private startingHandSize = 10;
   private statusMessage = getInitialStatusMessage();
   private lastPlayerListMessage = getEmptyPlayerListMessage();
@@ -356,7 +356,12 @@ export default class GameScene extends Phaser.Scene {
       }));
 
     this.cardStage?.setOpponents(opponents);
-    this.opponentCardCounts = opponents.map((opponent) => opponent.cardCount);
+    this.anyOpponentVulnerable = room.players.some(
+      (player) =>
+        player.id !== this.player?.id &&
+        (player.handCount ?? player.hand.length) === 1 &&
+        !player.calledUno,
+    );
     this.startingHandSize = room.startingHandSize ?? this.startingHandSize;
 
     const currentPlayer = room.players.find((player) => player.isTurn);
@@ -536,10 +541,10 @@ export default class GameScene extends Phaser.Scene {
     if (!this.isRoundInProgress()) {
       return 'hidden';
     }
-    if ((this.player?.hand?.length ?? 0) === 1) {
+    if ((this.player?.hand?.length ?? 0) === 1 && !this.player?.calledUno) {
       return 'declare';
     }
-    if (this.opponentCardCounts.some((count) => count === 1)) {
+    if (this.anyOpponentVulnerable) {
       return 'challenge';
     }
     return 'hidden';

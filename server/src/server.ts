@@ -372,6 +372,7 @@ io.on('connection', (socket) => {
       playerId: player.id,
       nickname: player.nickname,
     });
+    emitRoomState(io, store.rooms, player.roomId);
     console.log(`[uno:declare] ${player.nickname} chamou UNO na sala ${player.roomId}`);
   });
 
@@ -767,6 +768,7 @@ io.on('connection', (socket) => {
 
     for (const roomPlayer of room.players) {
       roomPlayer.hand = [];
+      roomPlayer.calledUno = false;
       for (let index = 0; index < handSize; index += 1) {
         const card = deck.pop();
         if (!card) {
