@@ -34,8 +34,13 @@ Logado: campo livre do lobby removido (nick da conta, read-only + dica
 Configurações: edição inline de nickname (Editar→Salvar, Enter/Esc). Quick-wins:
 alvos ≥44px (bandeiras, mute), botão Voltar como ghost, toast visível ao
 equipar skin, lacunas de `prefers-reduced-motion` cobertas, header de convidado
-no perfil. **Pendente p/ Lote H:** lazy Firebase, debounce resize, lobby scroll
-em tela curta, dropdown overflow, colisão do botão UNO! no overlay mobile.
+no perfil. ### 1.6 ✅ Perf + layout mobile — RESOLVIDO (Lote H)
+**Lazy Firebase**: SDK saiu do bundle inicial (124.95 → ~10 KB gzip; chunk
+`playerAccountFirebase` carregado só ao usar auth/perfil/store). Debounce de
+resize do Phaser (não recria stage/HUD a cada evento). `room:state` coalescido
+num único `hud.update`. Mobile: lobby rolável em tela curta, dropdown da conta
+com `max-height`/scroll/clamp, botão UNO! sem colidir com indicador/mesa no
+overlay (clamp/dock). API pública do `playerAccount` inalterada.
 
 ---
 

@@ -78,7 +78,7 @@ function emit(): void {
 export function equipCosmetic(id: string): Cosmetic {
   persistGuestId(id);
   if (authSession.user) {
-    void setEquippedCosmetic(id);
+    void setEquippedCosmetic(id).catch((e) => console.error('[firebase] Falha ao equipar cosmético.', e));
   }
   emit();
   return getEffectiveCosmetic();

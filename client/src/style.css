@@ -409,9 +409,13 @@ canvas:focus-visible {
 .ts-root {
   position: fixed;
   inset: 0;
-  overflow: hidden;
+  overflow-y: auto;
   display: grid;
+  /* Stays centered when the stack fits; on short/landscape phones (or with
+     the on-screen keyboard up) `safe` keeps the top reachable and the root
+     scrolls instead of silently clipping the logo/Play button. */
   place-items: center;
+  place-items: safe center;
   background: var(--color-bg-canvas, #120d1c);
   color: var(--color-text-primary, #fff);
   font-family: 'Inter', system-ui, sans-serif;
@@ -581,7 +585,7 @@ canvas:focus-visible {
   align-items: center;
   text-align: center;
   width: min(92vw, 28rem);
-  padding: 24px;
+  padding: 32px 24px;
 }
 
 .ts-logo {
@@ -923,6 +927,12 @@ canvas:focus-visible {
   top: 52px;
   right: 0;
   min-width: 220px;
+  /* Signed-in content (~7 rows) can exceed a short viewport; scroll
+     internally instead of pushing items out of reach. The width clamp keeps
+     it inside the viewport on narrow screens (anchored under the avatar). */
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   padding: 8px;
