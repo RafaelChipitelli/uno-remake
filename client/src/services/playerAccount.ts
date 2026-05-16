@@ -26,11 +26,13 @@ import {
   getFirestoreDb,
   isFirebaseConfigured,
 } from '../config/firebase';
+import { karmaForMatch } from './karma';
 
 export type UserStats = {
   gamesPlayed: number;
   gamesWon: number;
   gamesLost: number;
+  karma: number;
 };
 
 export type UserProfile = {
@@ -70,6 +72,7 @@ const DEFAULT_STATS: UserStats = {
   gamesPlayed: 0,
   gamesWon: 0,
   gamesLost: 0,
+  karma: 0,
 };
 
 const listeners = new Set<SessionListener>();
@@ -122,11 +125,14 @@ function normalizeStats(rawStats: unknown): UserStats {
   const gamesPlayed = Number(statsRecord.gamesPlayed);
   const gamesWon = Number(statsRecord.gamesWon);
   const gamesLost = Number(statsRecord.gamesLost);
+  // Old users predate the karma field; missing/garbage normalizes to 0.
+  const karma = Number(statsRecord.karma);
 
   return {
     gamesPlayed: Number.isFinite(gamesPlayed) && gamesPlayed >= 0 ? gamesPlayed : 0,
     gamesWon: Number.isFinite(gamesWon) && gamesWon >= 0 ? gamesWon : 0,
     gamesLost: Number.isFinite(gamesLost) && gamesLost >= 0 ? gamesLost : 0,
+    karma: Number.isFinite(karma) && karma >= 0 ? Math.floor(karma) : 0,
   };
 }
 
@@ -412,10 +418,13 @@ export async function recordCurrentUserMatchResult(didWin: boolean): Promise<Use
     { merge: true },
   );
 
+  const earnedKarma = karmaForMatch(didWin);
+
   await updateDoc(userRef, {
     'stats.gamesPlayed': increment(1),
     'stats.gamesWon': increment(didWin ? 1 : 0),
     'stats.gamesLost': increment(didWin ? 0 : 1),
+    'stats.karma': increment(earnedKarma),
     updatedAt: serverTimestamp(),
   });
 
@@ -430,6 +439,7 @@ export async function recordCurrentUserMatchResult(didWin: boolean): Promise<Use
       gamesPlayed: existingStats.gamesPlayed + 1,
       gamesWon: existingStats.gamesWon + (didWin ? 1 : 0),
       gamesLost: existingStats.gamesLost + (didWin ? 0 : 1),
+      karma: existingStats.karma + earnedKarma,
     },
   };
 

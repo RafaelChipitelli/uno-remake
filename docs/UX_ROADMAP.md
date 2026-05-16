@@ -73,9 +73,10 @@ Botão "convidar" na sala privada, gera link/code (code já existe).
 
 ## 5. Economia / progressão
 
-### 5.1 🟡 Sistema de pontos/níveis ("Karma")
-Pontos por jogar/vencer (ref.: "20 Karma points", "20/22"). Define progressão
-e talvez desbloqueios. Servidor precisa creditar pontos no fim da partida.
+### 5.1 ✅ Sistema de pontos/níveis ("Karma") — RESOLVIDO
+`services/karma.ts` (puro): +2 por jogo, +5 por vitória; curva triangular de
+nível (`levelForKarma`). Persistido em `stats.karma` (Firestore, increment +
+otimista). Card de nível/progresso no perfil + "Nível N" no dropdown.
 
 ### 5.2 🟢 Inventário de cosméticos
 Itens equipáveis (temas de carta, avatares — ref.: "Mr. Worldwide", "Lucky
