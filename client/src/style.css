@@ -824,3 +824,309 @@ canvas:focus-visible {
     animation: none;
   }
 }
+
+/* ==========================================================================
+   Lote A — account dropdown (avatar menu) + settings overlay
+   ========================================================================== */
+
+.ts-root.is-hidden {
+  visibility: hidden;
+}
+
+.ts-account {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.ts-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--color-surface-panel-border, rgba(156, 163, 175, 0.26));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-action-primary, #7b42e8) 70%, white) 0%,
+    var(--color-action-secondary, #4c2c7a) 100%
+  );
+  color: var(--color-text-inverse, #fff);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 0;
+  transition: transform 0.16s ease, filter 0.16s ease;
+}
+
+.ts-avatar:hover {
+  transform: scale(1.05);
+  filter: brightness(1.08);
+}
+
+.ts-avatar:focus-visible {
+  outline: 2px solid var(--color-action-primary, #9d7cff);
+  outline-offset: 2px;
+}
+
+.ts-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ts-avatar-initials {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.ts-menu {
+  position: absolute;
+  top: 52px;
+  right: 0;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  border-radius: 16px;
+  border: 1px solid var(--color-surface-panel-border, rgba(156, 163, 175, 0.26));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-surface-panel, #241a36) 96%, white) 0%,
+    var(--color-bg-game, #181023) 100%
+  );
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  z-index: 4;
+  transform-origin: top right;
+  animation: panel-pop 180ms ease-out;
+}
+
+.ts-menu-item {
+  background: none;
+  border: 0;
+  color: var(--color-text-primary, #fff);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  padding: 11px 14px;
+  min-height: 44px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background-color 0.14s ease;
+}
+
+.ts-menu-item:hover {
+  background: rgba(157, 124, 255, 0.16);
+}
+
+.ts-menu-item:focus-visible {
+  outline: 2px solid var(--color-action-primary, #9d7cff);
+  outline-offset: -2px;
+}
+
+.ts-menu-item--danger {
+  color: var(--color-status-danger, #ff6b7a);
+}
+
+.ts-menu-lang {
+  display: flex;
+  gap: 10px;
+  padding: 10px 14px 4px;
+  margin-top: 4px;
+  border-top: 1px solid var(--color-surface-panel-border, rgba(156, 163, 175, 0.2));
+}
+
+.st-root {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  overflow-y: auto;
+  display: grid;
+  place-items: start center;
+  background: var(--color-bg-canvas, #120d1c);
+  color: var(--color-text-primary, #fff);
+  font-family: 'Inter', system-ui, sans-serif;
+  animation: app-fade-in 220ms ease;
+}
+
+.st-stage {
+  width: min(94vw, 560px);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 48px 24px;
+}
+
+.st-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.st-title {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.st-card {
+  border-radius: 18px;
+  border: 1px solid var(--color-surface-panel-border, rgba(156, 163, 175, 0.26));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-surface-panel, #241a36) 96%, white) 0%,
+    var(--color-bg-game, #181023) 100%
+  );
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  padding: 20px;
+}
+
+.st-card-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 14px;
+}
+
+.st-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.st-row + .st-row {
+  border-top: 1px solid var(--color-surface-panel-border, rgba(156, 163, 175, 0.18));
+}
+
+.st-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.st-label {
+  font-size: 14px;
+  color: var(--color-text-secondary, #b9aedb);
+}
+
+.st-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary, #fff);
+  overflow-wrap: anywhere;
+}
+
+.st-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.st-badge--connected {
+  background: color-mix(in srgb, var(--color-status-success, #8bffb0) 20%, var(--color-bg-canvas, #120d1c));
+  border: 1px solid color-mix(in srgb, var(--color-status-success, #8bffb0) 55%, transparent);
+  color: var(--color-text-primary, #fff);
+}
+
+.st-slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.st-volume-slider {
+  width: min(220px, 50vw);
+  accent-color: var(--color-action-primary, #7b42e8);
+  cursor: pointer;
+  height: 28px;
+}
+
+.st-volume-slider:focus-visible {
+  outline: 2px solid var(--color-action-primary, #9d7cff);
+  outline-offset: 4px;
+}
+
+.st-volume-slider:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.st-volume-value {
+  min-width: 44px;
+  text-align: right;
+}
+
+.st-mute-toggle {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--color-action-primary, #7b42e8);
+  cursor: pointer;
+}
+
+.st-mute-toggle:focus-visible {
+  outline: 2px solid var(--color-action-primary, #9d7cff);
+  outline-offset: 3px;
+}
+
+.st-btn {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 11px 20px;
+  min-height: 44px;
+  color: var(--color-text-inverse, #fff);
+  cursor: pointer;
+  transition: transform 0.16s ease, filter 0.16s ease;
+}
+
+.st-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+.st-btn:active {
+  transform: scale(0.98);
+}
+
+.st-btn:focus-visible {
+  outline: 2px solid var(--color-action-primary, #9d7cff);
+  outline-offset: 2px;
+}
+
+.st-btn--primary {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-action-primary, #7b42e8) 80%, white) 0%,
+    var(--color-action-primary, #7b42e8) 100%
+  );
+}
+
+.st-btn--ghost {
+  background: rgba(156, 163, 175, 0.18);
+  color: var(--color-text-primary, #fff);
+}
+
+@media (max-width: 640px) {
+  .st-row {
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ts-menu,
+  .st-root,
+  .ts-avatar,
+  .st-btn {
+    animation: none;
+    transition: none;
+  }
+}

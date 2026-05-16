@@ -29,11 +29,9 @@ Estados de foco visíveis, navegação por Tab, `aria-label` nos botões do lobb
 
 ## 2. Menu / navegação (topo, estilo Richup)
 
-### 2.1 🔴 Dropdown de conta (avatar no canto superior direito)
-Avatar clicável → menu: **Seu perfil**, **Configurações**, **Sair**.
-Hoje o lobby só tem "Sair do Google" como texto solto. Centralizar tudo num
-dropdown com o avatar (ref.: print do menu Richup).
-**Escopo:** componente DOM reaproveitável, abre/fecha, fora-clique fecha.
+### 2.1 ✅ Dropdown de conta (avatar no canto superior direito) — RESOLVIDO
+Avatar (foto Google ou iniciais) → menu: Seu perfil (placeholder), Configurações,
+Entrar/Sair, seletor BR/US. Fora-clique + Esc fecham; acessível (aria, foco).
 
 ### 2.2 🟡 Barra superior persistente
 Logo (volta ao lobby) + "amigos online" + Store + avatar. Aparece no lobby e,
@@ -94,14 +92,15 @@ com itens grátis equipáveis, sem moeda real.
 
 ## 6. Configurações / sistema
 
-### 6.1 🟡 Página de Configurações
-Conta (editar usuário), contas vinculadas (Google — já temos), bloqueados.
-Layout em cards como o Settings do Richup; botão "Voltar ao lobby".
+### 6.1 ✅ Página de Configurações — RESOLVIDO
+Overlay DOM em cards: conta/nickname (editável; nuvem p/ logado, compartilhado
+c/ o lobby p/ convidado), conta Google vinculada, áudio, "Voltar ao lobby".
+Esc volta; acessível.
 
-### 6.2 🔴 Áudio / volume
-Controle de volume + mute (ícone de som no canto, como o Richup). Pré-requisito
-para efeitos sonoros (jogar carta, comprar, UNO!, vitória). Persistir em
-`localStorage`.
+### 6.2 ✅ Áudio / volume — RESOLVIDO (UI + persistência + API)
+`services/audio.ts`: volume/mute em `localStorage`, API
+`get/setVolume/setMuted/toggleMuted/subscribeAudio/getEffectiveVolume`.
+Slider+mute nas Configurações. **Falta só** ligar aos SFX (lote E).
 
 ### 6.3 🟢 Preferências de jogo
 Idioma (já existe no lobby — mover/replicar aqui), reduzir animações
@@ -121,7 +120,7 @@ Idioma (já existe no lobby — mover/replicar aqui), reduzir animações
 ## Ordem sugerida
 
 1. ~~**1.1** (bug do HUD)~~ — ✅ feito.
-2. **2.1** + **6.1/6.2** — menu de conta, configurações e áudio (base do resto).
+2. ~~**2.1** + **6.1/6.2**~~ — ✅ feito (Lote A).
 3. **3.1** — perfil com win rate + últimos jogos (precisa histórico no server).
 4. **5.1** — pontos/níveis (alimenta store/inventário).
 5. **4.x / 5.2 / 5.3** — social e economia.
