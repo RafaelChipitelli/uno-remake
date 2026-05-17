@@ -1011,15 +1011,32 @@ export default class CardStage {
     );
     zone.on('pointerup', () => this.onUnoRequested?.());
 
-    if (isDeclare && !prefersReducedMotion()) {
+    if (!prefersReducedMotion()) {
+      // The "UNO!" call is a cinematic beat — it pops in, then (only when it
+      // is the player's to declare) settles into a slow breathing loop.
+      container.setScale(0.6);
+      container.setAlpha(0);
       this.scene.tweens.add({
         targets: container,
-        scaleX: 1.05,
-        scaleY: 1.05,
-        duration: 620,
-        yoyo: true,
-        repeat: -1,
-        ease: 'Sine.easeInOut',
+        scaleX: 1,
+        scaleY: 1,
+        alpha: 1,
+        duration: 360,
+        ease: 'Back.easeOut',
+        onComplete: () => {
+          if (!isDeclare) {
+            return;
+          }
+          this.scene.tweens.add({
+            targets: container,
+            scaleX: 1.05,
+            scaleY: 1.05,
+            duration: 620,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut',
+          });
+        },
       });
     }
 
