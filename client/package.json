@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "npm run tokens:check && tsc && vite build",
     "typecheck": "tsc --noEmit",
+    "tokens:check": "node scripts/tokens-bootstrap.mjs",
+    "tokens:sync": "node scripts/tokens-bootstrap.mjs --fix",
     "preview": "vite preview"
   },
   "devDependencies": {
