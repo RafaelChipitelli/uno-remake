@@ -3,27 +3,32 @@
 :root {
   color-scheme: dark;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  /* Bootstrap values mirror theme/tokens.ts so there is no color flash before
-     applyThemeCssVariables() runs; the JS overwrites these on mount. */
+  /* tokens.ts e a fonte unica de cor. Este bloco so evita flash antes de
+     applyThemeCssVariables() rodar — NAO edite a mao: rode `npm run tokens:sync`.
+     `npm run tokens:check` (roda no build) falha se divergir de tokens.ts. */
+  /* tokens:bootstrap:start */
   --color-bg-canvas: #0b0910;
   --color-bg-game: #100c18;
   --color-surface-panel: #1a1626;
   --color-surface-panel-border: #2e2742;
+  --color-surface-card: #211b30;
+  --color-surface-card-alt: #2a2240;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #c7bee3;
+  --color-text-muted: #9a8fbc;
+  --color-text-inverse: #ffffff;
+  --color-text-on-light: #1f2937;
   --color-action-primary: #8b45ff;
   --color-action-primary-border: #b488ff;
   --color-action-secondary: #3f2a66;
   --color-status-success: #3be585;
   --color-status-danger: #ff5c6e;
-  --color-text-primary: #ffffff;
-  --color-text-secondary: #c7bee3;
-  --color-text-muted: #9a8fbc;
-  --color-text-inverse: #ffffff;
   --color-card-red: #e62e4d;
   --color-card-green: #1fe07a;
   --color-card-blue: #2a77e0;
   --color-card-yellow: #ffd21f;
-  --color-surface-card: #211b30;
-  --color-surface-card-alt: #2a2240;
+  --color-decor-glow-warm: #f4a73a;
+  /* tokens:bootstrap:end */
 
   /* aliases legados (retrocompatibilidade) */
   --bg: var(--color-bg-canvas);
@@ -76,9 +81,9 @@ body {
   width: 100%;
   display: block;
   border: 0;
-  border-bottom: 2px #fff solid;
+  border-bottom: 2px var(--color-text-primary) solid;
   background: transparent;
-  color: #fff;
+  color: var(--color-text-primary);
   font: inherit;
   font-size: 18px;
   outline: none;
@@ -102,7 +107,7 @@ body {
   display: inline-block;
   font-size: 18px;
   min-width: 5px;
-  color: #fff;
+  color: var(--color-text-primary);
   transition: 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
@@ -226,7 +231,7 @@ canvas:focus-visible {
 }
 
 .ui-draw-decision-card-value {
-  color: #f9fafb;
+  color: var(--color-text-primary);
   font-weight: 800;
   font-size: 24px;
   line-height: 0.9;
@@ -236,7 +241,7 @@ canvas:focus-visible {
 }
 
 .ui-draw-decision-card--yellow .ui-draw-decision-card-value {
-  color: #1f2937;
+  color: var(--color-text-on-light);
   text-shadow: none;
 }
 
@@ -473,7 +478,7 @@ canvas:focus-visible {
   transform: translateX(-50%);
   background: radial-gradient(
     ellipse at center,
-    color-mix(in srgb, #f4a73a 70%, transparent) 0%,
+    color-mix(in srgb, var(--color-decor-glow-warm) 70%, transparent) 0%,
     color-mix(in srgb, var(--color-action-primary, #7b42e8) 40%, transparent) 45%,
     transparent 72%
   );
@@ -519,7 +524,7 @@ canvas:focus-visible {
   place-items: center;
   font-size: 22px;
   font-weight: 800;
-  color: #fff;
+  color: var(--color-text-primary);
   border: 2px solid rgba(255, 255, 255, 0.85);
   transform: translateX(var(--tx)) translateY(calc(var(--lift) * -1)) rotate(var(--rot));
   box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
@@ -658,7 +663,7 @@ canvas:focus-visible {
 .ts-card-icon b {
   font-size: 22px;
   font-weight: 800;
-  color: #fff;
+  color: var(--color-text-primary);
   letter-spacing: 0.5px;
 }
 
@@ -714,9 +719,9 @@ canvas:focus-visible {
   width: 100%;
   display: block;
   border: 0;
-  border-bottom: 2px solid #fff;
+  border-bottom: 2px solid var(--color-text-primary);
   background: transparent;
-  color: #fff;
+  color: var(--color-text-primary);
   font: inherit;
   font-size: 18px;
   outline: none;
@@ -732,7 +737,7 @@ canvas:focus-visible {
   position: absolute;
   top: 14px;
   left: 0;
-  color: #fff;
+  color: var(--color-text-primary);
   font-size: 18px;
   pointer-events: none;
   transition: 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
@@ -762,7 +767,7 @@ canvas:focus-visible {
 }
 
 .ts-account-name-value {
-  color: #fff;
+  color: var(--color-text-primary);
   font-size: 18px;
   font-weight: 600;
 }
@@ -788,7 +793,7 @@ canvas:focus-visible {
 .ts-btn {
   font: inherit;
   font-weight: 700;
-  color: #fff;
+  color: var(--color-text-primary);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
   cursor: pointer;
@@ -848,7 +853,7 @@ canvas:focus-visible {
 
 .ts-btn--secondary:hover {
   transform: translateY(-2px);
-  color: #fff;
+  color: var(--color-text-primary);
   background: var(--color-surface-card-alt, #342753);
 }
 

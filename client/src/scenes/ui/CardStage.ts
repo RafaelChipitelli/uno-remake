@@ -122,7 +122,7 @@ function createRoundedSurface(
       gfx.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
     }
     if (style.sheen && style.sheen > 0) {
-      gfx.fillStyle(0xffffff, style.sheen);
+      gfx.fillStyle(phaserTheme.colors.text.primary, style.sheen);
       gfx.fillRoundedRect(-w / 2 + 3, -h / 2 + 3, w - 6, h * 0.4, r * 0.7);
     }
   };

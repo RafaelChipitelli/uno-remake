@@ -19,6 +19,7 @@ npm --prefix client run build      # tsc + vite build
 - `ReturnToTitleScene` (registered under key `TitleScene`) tears the game down and remounts the DOM lobby on exit.
 - Game rules are server-authoritative in `server/src/core/`; the client never decides outcomes.
 - Server room state is in-memory only (lost on restart).
+- Cor: fonte única é `client/src/theme/tokens.ts` (deriva Phaser + CSS vars). O bloco bootstrap em `style.css` é gerado — `npm --prefix client run tokens:sync` após mudar tokens; `tokens:check` roda no build.
 
 ## Workflow
 
