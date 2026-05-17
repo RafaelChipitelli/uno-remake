@@ -1,71 +1,77 @@
 const hexToNumber = (hex: string): number => Number.parseInt(hex.replace('#', ''), 16);
 
+// Spotify-style "content-first darkness": the UI recedes into a near-black
+// neutral cocoon so the four UNO card colors are the only thing that sings.
+// The four card hues are deliberately pushed to high-saturation/neon so they
+// "explode" off the deep background without polluting the chrome.
 export const theme = {
   colors: {
     bg: {
-      canvas: '#120D1C',
-      game: '#181023',
+      canvas: '#0B0910',
+      game: '#100C18',
     },
     surface: {
-      panel: '#241A36',
-      panelBorder: '#382A52',
-      card: '#2B2140',
-      cardAlt: '#342753',
-      raised: '#3A2A5C',
-      disabled: '#2A2435',
+      panel: '#1A1626',
+      panelBorder: '#2E2742',
+      card: '#211B30',
+      cardAlt: '#2A2240',
+      raised: '#332A4A',
+      disabled: '#221E2C',
     },
     text: {
       primary: '#FFFFFF',
-      secondary: '#B9AEDB',
-      muted: '#8F83B5',
-      subtle: '#6F638F',
+      secondary: '#C7BEE3',
+      muted: '#9A8FBC',
+      subtle: '#73698F',
       inverse: '#FFFFFF',
-      success: '#D8CFFF',
+      success: '#DAFFE7',
     },
     decor: {
-      cardBackLeft: '#2A2140',
-      cardBackRight: '#3A2A63',
-      sparkle: '#B9A7FF',
-      shadowDeep: '#08050D',
+      cardBackLeft: '#241C38',
+      cardBackRight: '#3A2D5C',
+      sparkle: '#C4B4FF',
+      shadowDeep: '#040308',
       overlay: '#000000',
     },
     action: {
       primary: {
-        base: '#7B42E8',
-        hover: '#8D55F2',
-        border: '#9D7CFF',
-        shadow: '#2D174F',
+        base: '#8B45FF',
+        hover: '#9D5CFF',
+        border: '#B488FF',
+        shadow: '#2A1450',
       },
       secondary: {
-        base: '#4C2C7A',
-        hover: '#5B3792',
-        border: '#6F4BA8',
-        shadow: '#1A102A',
+        base: '#3F2A66',
+        hover: '#4E357E',
+        border: '#674C9C',
+        shadow: '#160E26',
       },
       danger: {
-        base: '#B84A5A',
-        hover: '#D45B6C',
-        border: '#E47786',
-        shadow: '#35121A',
+        base: '#E0455C',
+        hover: '#F2596F',
+        border: '#FF8294',
+        shadow: '#3A1019',
       },
       neutral: {
-        base: '#2A203D',
-        hover: '#36294F',
-        border: '#4A3A66',
-        shadow: '#120B1D',
+        base: '#241D34',
+        hover: '#2F2645',
+        border: '#453959',
+        shadow: '#100B19',
       },
     },
     status: {
-      success: '#8BFFB0',
-      danger: '#FF6B7A',
-      info: '#B9A7FF',
+      success: '#3BE585',
+      danger: '#FF5C6E',
+      info: '#C4B4FF',
     },
+    // The four UNO hues — neon-bright so they detonate against the near-black
+    // canvas (Spotify "let the content provide the color").
     card: {
-      red: '#E84A5F',
-      green: '#36C47A',
-      blue: '#4C8DFF',
-      yellow: '#FFC84A',
-      wild: '#20172D',
+      red: '#E62E4D',
+      green: '#1FE07A',
+      blue: '#2A77E0',
+      yellow: '#FFD21F',
+      wild: '#1A1426',
     },
   },
 } as const;
@@ -140,6 +146,8 @@ export const phaserTheme = {
   },
 } as const;
 
+// Mirrors `theme` 1:1 so the DOM lobby / style.css never need hardcoded
+// fallbacks to stay in sync with the canvas (Phaser) side.
 export const themeCssVariables: Record<string, string> = {
   '--color-bg-canvas': theme.colors.bg.canvas,
   '--color-bg-game': theme.colors.bg.game,
@@ -147,15 +155,24 @@ export const themeCssVariables: Record<string, string> = {
   '--color-surface-panel-border': theme.colors.surface.panelBorder,
   '--color-surface-card': theme.colors.surface.card,
   '--color-surface-card-alt': theme.colors.surface.cardAlt,
+  '--color-surface-raised': theme.colors.surface.raised,
+  '--color-surface-disabled': theme.colors.surface.disabled,
   '--color-text-primary': theme.colors.text.primary,
-  '--color-text-muted': theme.colors.text.muted,
   '--color-text-secondary': theme.colors.text.secondary,
+  '--color-text-muted': theme.colors.text.muted,
+  '--color-text-subtle': theme.colors.text.subtle,
   '--color-text-inverse': theme.colors.text.inverse,
   '--color-action-primary': theme.colors.action.primary.base,
+  '--color-action-primary-hover': theme.colors.action.primary.hover,
+  '--color-action-primary-border': theme.colors.action.primary.border,
   '--color-action-secondary': theme.colors.action.secondary.base,
   '--color-action-danger': theme.colors.action.danger.base,
   '--color-status-success': theme.colors.status.success,
   '--color-status-danger': theme.colors.status.danger,
+  '--color-card-red': theme.colors.card.red,
+  '--color-card-green': theme.colors.card.green,
+  '--color-card-blue': theme.colors.card.blue,
+  '--color-card-yellow': theme.colors.card.yellow,
 };
 
 export function applyThemeCssVariables(root: HTMLElement = document.documentElement): void {

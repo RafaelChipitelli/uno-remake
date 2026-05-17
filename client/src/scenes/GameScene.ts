@@ -42,6 +42,7 @@ import {
   registerGameSceneSocketHandlers,
 } from './game/socketHandlers';
 import { createWildColorModal, type WildColorModalHandle } from './game/wildColorModal';
+import { showGameOverBanner, type GameOverBannerHandle } from './game/gameOverBanner';
 import CardStage from './ui/CardStage';
 import GameHud, { type HudSnapshot } from './ui/GameHud';
 import {
@@ -72,6 +73,7 @@ export default class GameScene extends Phaser.Scene {
   private cardStage?: CardStage;
   private responsiveLayout!: ResponsiveGameLayout;
   private pendingResize?: Phaser.Time.TimerEvent;
+  private gameOverBanner?: GameOverBannerHandle;
 
   private player?: Player;
   private roomId?: string;
@@ -230,6 +232,8 @@ export default class GameScene extends Phaser.Scene {
       this.clearGroup(this.backgroundElements);
       this.hud?.destroy();
       this.cardStage?.destroy();
+      this.gameOverBanner?.destroy();
+      this.gameOverBanner = undefined;
     });
   }
 
@@ -280,6 +284,16 @@ export default class GameScene extends Phaser.Scene {
     this.pushLog(t('game.log.waitingNextRound'));
     this.setStatus(payload.message, t('game.status.ended'));
     this.syncHudActions();
+
+    this.gameOverBanner?.destroy();
+    this.gameOverBanner = showGameOverBanner(
+      this,
+      {
+        didWin: payload.winnerId === this.player?.id,
+        winnerNickname: payload.winnerNickname,
+      },
+      () => this.goBackToLobby(),
+    );
 
     void this.recordAuthenticatedMatchResult(payload);
   }
@@ -1165,6 +1179,7 @@ export default class GameScene extends Phaser.Scene {
       fontScale: this.responsiveLayout.fontScale,
       compact: this.responsiveLayout.compact,
     });
+    this.gameOverBanner?.resize();
   }
 
   private clearGroup(group: Phaser.GameObjects.GameObject[]): void {

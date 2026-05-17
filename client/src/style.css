@@ -3,16 +3,27 @@
 :root {
   color-scheme: dark;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  --color-bg-canvas: #0b0f1a;
-  --color-bg-game: #0f172a;
-  --color-action-primary: #6c5ce7;
-  --color-action-secondary: #3a86ff;
-  --color-status-success: #22c55e;
-  --color-status-danger: #ff4d4d;
-  --color-text-primary: #e5e7eb;
-  --color-text-muted: #9ca3af;
-  --color-surface-card: #111827;
-  --color-surface-card-alt: #1f2937;
+  /* Bootstrap values mirror theme/tokens.ts so there is no color flash before
+     applyThemeCssVariables() runs; the JS overwrites these on mount. */
+  --color-bg-canvas: #0b0910;
+  --color-bg-game: #100c18;
+  --color-surface-panel: #1a1626;
+  --color-surface-panel-border: #2e2742;
+  --color-action-primary: #8b45ff;
+  --color-action-primary-border: #b488ff;
+  --color-action-secondary: #3f2a66;
+  --color-status-success: #3be585;
+  --color-status-danger: #ff5c6e;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #c7bee3;
+  --color-text-muted: #9a8fbc;
+  --color-text-inverse: #ffffff;
+  --color-card-red: #e62e4d;
+  --color-card-green: #1fe07a;
+  --color-card-blue: #2a77e0;
+  --color-card-yellow: #ffd21f;
+  --color-surface-card: #211b30;
+  --color-surface-card-alt: #2a2240;
 
   /* aliases legados (retrocompatibilidade) */
   --bg: var(--color-bg-canvas);
@@ -195,23 +206,23 @@ canvas:focus-visible {
 }
 
 .ui-draw-decision-card--red {
-  background: #ef4444;
+  background: var(--color-card-red, #e62e4d);
 }
 
 .ui-draw-decision-card--green {
-  background: #22c55e;
+  background: var(--color-card-green, #1fe07a);
 }
 
 .ui-draw-decision-card--blue {
-  background: #3b82f6;
+  background: var(--color-card-blue, #2a77e0);
 }
 
 .ui-draw-decision-card--yellow {
-  background: #facc15;
+  background: var(--color-card-yellow, #ffd21f);
 }
 
 .ui-draw-decision-card--wild {
-  background: #111827;
+  background: var(--color-surface-card, #211b30);
 }
 
 .ui-draw-decision-card-value {
@@ -514,12 +525,18 @@ canvas:focus-visible {
   box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
 }
 
-.ts-pile-card--r { background: var(--color-card-red, #e84a5f); }
-.ts-pile-card--g { background: var(--color-card-green, #36c47a); }
-.ts-pile-card--b { background: var(--color-card-blue, #4c8dff); }
-.ts-pile-card--y { background: var(--color-card-yellow, #ffc84a); color: #2b2140; }
+.ts-pile-card--r { background: var(--color-card-red, #e62e4d); }
+.ts-pile-card--g { background: var(--color-card-green, #1fe07a); color: #0b0910; }
+.ts-pile-card--b { background: var(--color-card-blue, #2a77e0); }
+.ts-pile-card--y { background: var(--color-card-yellow, #ffd21f); color: #0b0910; }
 .ts-pile-card--w {
-  background: linear-gradient(135deg, #e84a5f 0 25%, #ffc84a 25% 50%, #36c47a 50% 75%, #4c8dff 75% 100%);
+  background: linear-gradient(
+    135deg,
+    var(--color-card-red, #e62e4d) 0 25%,
+    var(--color-card-yellow, #ffd21f) 25% 50%,
+    var(--color-card-green, #1fe07a) 50% 75%,
+    var(--color-card-blue, #2a77e0) 75% 100%
+  );
 }
 
 .ts-topright {
@@ -588,6 +605,32 @@ canvas:focus-visible {
   padding: 32px 24px;
 }
 
+/* Framer motion-first entrance: the lobby reveals as a cinematic cascade
+   (transform/opacity only). nth-child staggers each block like a trailer cut.
+   Disabled wholesale under prefers-reduced-motion below. */
+.ts-stage > * {
+  animation: ts-rise 520ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.ts-stage > .ts-logo { animation-delay: 60ms; }
+.ts-stage > .ts-field,
+.ts-stage > .ts-account-name { animation-delay: 160ms; }
+.ts-stage > .ts-stats { animation-delay: 220ms; }
+.ts-stage > .ts-btn--primary { animation-delay: 280ms; }
+.ts-stage > .ts-secondary { animation-delay: 340ms; }
+.ts-stage > .ts-info { animation-delay: 400ms; }
+
+@keyframes ts-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .ts-logo {
   display: flex;
   flex-direction: column;
@@ -639,10 +682,12 @@ canvas:focus-visible {
   display: flex;
   gap: 14px;
   margin: 22px 0 0;
-  font-size: clamp(3.2rem, 8vw, 3.8rem);
-  font-weight: 800;
-  letter-spacing: 2px;
-  line-height: 1;
+  font-size: clamp(3.4rem, 8.5vw, 4.2rem);
+  /* PlayStation: airy, confident display weight — poster-grade with the
+     letter-spacing pulled tight rather than a heavy bold. */
+  font-weight: 600;
+  letter-spacing: -1.5px;
+  line-height: 0.95;
 }
 
 .ts-uno {
@@ -756,6 +801,11 @@ canvas:focus-visible {
   pointer-events: none;
 }
 
+.ts-btn:focus-visible {
+  outline: 2px solid var(--color-action-primary-border, #b488ff);
+  outline-offset: 3px;
+}
+
 .ts-btn--primary {
   width: 100%;
   margin: 28px 0 0;
@@ -856,7 +906,8 @@ canvas:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .ts-glyph,
   .ts-card-icon,
-  .ts-pile {
+  .ts-pile,
+  .ts-stage > * {
     animation: none;
   }
 
